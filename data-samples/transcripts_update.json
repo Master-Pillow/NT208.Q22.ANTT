@@ -1,0 +1,95 @@
+{
+  "generated_at": "2026-03-03T00:00:00+07:00",
+  "source": "DAA_MOCK",
+  "students": [
+    {
+      "profile": {
+        "mssv": "22520001",
+        "full_name": "Nguyen Van A",
+        "dob": "2004-02-11",
+        "class_code": "ATTT2025.1"
+      },
+      "transcripts": [
+        {
+          "semester": "2025-1",
+          "items": [
+            {
+              "course": { "code": "IT001", "name": "Lap trinh co ban", "credits": 3 },
+              "status": "HOC_MOI",
+              "components": { "qt": 8.0, "gk": 7.5, "th": 9.0, "ck": 7.0 },
+              "final_score": 7.8,
+              "letter": "B+"
+            },
+            {
+              "course": { "code": "MA001", "name": "Giai tich 1", "credits": 4 },
+              "status": "HOC_MOI",
+              "components": { "qt": 6.0, "gk": 5.5, "ck": 4.0 },
+              "final_score": 4.8,
+              "letter": "D"
+            }
+          ]
+        },
+        {
+          "semester": "2025-2",
+          "items": [
+            {
+              "course": { "code": "IT002", "name": "CTDL & GT", "credits": 4 },
+              "status": "HOC_MOI",
+              "components": { "qt": 7.0, "gk": 6.0, "th": 8.0, "ck": 5.5 },
+              "final_score": 6.4,
+              "letter": "C+"
+            },
+            {
+              "course": { "code": "MA001", "name": "Giai tich 1", "credits": 4 },
+              "status": "HOC_LAI",
+              "components": { "qt": 7.5, "gk": 7.0, "ck": 6.0 },
+              "final_score": 6.6,
+              "letter": "C+"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "profile": {
+        "mssv": "22520002",
+        "full_name": "Tran Thi B",
+        "dob": "2004-09-20",
+        "class_code": "ATTT2025.1"
+      },
+      "transcripts": [
+        {
+          "semester": "2025-1",
+          "items": [
+            {
+              "course": { "code": "IT001", "name": "Lap trinh co ban", "credits": 3 },
+              "status": "HOC_MOI",
+              "components": { "qt": 9.0, "gk": 9.0, "th": 9.5, "ck": 9.0 },
+              "final_score": 9.1,
+              "letter": "A"
+            },
+            {
+              "course": { "code": "EN001", "name": "Tieng Anh 1", "credits": 3 },
+              "status": "HOC_MOI",
+              "components": { "qt": 8.5, "ck": 8.0 },
+              "final_score": 8.2,
+              "letter": "A-"
+            }
+          ]
+        },
+        {
+          "semester": "2025-2",
+          "items": [
+            {
+              "course": { "code": "IT002", "name": "CTDL & GT", "credits": 4 },
+              "status": "HOC_MOI",
+              "components": { "qt": 4.0, "gk": 3.5, "th": 5.0, "ck": 3.0 },
+              "final_score": 5.0,
+              "letter": "D"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

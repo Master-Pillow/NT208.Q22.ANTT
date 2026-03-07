@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advisor Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: white;
+      padding: 18px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+    }
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .logout {
+      background: #ef4444;
+    }
+    .logout:hover {
+      background: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>Advisor Dashboard</h2>
+    <button class="logout" onclick="logout()">Đăng xuất</button>
+  </div>
+
+  <div class="card">
+    <p><b>Danh sách sinh viên lớp phụ trách</b></p>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>MSSV</th>
+          <th>Họ tên</th>
+          <th>Lớp</th>
+          <th>Xem</th>
+        </tr>
+      </thead>
+      <tbody id="studentTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:4000";
+
+    function getAdvisorId() {
+      const user = JSON.parse(localStorage.getItem("currentUser") || "null");
+      if (!user || user.role !== "ADVISOR") {
+        alert("Bạn chưa đăng nhập advisor.");
+        window.location.href = "login.html";
+        return null;
+      }
+      return user.id;
+    }
+
+    function logout() {
+      localStorage.removeItem("currentUser");
+      window.location.href = "login.html";
+    }
+
+    async function loadStudents() {
+      const advisorId = getAdvisorId();
+      if (!advisorId) return;
+
+      const tbody = document.getElementById("studentTableBody");
+      tbody.innerHTML = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/advisor/students?advisorId=${advisorId}`);
+        const data = await res.json();
+
+        if (!Array.isArray(data) || data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5">Chưa có sinh viên</td></tr>`;
+          return;
+        }
+
+        data.forEach((student) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${student.id}</td>
+            <td>${student.mssv}</td>
+            <td>${student.full_name}</td>
+            <td>${student.class_code ?? ""}</td>
+            <td><button onclick="viewStudent(${student.id})">Xem chi tiết</button></td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5">Không tải được danh sách sinh viên</td></tr>`;
+      }
+    }
+
+    function viewStudent(id) {
+      window.location.href = `student.html?id=${id}`;
+    }
+
+    loadStudents();
+  </script>
+</body>
+</html>

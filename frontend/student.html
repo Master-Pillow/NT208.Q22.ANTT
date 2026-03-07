@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chi tiết sinh viên</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+    .topbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: white;
+      padding: 18px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      margin-bottom: 20px;
+    }
+    .warning {
+      background: #fef2f2;
+      color: #b91c1c;
+      padding: 10px;
+      border-radius: 8px;
+      margin: 8px 0;
+    }
+    .ok {
+      background: #ecfdf5;
+      color: #065f46;
+      padding: 10px;
+      border-radius: 8px;
+      margin: 8px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+    }
+    button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <button onclick="goBack()">← Quay lại</button>
+    <button onclick="logout()">Đăng xuất</button>
+  </div>
+
+  <div class="card">
+    <h2>Thông tin sinh viên</h2>
+    <div id="studentInfo">Đang tải...</div>
+  </div>
+
+  <div class="card">
+    <h3>Cảnh báo học vụ</h3>
+    <div id="warnings"></div>
+  </div>
+
+  <div class="card">
+    <h3>Danh sách môn học</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Mã môn</th>
+          <th>Tên môn</th>
+          <th>Học kỳ</th>
+          <th>Trạng thái</th>
+          <th>Điểm TK</th>
+          <th>Chữ</th>
+          <th>GPA</th>
+        </tr>
+      </thead>
+      <tbody id="courseTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:4000";
+
+    function getStudentId() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id");
+    }
+
+    function goBack() {
+      history.back();
+    }
+
+    function logout() {
+      localStorage.removeItem("currentUser");
+      window.location.href = "login.html";
+    }
+
+    async function loadStudentDetail() {
+      const studentId = getStudentId();
+      const studentInfo = document.getElementById("studentInfo");
+      const warningsDiv = document.getElementById("warnings");
+      const tbody = document.getElementById("courseTableBody");
+
+      tbody.innerHTML = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/students/${studentId}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          studentInfo.innerHTML = "Không tìm thấy sinh viên.";
+          return;
+        }
+
+        const s = data.student;
+
+        studentInfo.innerHTML = `
+          <p><b>ID:</b> ${s.id}</p>
+          <p><b>MSSV:</b> ${s.mssv}</p>
+          <p><b>Họ tên:</b> ${s.full_name}</p>
+          <p><b>Ngày sinh:</b> ${s.dob ? s.dob.substring(0, 10) : ""}</p>
+          <p><b>Lớp:</b> ${s.class_code ?? ""}</p>
+          <p><b>Khóa:</b> ${s.cohort ?? ""}</p>
+          <p><b>GPA tích lũy:</b> ${data.gpa}</p>
+        `;
+
+        if (data.warnings && data.warnings.length > 0) {
+          warningsDiv.innerHTML = data.warnings
+            .map(w => `<div class="warning">⚠ ${w}</div>`)
+            .join("");
+        } else {
+          warningsDiv.innerHTML = `<div class="ok">Không có cảnh báo học vụ</div>`;
+        }
+
+        if (data.courses && data.courses.length > 0) {
+          data.courses.forEach((c) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${c.course_code ?? ""}</td>
+              <td>${c.course_name ?? ""}</td>
+              <td>${c.semester ?? ""}</td>
+              <td>${c.status ?? ""}</td>
+              <td>${c.final_score ?? ""}</td>
+              <td>${c.letter ?? ""}</td>
+              <td>${c.gpa_points ?? ""}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = `<tr><td colspan="7">Chưa có dữ liệu môn học</td></tr>`;
+        }
+      } catch (err) {
+        studentInfo.innerHTML = "Lỗi kết nối backend.";
+      }
+    }
+
+    loadStudentDetail();
+  </script>
+</body>
+</html>

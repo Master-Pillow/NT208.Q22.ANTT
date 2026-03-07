@@ -1,0 +1,75 @@
+-- USERS
+CREATE TABLE IF NOT EXISTS users (
+  id BIGSERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN','ADVISOR')),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- CLASSES
+CREATE TABLE IF NOT EXISTS classes (
+  id BIGSERIAL PRIMARY KEY,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  cohort VARCHAR(50),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ADVISOR_CLASS (assign advisor to class)
+CREATE TABLE IF NOT EXISTS advisor_class (
+  advisor_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  class_id BIGINT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (advisor_user_id, class_id)
+);
+
+-- STUDENTS
+CREATE TABLE IF NOT EXISTS students (
+  id BIGSERIAL PRIMARY KEY,
+  mssv VARCHAR(50) UNIQUE NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  dob DATE,
+  class_id BIGINT REFERENCES classes(id) ON DELETE SET NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- COURSES
+CREATE TABLE IF NOT EXISTS courses (
+  id BIGSERIAL PRIMARY KEY,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  credits INT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ENROLLMENTS
+CREATE TABLE IF NOT EXISTS enrollments (
+  id BIGSERIAL PRIMARY KEY,
+  student_id BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  semester VARCHAR(20) NOT NULL,
+  status VARCHAR(20) NOT NULL CHECK (status IN ('HOC_MOI','HOC_LAI','CAI_THIEN')),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (student_id, course_id, semester, status)
+);
+
+-- GRADES (1-1 with enrollments)
+CREATE TABLE IF NOT EXISTS grades (
+  enrollment_id BIGINT PRIMARY KEY REFERENCES enrollments(id) ON DELETE CASCADE,
+  components_json JSONB,
+  final_score NUMERIC,
+  letter VARCHAR(5),
+  gpa_points NUMERIC,
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ADVISING_LOGS
+CREATE TABLE IF NOT EXISTS advising_logs (
+  id BIGSERIAL PRIMARY KEY,
+  student_id BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  advisor_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  reason VARCHAR(255),
+  action_plan VARCHAR(255),
+  note TEXT
+);

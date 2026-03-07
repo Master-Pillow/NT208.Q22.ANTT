@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 20px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: white;
+      padding: 18px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+      margin-bottom: 20px;
+    }
+    input {
+      width: 100%;
+      max-width: 320px;
+      padding: 10px;
+      margin: 6px 0 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+    }
+    .msg {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .logout {
+      background: #ef4444;
+    }
+    .logout:hover {
+      background: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <h2>Admin Dashboard</h2>
+    <button class="logout" onclick="logout()">Đăng xuất</button>
+  </div>
+
+  <div class="card">
+    <h3>Tạo Advisor</h3>
+    <input id="advisorEmail" type="email" placeholder="advisor2@uit.edu.vn" />
+    <input id="advisorPassword" type="text" placeholder="Mật khẩu" />
+    <button onclick="createAdvisor()">Tạo Advisor</button>
+    <div id="advisorMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h3>Tạo lớp</h3>
+    <input id="classCode" type="text" placeholder="ATTT2024.1" />
+    <input id="classCohort" type="text" placeholder="2024" />
+    <button onclick="createClass()">Tạo lớp</button>
+    <div id="classMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h3>Gán Advisor cho lớp</h3>
+    <input id="assignAdvisorId" type="number" placeholder="advisor_user_id" />
+    <input id="assignClassId" type="number" placeholder="class_id" />
+    <button onclick="assignAdvisor()">Gán</button>
+    <div id="assignMsg" class="msg"></div>
+  </div>
+
+  <div class="card">
+    <h3>Danh sách lớp và advisor</h3>
+    <button onclick="loadClasses()">Tải danh sách</button>
+    <table>
+      <thead>
+        <tr>
+          <th>Class ID</th>
+          <th>Mã lớp</th>
+          <th>Khóa</th>
+          <th>Advisor ID</th>
+          <th>Advisor Email</th>
+        </tr>
+      </thead>
+      <tbody id="classTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:4000";
+
+    function checkAdmin() {
+      const user = JSON.parse(localStorage.getItem("currentUser") || "null");
+      if (!user || user.role !== "ADMIN") {
+        alert("Bạn chưa đăng nhập admin.");
+        window.location.href = "login.html";
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem("currentUser");
+      window.location.href = "login.html";
+    }
+
+    async function createAdvisor() {
+      const email = document.getElementById("advisorEmail").value.trim();
+      const password = document.getElementById("advisorPassword").value.trim();
+      const msg = document.getElementById("advisorMsg");
+
+      msg.textContent = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/advisors`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+        msg.textContent = data.message || "Đã xử lý";
+      } catch (err) {
+        msg.textContent = "Lỗi kết nối backend";
+      }
+    }
+
+    async function createClass() {
+      const code = document.getElementById("classCode").value.trim();
+      const cohort = document.getElementById("classCohort").value.trim();
+      const msg = document.getElementById("classMsg");
+
+      msg.textContent = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/classes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, cohort })
+        });
+
+        const data = await res.json();
+        msg.textContent = data.message || "Đã xử lý";
+        loadClasses();
+      } catch (err) {
+        msg.textContent = "Lỗi kết nối backend";
+      }
+    }
+
+    async function assignAdvisor() {
+      const advisor_user_id = Number(document.getElementById("assignAdvisorId").value);
+      const class_id = Number(document.getElementById("assignClassId").value);
+      const msg = document.getElementById("assignMsg");
+
+      msg.textContent = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/assign-advisor`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ advisor_user_id, class_id })
+        });
+
+        const data = await res.json();
+        msg.textContent = data.message || "Đã xử lý";
+        loadClasses();
+      } catch (err) {
+        msg.textContent = "Lỗi kết nối backend";
+      }
+    }
+
+    async function loadClasses() {
+      const tbody = document.getElementById("classTableBody");
+      tbody.innerHTML = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/classes`);
+        const data = await res.json();
+
+        data.forEach((item) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${item.class_id ?? ""}</td>
+            <td>${item.class_code ?? ""}</td>
+            <td>${item.cohort ?? ""}</td>
+            <td>${item.advisor_id ?? ""}</td>
+            <td>${item.advisor_email ?? ""}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5">Không tải được dữ liệu</td></tr>`;
+      }
+    }
+
+    checkAdmin();
+    loadClasses();
+  </script>
+</body>
+</html>

@@ -51,3 +51,19 @@ coverage/
 
 # Optional eslint cache
 .eslintcache
+
+# Local environment examples
+.env.*
+
+# PostgreSQL dumps
+*.sql.backup
+*.dump
+
+# Node lock optional (tuỳ team)
+pnpm-lock.yaml
+
+# Mac hidden files
+._*
+
+# Windows system
+desktop.ini

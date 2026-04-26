@@ -1,24 +1,39 @@
 import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, ShieldCheck, BookOpen, Users } from 'lucide-react';
 import { cn } from '../lib/utils';
+import apiClient from '../lib/api'; // Import bộ gọi API của chúng ta
 
 interface LoginProps {
   onLogin: () => void;
 }
 
 export const Login = ({ onLogin }: LoginProps) => {
-  const [email, setEmail] = useState('aris.thorne@uit.edu.vn');
-  const [password, setPassword] = useState('••••••••');
+  // Để trống email và password hoặc điền sẵn tài khoản có thật trong DB của bạn
+  const [email, setEmail] = useState('aris.thorne@uit.edu.vn'); 
+  const [password, setPassword] = useState(''); 
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(''); // State để hiển thị lỗi
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate network request
-    setTimeout(() => {
-      setIsLoading(false);
+    setErrorMsg(''); // Xóa lỗi cũ (nếu có) trước khi gửi request mới
+
+    try {
+      // 1. Gửi Email và Password xuống Backend Node.js
+      const response = await apiClient.post('/auth/login', { email, password });
+      
+      // 2. Nếu thành công, lưu thông tin User vào trình duyệt
+      localStorage.setItem('currentUser', JSON.stringify(response.data.user));
+      
+      // 3. Gọi hàm onLogin để chuyển hướng sang Dashboard
       onLogin();
-    }, 1200);
+    } catch (error: any) {
+      // Bắt lỗi từ Backend (Ví dụ: Sai mật khẩu, Email không tồn tại)
+      setErrorMsg(error.response?.data?.message || 'Lỗi kết nối đến máy chủ. Vui lòng kiểm tra lại!');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -85,10 +100,18 @@ export const Login = ({ onLogin }: LoginProps) => {
             <span className="font-headline font-black text-xl tracking-tight text-slate-900">UIT AdvisorHub</span>
           </div>
 
-          <div className="mb-10">
+          <div className="mb-8">
             <h2 className="text-3xl font-black text-slate-900 font-headline mb-3">Welcome back</h2>
             <p className="text-slate-500 font-medium">Please sign in to access your advisor dashboard.</p>
           </div>
+
+          {/* Block hiển thị lỗi nếu có */}
+          {errorMsg && (
+            <div className="mb-6 p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl border border-red-100 flex items-center gap-2 animate-in fade-in zoom-in-95">
+              <ShieldCheck className="w-5 h-5 shrink-0" />
+              {errorMsg}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -118,7 +141,7 @@ export const Login = ({ onLogin }: LoginProps) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 outline-none rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all tracking-widest"
-                  placeholder="••••••••"
+                  placeholder="Nhập mật khẩu..."
                   required
                 />
               </div>

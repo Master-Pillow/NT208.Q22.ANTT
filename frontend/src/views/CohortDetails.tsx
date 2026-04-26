@@ -1,33 +1,54 @@
 import React, { useEffect, useState } from 'react';
 import { Download, Plus, Verified, Filter, ArrowUpDown, Mail, MoreHorizontal } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Import supabase client
+import apiClient from '../lib/api'; // Sử dụng apiClient thay vì supabase
 
 export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
-  // State lưu dữ liệu thật
   const [dbStudents, setDbStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Gọi Database khi màn hình vừa render
+  // Gọi Database thông qua Backend Node.js khi màn hình vừa render
   useEffect(() => {
     async function fetchStudents() {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .like('mssv', 'FAKE%') // Lấy sinh viên test
-        .limit(10); // Lấy 10 người cho nhẹ giao diện
+      try {
+        const userStr = localStorage.getItem('currentUser');
+        if (!userStr) return;
+        const user = JSON.parse(userStr);
 
-      if (data) {
+        // Gọi API lấy danh sách sinh viên thực tế
+        const { data } = await apiClient.get(`/advisor/students?advisorId=${user.id}`);
         setDbStudents(data);
+      } catch (error) {
+        console.error("Lỗi lấy danh sách sinh viên:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     fetchStudents();
   }, []);
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pt-8 pb-12 max-w-7xl mx-auto xl:mx-0">
-      {/* ... Giữ nguyên phần Header và 4 ô Thống kê (Section 1 & 2) ở đây ... */}
-      
+      {/* Các thành phần Header và Thống kê */}
+      <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="w-3 h-3 rounded-full bg-green-500 shadow-sm shadow-green-500/50 animate-pulse"></span>
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Active Cohort</span>
+          </div>
+          <h2 className="font-headline text-4xl sm:text-5xl font-black text-on-surface tracking-tight mb-2">KHMT 2023.2</h2>
+          <p className="text-on-surface-variant font-medium text-lg max-w-2xl">B.S. in Computer Science • Standard Program</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button className="flex items-center px-6 py-3 bg-white rounded-full text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all border border-slate-200">
+            <Download className="w-4 h-4 mr-2" /> Export
+          </button>
+          <button className="flex items-center px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-md shadow-primary/20 hover:shadow-lg transition-all">
+            <Plus className="w-4 h-4 mr-2" /> Add Note
+          </button>
+        </div>
+      </section>
+
+      {/* Bảng danh sách sinh viên */}
       <section className="bg-surface-container-lowest rounded-[2rem] shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -41,10 +62,12 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-10 text-slate-400">Đang tải dữ liệu từ Supabase...</td></tr>
+              <tr><td colSpan={5} className="text-center py-10 text-slate-400">Đang tải dữ liệu từ Hệ thống...</td></tr>
+            ) : dbStudents.length === 0 ? (
+              <tr><td colSpan={5} className="text-center py-10 text-slate-400">Lớp học này chưa có sinh viên.</td></tr>
             ) : (
-              dbStudents.map((student, i) => {
-                // Tạo data UI giả định dựa trên sinh viên thật
+              dbStudents.map((student) => {
+                // Ta vẫn tạo UI giả lập GPA cho đẹp vì API hiện tại chưa trả về GPA gộp chung
                 const fakeGpa = (Math.random() * (4.0 - 2.0) + 2.0).toFixed(2);
                 const isAtRisk = parseFloat(fakeGpa) < 2.5;
 

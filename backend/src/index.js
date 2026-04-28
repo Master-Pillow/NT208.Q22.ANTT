@@ -1,5 +1,5 @@
 console.log("Running from:", import.meta.url);
-
+import advisorRouter from './routes/advisorRoutes.js'; // ← thêm
 import express from "express";
 import cors from "cors";
 import { pool } from "./db.js";
@@ -8,6 +8,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use('/advisor', advisorRouter); // ← thêm
 
 pool.query("SELECT NOW()")
   .then((res) => {
@@ -223,39 +224,7 @@ app.get("/admin/classes", async (req, res) => {
  * ADVISOR - XEM SINH VIÊN THUỘC CÁC LỚP MÌNH PHỤ TRÁCH
  * GET /advisor/students?advisorId=2
  */
-app.get("/advisor/students", async (req, res) => {
-  try {
-    const { advisorId } = req.query;
 
-    if (!advisorId) {
-      return res.status(400).json({ message: "Thiếu advisorId" });
-    }
-
-    const result = await pool.query(
-      `
-      SELECT
-        s.id,
-        s.mssv,
-        s.full_name,
-        s.dob,
-        c.id AS class_id,
-        c.code AS class_code,
-        c.cohort
-      FROM advisor_class ac
-      JOIN classes c ON c.id = ac.class_id
-      JOIN students s ON s.class_id = c.id
-      WHERE ac.advisor_user_id = $1
-      ORDER BY s.id ASC
-      `,
-      [advisorId]
-    );
-
-    return res.json(result.rows);
-  } catch (err) {
-    console.error("GET ADVISOR STUDENTS ERROR:", err);
-    return res.status(500).json({ message: "Lỗi server" });
-  }
-});
 
 /**
  * CHI TIẾT 1 SINH VIÊN

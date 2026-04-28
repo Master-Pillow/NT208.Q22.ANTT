@@ -49,7 +49,8 @@ app.post("/auth/login", async (req, res) => {
     const user = result.rows[0];
 
     // MVP: password_hash đang dùng như password thường
-    const isValid = await bcrypt.compare(password, user.password_hash);
+    //const isValid = await bcrypt.compare(password, user.password_hash);
+    const isValid = (password === user.password_hash);
 if (!isValid) {
   return res.status(401).json({ message: 'Sai mật khẩu' });
 }

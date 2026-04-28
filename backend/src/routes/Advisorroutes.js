@@ -14,7 +14,7 @@ router.get('/students', async (req, res) => {
   try {
     const query = `
       WITH advisor_students AS (
-        SELECT s.id, s.full_name, s.mssv, s.dob,
+        SELECT s.id, s.full_name, s.mssv, 
                cl.code AS class_code, cl.cohort
         FROM students s
         JOIN admin_classes cl ON cl.code = s.class_code

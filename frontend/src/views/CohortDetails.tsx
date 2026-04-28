@@ -118,68 +118,24 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
 
       {/* ── Student Table ── */}
       <section className="bg-surface-container-lowest rounded-[2rem] shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-100/80">
-                <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  Student Name
-                </th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  Student ID
-                </th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  GPA (Live)
-                </th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                  Credit Debt
-                </th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">
-                  Status
-                </th>
-                <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-
-              {/* ── Loading state ── */}
-              {loading && (
-                <tr>
-                  <td colSpan={6} className="text-center py-12">
-                    <div className="flex items-center justify-center gap-3 text-slate-400">
-                      <span className="w-5 h-5 border-2 border-slate-200 border-t-primary rounded-full animate-spin" />
-                      <span className="text-sm font-medium">Đang tải dữ liệu từ Hệ thống...</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-
-              {/* ── Error state ── */}
-              {!loading && error && (
-                <tr>
-                  <td colSpan={6} className="text-center py-12">
-                    <div className="flex items-center justify-center gap-2 text-red-500">
-                      <AlertCircle className="w-5 h-5" />
-                      <span className="text-sm font-semibold">{error}</span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-
-              {/* ── Empty state ── */}
-              {!loading && !error && students.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-400 text-sm">
-                    Lớp học này chưa có sinh viên.
-                  </td>
-                </tr>
-              )}
-
-              {/* ── Student rows ── */}
-              {!loading && !error && students.map((student) => {
-                const risk = isAtRisk(student);
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-100/80">
+              <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Student Name</th>
+              <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Student ID</th>
+              <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">GPA (Mock)</th>
+              <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Status</th>
+              <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              <tr><td colSpan={5} className="text-center py-10 text-slate-400">Đang tải dữ liệu từ Supabase...</td></tr>
+            ) : (
+              dbStudents.map((student, i) => {
+                // Tạo data UI giả định dựa trên sinh viên thật
+                const fakeGpa = (Math.random() * (4.0 - 2.0) + 2.0).toFixed(2);
+                const isAtRisk = parseFloat(fakeGpa) < 2.5;
 
                 return (
                   <tr

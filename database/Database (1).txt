@@ -1,0 +1,314 @@
+-- =================================================================
+-- UIT AdvisorHub — Complete Database Seed Script
+-- Assumptions about schema (adjust column names if yours differ):
+--   users(id, email, password_hash, full_name, role)
+--   admin_classes(code, name, cohort, program)
+--   courses(id, code, name, credits, department)
+--   advisor_class(advisor_id, class_code)
+--   students(id, full_name, mssv, class_code, cohort)
+--   enrollments(id, student_id, course_id, semester)
+--   grades(id, enrollment_id, letter_grade, numeric_grade, gpa_points)
+-- =================================================================
+
+BEGIN;
+
+-- ===============================================================
+-- PART 1: 5 ACADEMIC ADVISORS
+-- Passwords are bcrypt hashes of 'password123' (replace in prod)
+-- ===============================================================
+INSERT INTO users (id, email, password_hash, full_name, role) VALUES
+(1, 'aris.thorne@uit.edu.vn',    '$2b$10$XvQzDK1y7E3mN8pL2sRcOeW1f9TjUb4lHdGnAkMoPqYrVwIsBzCxu', 'Dr. Aris Thorne',      'ADVISOR'),
+(2, 'minh.nguyen@uit.edu.vn',    '$2b$10$XvQzDK1y7E3mN8pL2sRcOeW1f9TjUb4lHdGnAkMoPqYrVwIsBzCxu', 'TS. Nguyễn Văn Minh',  'ADVISOR'),
+(3, 'thu.le@uit.edu.vn',         '$2b$10$XvQzDK1y7E3mN8pL2sRcOeW1f9TjUb4lHdGnAkMoPqYrVwIsBzCxu', 'ThS. Lê Thị Thu',      'ADVISOR'),
+(4, 'hung.pham@uit.edu.vn',      '$2b$10$XvQzDK1y7E3mN8pL2sRcOeW1f9TjUb4lHdGnAkMoPqYrVwIsBzCxu', 'TS. Phạm Quốc Hùng',   'ADVISOR'),
+(5, 'lan.tran@uit.edu.vn',       '$2b$10$XvQzDK1y7E3mN8pL2sRcOeW1f9TjUb4lHdGnAkMoPqYrVwIsBzCxu', 'ThS. Trần Ngọc Lan',   'ADVISOR')
+ON CONFLICT (id) DO NOTHING;
+
+-- Reset sequence
+SELECT setval('users_id_seq', 10, true);
+
+
+-- ===============================================================
+-- PART 2: 11 ADMINISTRATIVE CLASSES
+-- MSSV prefix matches cohort year (22→2022, 23→2023, 24→2024)
+-- ===============================================================
+INSERT INTO admin_classes (code, name, cohort, program) VALUES
+('CS2023A',   'Khoa học Máy tính 2023 - Lớp A',           '2023', 'Computer Science'),
+('CS2023B',   'Khoa học Máy tính 2023 - Lớp B',           '2023', 'Computer Science'),
+('SE2022A',   'Kỹ thuật Phần mềm 2022 - Lớp A',           '2022', 'Software Engineering'),
+('SE2022B',   'Kỹ thuật Phần mềm 2022 - Lớp B',           '2022', 'Software Engineering'),
+('AI2024A',   'Trí tuệ Nhân tạo 2024 - Lớp A',            '2024', 'Artificial Intelligence'),
+('AI2024B',   'Trí tuệ Nhân tạo 2024 - Lớp B',            '2024', 'Artificial Intelligence'),
+('IT2023A',   'Công nghệ Thông tin 2023 - Lớp A',          '2023', 'Information Technology'),
+('IT2023B',   'Công nghệ Thông tin 2023 - Lớp B',          '2023', 'Information Technology'),
+('NT2022A',   'Mạng Máy tính và Truyền thông 2022 - Lớp A','2022', 'Network & Communications'),
+('NT2022B',   'Mạng Máy tính và Truyền thông 2022 - Lớp B','2022', 'Network & Communications'),
+('DS2024A',   'Khoa học Dữ liệu 2024 - Lớp A',            '2024', 'Data Science')
+ON CONFLICT (code) DO NOTHING;
+
+
+-- ===============================================================
+-- PART 3: 18 SUBJECT COURSES
+-- ===============================================================
+INSERT INTO courses (id, code, name, credits, department) VALUES
+(1,  'IT001',  'Nhập môn Lập trình',                       3, 'IT'),
+(2,  'IT002',  'Lập trình hướng đối tượng',                3, 'IT'),
+(3,  'IT003',  'Cấu trúc dữ liệu và Giải thuật',           3, 'IT'),
+(4,  'IT004',  'Hệ điều hành',                             3, 'IT'),
+(5,  'IT005',  'Cơ sở dữ liệu',                            3, 'IT'),
+(6,  'IT006',  'Trí tuệ nhân tạo',                         3, 'IT'),
+(7,  'NT101',  'Mạng máy tính',                            3, 'NET'),
+(8,  'NT201',  'An ninh mạng',                             3, 'NET'),
+(9,  'MA001',  'Giải tích',                                3, 'MATH'),
+(10, 'MA003',  'Xác suất thống kê',                        3, 'MATH'),
+(11, 'MA006',  'Toán rời rạc',                             3, 'MATH'),
+(12, 'MA007',  'Đại số tuyến tính',                        3, 'MATH'),
+(13, 'SE301',  'Công nghệ phần mềm',                       3, 'SE'),
+(14, 'SE302',  'Kiến trúc phần mềm',                       3, 'SE'),
+(15, 'SE401',  'Kiểm thử phần mềm',                        2, 'SE'),
+(16, 'AI101',  'Học máy',                                  3, 'AI'),
+(17, 'AI102',  'Xử lý ngôn ngữ tự nhiên',                  3, 'AI'),
+(18, 'DS101',  'Phân tích và Trực quan hóa dữ liệu',        3, 'DS')
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval('courses_id_seq', 20, true);
+
+
+-- ===============================================================
+-- PART 4: ADVISOR → CLASS ASSIGNMENTS
+-- Advisor 1 (Aris Thorne) manages CS2023A, CS2023B, IT2023A
+-- Advisor 2 manages SE2022A, SE2022B
+-- Advisor 3 manages AI2024A, AI2024B, DS2024A
+-- Advisor 4 manages NT2022A, NT2022B
+-- Advisor 5 manages IT2023B, CS2023B (shared oversight)
+-- ===============================================================
+INSERT INTO advisor_class (advisor_id, class_code) VALUES
+(1, 'CS2023A'), (1, 'CS2023B'), (1, 'IT2023A'),
+(2, 'SE2022A'), (2, 'SE2022B'),
+(3, 'AI2024A'), (3, 'AI2024B'), (3, 'DS2024A'),
+(4, 'NT2022A'), (4, 'NT2022B'),
+(5, 'IT2023B')
+ON CONFLICT DO NOTHING;
+
+
+-- ===============================================================
+-- PART 5: ~300 STUDENTS
+-- MSSV Rule: First 2 digits = enrollment year
+--   2022 cohort → mssv like 22521XXX
+--   2023 cohort → mssv like 23521XXX
+--   2024 cohort → mssv like 24521XXX
+-- ===============================================================
+DO $$
+DECLARE
+  -- Vietnamese last names
+  last_names TEXT[] := ARRAY[
+    'Nguyễn','Trần','Lê','Phạm','Hoàng','Huỳnh','Phan','Vũ','Võ',
+    'Đặng','Bùi','Đỗ','Hồ','Ngô','Dương','Lý','Đinh','Lưu','Cao','Tô'
+  ];
+  -- Vietnamese middle names
+  mid_male   TEXT[] := ARRAY['Văn','Quốc','Minh','Hữu','Đức','Công','Thành','Bảo','Gia','Tiến'];
+  mid_female TEXT[] := ARRAY['Thị','Ngọc','Kim','Thanh','Hồng','Phương','Thu','Ánh','Tuyết','Mai'];
+  -- Vietnamese first names
+  first_male   TEXT[] := ARRAY['An','Bình','Cường','Dũng','Giang','Hải','Khoa','Long','Nam','Phúc','Quân','Sơn','Thắng','Trung','Tuấn','Việt','Đạt','Hưng','Khải','Lâm'];
+  first_female TEXT[] := ARRAY['Anh','Châu','Dung','Hà','Hương','Lan','Linh','Mai','Nga','Nhi','Oanh','Phương','Thảo','Thùy','Trang','Trinh','Uyên','Vân','Xuân','Yến'];
+
+  -- Class configs: (class_code, cohort_year, mssv_prefix, count)
+  class_configs RECORD;
+
+  i            INT;
+  student_id   INT := 1;
+  is_female    BOOLEAN;
+  s_last       TEXT;
+  s_mid        TEXT;
+  s_first      TEXT;
+  full_name    TEXT;
+  mssv         TEXT;
+  seq_num      INT;
+BEGIN
+  FOR class_configs IN
+    SELECT code, cohort,
+      CASE cohort
+        WHEN '2022' THEN '22521'
+        WHEN '2023' THEN '23521'
+        WHEN '2024' THEN '24521'
+        ELSE '23521'
+      END AS prefix,
+      CASE code
+        WHEN 'CS2023A' THEN 30 WHEN 'CS2023B' THEN 28
+        WHEN 'SE2022A' THEN 30 WHEN 'SE2022B' THEN 28
+        WHEN 'AI2024A' THEN 28 WHEN 'AI2024B' THEN 26
+        WHEN 'IT2023A' THEN 30 WHEN 'IT2023B' THEN 28
+        WHEN 'NT2022A' THEN 28 WHEN 'NT2022B' THEN 26
+        WHEN 'DS2024A' THEN 26 ELSE 25
+      END AS student_count
+    FROM admin_classes
+  LOOP
+    FOR i IN 1..class_configs.student_count LOOP
+      is_female := (random() > 0.52);
+      s_last    := last_names[1 + floor(random() * array_length(last_names, 1))::int];
+
+      IF is_female THEN
+        s_mid   := mid_female[1 + floor(random() * array_length(mid_female, 1))::int];
+        s_first := first_female[1 + floor(random() * array_length(first_female, 1))::int];
+      ELSE
+        s_mid   := mid_male[1 + floor(random() * array_length(mid_male, 1))::int];
+        s_first := first_male[1 + floor(random() * array_length(first_male, 1))::int];
+      END IF;
+
+      full_name := s_last || ' ' || s_mid || ' ' || s_first;
+
+      -- MSSV: prefix (5 digits) + 3-digit sequence → 8 digits total
+      seq_num := (student_id % 1000);
+      mssv := class_configs.prefix || lpad(seq_num::text, 3, '0');
+      -- Make unique by appending student_id if conflict would occur
+      mssv := class_configs.prefix || lpad(student_id::text, 3, '0');
+
+      INSERT INTO students (id, full_name, mssv, class_code, cohort)
+      VALUES (student_id, full_name, mssv, class_configs.code, class_configs.cohort)
+      ON CONFLICT DO NOTHING;
+
+      student_id := student_id + 1;
+    END LOOP;
+  END LOOP;
+END $$;
+
+SELECT setval('students_id_seq', 400, true);
+
+
+-- ===============================================================
+-- PART 6: ENROLLMENTS
+-- Each student enrolls in 6-8 courses across semesters
+-- We map classes to relevant courses to make failure rates authentic
+-- ===============================================================
+DO $$
+DECLARE
+  -- Course pools by program relevance
+  cs_courses   INT[] := ARRAY[1,2,3,4,5,9,10,11,12,13];   -- CS students
+  se_courses   INT[] := ARRAY[2,3,4,5,10,11,13,14,15,7];  -- SE students
+  ai_courses   INT[] := ARRAY[2,3,5,6,10,11,12,16,17,18]; -- AI students
+  it_courses   INT[] := ARRAY[1,2,3,4,5,7,9,10,11,13];    -- IT students
+  nt_courses   INT[] := ARRAY[1,2,4,7,8,9,10,11,12,13];   -- NT students
+  ds_courses   INT[] := ARRAY[2,3,5,6,10,11,12,16,18,9];  -- DS students
+
+  s            RECORD;
+  course_pool  INT[];
+  num_courses  INT;
+  enrolled_cnt INT;
+  course_id    INT;
+  enr_id       INT := 1;
+  sem          TEXT;
+  already_enrolled INT[];
+BEGIN
+  FOR s IN SELECT id, class_code, cohort FROM students LOOP
+    -- Determine course pool by class
+    course_pool := CASE
+      WHEN s.class_code LIKE 'CS%' THEN cs_courses
+      WHEN s.class_code LIKE 'SE%' THEN se_courses
+      WHEN s.class_code LIKE 'AI%' THEN ai_courses
+      WHEN s.class_code LIKE 'IT%' THEN it_courses
+      WHEN s.class_code LIKE 'NT%' THEN nt_courses
+      WHEN s.class_code LIKE 'DS%' THEN ds_courses
+      ELSE cs_courses
+    END;
+
+    -- Enroll in 7-9 courses
+    num_courses   := 7 + floor(random() * 3)::int;
+    enrolled_cnt  := 0;
+    already_enrolled := ARRAY[]::INT[];
+
+    WHILE enrolled_cnt < num_courses LOOP
+      course_id := course_pool[1 + floor(random() * array_length(course_pool, 1))::int];
+
+      -- Skip if already enrolled in this course
+      IF course_id = ANY(already_enrolled) THEN
+        CONTINUE;
+      END IF;
+
+      already_enrolled := array_append(already_enrolled, course_id);
+
+      -- Alternate semesters: older cohorts have more semesters done
+      sem := CASE
+        WHEN s.cohort = '2022' THEN (ARRAY['HK1-2022','HK2-2022','HK1-2023','HK2-2023'])[1 + floor(random()*4)::int]
+        WHEN s.cohort = '2023' THEN (ARRAY['HK1-2023','HK2-2023','HK1-2024'])[1 + floor(random()*3)::int]
+        ELSE (ARRAY['HK1-2024','HK2-2024'])[1 + floor(random()*2)::int]
+      END;
+
+      INSERT INTO enrollments (id, student_id, course_id, semester)
+      VALUES (enr_id, s.id, course_id, sem)
+      ON CONFLICT DO NOTHING;
+
+      enr_id       := enr_id + 1;
+      enrolled_cnt := enrolled_cnt + 1;
+    END LOOP;
+  END LOOP;
+END $$;
+
+SELECT setval('enrollments_id_seq', 3500, true);
+
+
+-- ===============================================================
+-- PART 7: GRADES
+-- Grade distribution per course (reflects real failure rates):
+--   IT003, NT101, MA003, MA006, IT002 → High failure (killer subjects)
+--   Others → Normal distribution
+-- letter_grade: A / B / C / D / F
+-- gpa_points:   4 / 3 / 2 / 1 / 0
+-- ===============================================================
+DO $$
+DECLARE
+  e         RECORD;
+  r         FLOAT;
+  lgrade    TEXT;
+  gpa_pts   NUMERIC(3,2);
+
+  -- Probability thresholds [A, B, C, D, F] cumulative
+  -- Killer courses: higher chance of D/F
+  killer_ids INT[] := ARRAY[2, 3, 7, 10, 11]; -- IT002, IT003, NT101, MA003, MA006
+BEGIN
+  FOR e IN SELECT id, course_id FROM enrollments LOOP
+    r := random();
+
+    IF e.course_id = ANY(killer_ids) THEN
+      -- Killer subject distribution: A=15% B=22% C=23% D=18% F=22%
+      lgrade := CASE
+        WHEN r < 0.15 THEN 'A'
+        WHEN r < 0.37 THEN 'B'
+        WHEN r < 0.60 THEN 'C'
+        WHEN r < 0.78 THEN 'D'
+        ELSE 'F'
+      END;
+    ELSE
+      -- Normal distribution: A=20% B=35% C=28% D=10% F=7%
+      lgrade := CASE
+        WHEN r < 0.20 THEN 'A'
+        WHEN r < 0.55 THEN 'B'
+        WHEN r < 0.83 THEN 'C'
+        WHEN r < 0.93 THEN 'D'
+        ELSE 'F'
+      END;
+    END IF;
+
+    gpa_pts := CASE lgrade
+      WHEN 'A' THEN 4.00
+      WHEN 'B' THEN 3.00
+      WHEN 'C' THEN 2.00
+      WHEN 'D' THEN 1.00
+      ELSE 0.00
+    END;
+
+    INSERT INTO grades (enrollment_id, letter_grade, gpa_points)
+    VALUES (e.id, lgrade, gpa_pts)
+    ON CONFLICT (enrollment_id) DO NOTHING;
+  END LOOP;
+END $$;
+
+COMMIT;
+
+-- ===============================================================
+-- VERIFICATION QUERIES (run manually to confirm data)
+-- ===============================================================
+-- SELECT COUNT(*) FROM students;                        -- ~308
+-- SELECT COUNT(*) FROM enrollments;                     -- ~2300
+-- SELECT COUNT(*) FROM grades;                          -- ~2300
+-- SELECT class_code, COUNT(*) FROM students GROUP BY 1 ORDER BY 1;
+-- SELECT letter_grade, COUNT(*) FROM grades GROUP BY 1; -- Check distribution

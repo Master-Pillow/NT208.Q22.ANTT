@@ -65,10 +65,7 @@ router.get('/students', async (req, res) => {
 
 // GET /advisor/dashboard/stats?advisorId=<id>
 router.get('/dashboard/stats', async (req, res) => {
-  const advisorId = parseInt(req.query.advisorId, 10);
-  if (!advisorId) {
-    return res.status(400).json({ message: 'advisorId là bắt buộc.' });
-  }
+  const advisorId = req.user.id;
 
   try {
     const gpaQuery = `

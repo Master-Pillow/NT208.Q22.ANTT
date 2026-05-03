@@ -13,13 +13,13 @@ interface Student {
 }
 
 const isAtRisk = (student: Student): boolean =>
-  student.current_gpa < 2.5 || student.credit_debt > 0;
+  Number(student.current_gpa) < 2.5 || Number(student.credit_debt) > 0;
 
 const formatGpa = (gpa: number): string =>
-  typeof gpa === 'number' ? gpa.toFixed(2) : '—';
+  !isNaN(Number(gpa)) ? Number(gpa).toFixed(2) : '—';
 
 const gpaToPercent = (gpa: number): number =>
-  Math.min(Math.round((gpa / 4.0) * 100), 100);
+  Math.min(Math.round((Number(gpa) / 4.0) * 100), 100);
 
 export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = ({
   onNavigate,
@@ -37,7 +37,12 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
         if (!userStr) return;
         const user = JSON.parse(userStr);
         const { data } = await apiClient.get(`/advisor/students?advisorId=${user.id}`);
-        setStudents(data ?? []);
+        const mapped = (data ?? []).map((s: any) => ({
+          ...s,
+          current_gpa: Number(s.current_gpa),
+          credit_debt: Number(s.credit_debt),
+        }));
+        setStudents(mapped);
       } catch (err) {
         console.error('[CohortDetails] Error fetching students:', err);
         setError('Không thể tải danh sách sinh viên. Vui lòng thử lại.');
@@ -54,6 +59,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pt-8 pb-12 max-w-7xl mx-auto xl:mx-0">
 
+      {/* Header */}
       <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -82,14 +88,17 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
             </div>
           )}
         </div>
-    );
-
-    if (loading) return (
-        <div className="flex items-center justify-center h-[60vh] gap-3 text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin" /><span>Đang tải dữ liệu lớp...</span>
+        <div className="flex flex-wrap gap-3">
+          <button className="flex items-center px-6 py-3 bg-white rounded-full text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all border border-slate-200">
+            <Download className="w-4 h-4 mr-2" /> Export
+          </button>
+          <button className="flex items-center px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-md shadow-primary/20 hover:shadow-lg transition-all">
+            <Plus className="w-4 h-4 mr-2" /> Add Note
+          </button>
         </div>
       </section>
 
+      {/* Table */}
       <section className="bg-surface-container-lowest rounded-[2rem] shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">

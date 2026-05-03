@@ -13,11 +13,7 @@ export const StudentProfiles: React.FC<Props> = ({ onNavigate }) => {
   useEffect(() => {
     async function fetchClasses() {
       try {
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) return;
-        const user = JSON.parse(userStr);
-
-        const { data } = await apiClient.get(`/advisor/students?advisorId=${user.id}`);
+        const { data } = await apiClient.get('/advisor/students');
         
         // Thuật toán: Nhóm sinh viên theo mã lớp (class_code)
         const classMap = new Map();

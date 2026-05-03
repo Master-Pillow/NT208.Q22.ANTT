@@ -60,11 +60,7 @@ export const Dashboard = () => {
         setIsLoadingStudents(true);
         setStudentsError('');
 
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) return;
-        const user = JSON.parse(userStr);
-
-        const { data } = await apiClient.get(`/advisor/students?advisorId=${user.id}`);
+        const { data } = await apiClient.get('/advisor/students');
 
         if (data && Array.isArray(data)) {
           // Ép kiểu về number trước khi sort
@@ -99,11 +95,7 @@ export const Dashboard = () => {
         setIsLoadingStats(true);
         setStatsError('');
 
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) return;
-        const user = JSON.parse(userStr);
-
-        const { data } = await apiClient.get(`/advisor/dashboard/stats?advisorId=${user.id}`);
+        const { data } = await apiClient.get('/advisor/dashboard/stats');
         setStats(data);
       } catch (err) {
         console.error('[Dashboard] Error fetching stats:', err);

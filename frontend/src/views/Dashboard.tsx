@@ -58,7 +58,7 @@ export const Dashboard = () => {
   // Sorted by credit_debt desc then gpa asc so worst cases surface
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    async function fetchRiskStudents() {
+    async function fetchData() {
       try {
         setIsLoadingStudents(true);
         setStudentsError('');
@@ -156,9 +156,10 @@ export const Dashboard = () => {
               <thead>
                 <tr className="text-[10px] uppercase tracking-widest text-slate-400 border-b border-surface-container/50">
                   <th className="pb-4 font-semibold">Student Name</th>
-                  <th className="pb-4 font-semibold">Student ID</th>
-                  <th className="pb-4 font-semibold">GPA Drop</th>
-                  <th className="pb-4 font-semibold text-right">Credit Debt</th>
+                  <th className="pb-4 font-semibold">MSSV</th>
+                  <th className="pb-4 font-semibold">GPA</th>
+                  <th className="pb-4 font-semibold text-center">Nợ tín chỉ</th>
+                  <th className="pb-4 font-semibold text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="text-sm">

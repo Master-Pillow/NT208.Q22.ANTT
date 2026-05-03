@@ -11,12 +11,12 @@ app.use(express.json());
 app.use('/advisor', advisorRouter); // ← thêm
 
 pool.query("SELECT NOW()")
-  .then((res) => {
-    console.log("DB connected:", res.rows[0]);
-  })
-  .catch((err) => {
-    console.error("DB connection error:", err.message);
-  });
+    .then((res) => {
+      console.log("DB connected:", res.rows[0]);
+    })
+    .catch((err) => {
+      console.error("DB connection error:", err.message);
+    });
 
 app.get("/health", (req, res) => {
   res.json({ ok: true });
@@ -36,10 +36,10 @@ app.post("/auth/login", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, email, password_hash, role
-       FROM users
-       WHERE email = $1`,
-      [email]
+        `SELECT id, email, password_hash, role
+         FROM users
+         WHERE email = $1`,
+        [email]
     );
 
     if (result.rows.length === 0) {
@@ -81,8 +81,8 @@ app.post("/admin/advisors", async (req, res) => {
     }
 
     const existing = await pool.query(
-      `SELECT id FROM users WHERE email = $1`,
-      [email]
+        `SELECT id FROM users WHERE email = $1`,
+        [email]
     );
 
     if (existing.rows.length > 0) {
@@ -90,10 +90,10 @@ app.post("/admin/advisors", async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, role)
-       VALUES ($1, $2, 'ADVISOR')
-       RETURNING id, email, role, created_at`,
-      [email, password]
+        `INSERT INTO users (email, password_hash, role)
+           VALUES ($1, $2, 'ADVISOR')
+             RETURNING id, email, role, created_at`,
+        [email, password]
     );
 
     return res.status(201).json({
@@ -118,8 +118,8 @@ app.post("/admin/classes", async (req, res) => {
     }
 
     const existing = await pool.query(
-      `SELECT id FROM classes WHERE code = $1`,
-      [code]
+        `SELECT code FROM admin_classes WHERE code = $1`,
+        [code]
     );
 
     if (existing.rows.length > 0) {
@@ -127,10 +127,10 @@ app.post("/admin/classes", async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO classes (code, cohort)
-       VALUES ($1, $2)
-       RETURNING *`,
-      [code, cohort || null]
+        `INSERT INTO admin_classes (code, cohort)
+           VALUES ($1, $2)
+             RETURNING *`,
+        [code, cohort || null]
     );
 
     return res.status(201).json({
@@ -155,8 +155,8 @@ app.post("/admin/assign-advisor", async (req, res) => {
     }
 
     const advisorCheck = await pool.query(
-      `SELECT id, role FROM users WHERE id = $1`,
-      [advisor_user_id]
+        `SELECT id, role FROM users WHERE id = $1`,
+        [advisor_user_id]
     );
 
     if (advisorCheck.rows.length === 0) {
@@ -168,8 +168,8 @@ app.post("/admin/assign-advisor", async (req, res) => {
     }
 
     const classCheck = await pool.query(
-      `SELECT id FROM classes WHERE id = $1`,
-      [class_id]
+        `SELECT code FROM admin_classes WHERE code = $1`,
+        [class_id]
     );
 
     if (classCheck.rows.length === 0) {
@@ -177,18 +177,18 @@ app.post("/admin/assign-advisor", async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO advisor_class (advisor_user_id, class_id)
-       VALUES ($1, $2)
-       ON CONFLICT (advisor_user_id, class_id) DO NOTHING
+        `INSERT INTO advisor_class (advisor_id, class_code)
+         VALUES ($1, $2)
+         ON CONFLICT (advisor_id, class_code) DO NOTHING
        RETURNING *`,
-      [advisor_user_id, class_id]
+        [advisor_user_id, class_id]
     );
 
     return res.json({
       message:
-        result.rows.length > 0
-          ? "Gán advisor cho lớp thành công"
-          : "Advisor đã được gán cho lớp này rồi",
+          result.rows.length > 0
+              ? "Gán advisor cho lớp thành công"
+              : "Advisor đã được gán cho lớp này rồi",
       assignment: result.rows[0] || null,
     });
   } catch (err) {
@@ -204,15 +204,16 @@ app.get("/admin/classes", async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
-        c.id AS class_id,
         c.code AS class_code,
+        c.name AS class_name,
         c.cohort,
         u.id AS advisor_id,
-        u.email AS advisor_email
-      FROM classes c
-      LEFT JOIN advisor_class ac ON ac.class_id = c.id
-      LEFT JOIN users u ON u.id = ac.advisor_user_id
-      ORDER BY c.id ASC
+        u.email AS advisor_email,
+        u.full_name AS advisor_name
+      FROM admin_classes c
+             LEFT JOIN advisor_class ac ON ac.class_code = c.code
+             LEFT JOIN users u ON u.id = ac.advisor_id
+      ORDER BY c.code ASC
     `);
 
     return res.json(result.rows);
@@ -221,12 +222,6 @@ app.get("/admin/classes", async (req, res) => {
     return res.status(500).json({ message: "Lỗi server" });
   }
 });
-
-/**
- * ADVISOR - XEM SINH VIÊN THUỘC CÁC LỚP MÌNH PHỤ TRÁCH
- * GET /advisor/students?advisorId=2
- */
-
 
 /**
  * CHI TIẾT 1 SINH VIÊN
@@ -239,20 +234,18 @@ app.get("/students/:id", async (req, res) => {
     const { id } = req.params;
 
     const studentResult = await client.query(
-      `
-      SELECT
-        s.id,
-        s.mssv,
-        s.full_name,
-        s.dob,
-        c.id AS class_id,
-        c.code AS class_code,
-        c.cohort
-      FROM students s
-      LEFT JOIN classes c ON c.id = s.class_id
-      WHERE s.id = $1
-      `,
-      [id]
+        `
+          SELECT
+            s.id,
+            s.mssv,
+            s.full_name,
+            c.code AS class_code,
+            c.cohort
+          FROM students s
+                 LEFT JOIN admin_classes c ON c.code = s.class_code
+          WHERE s.id = $1
+        `,
+        [id]
     );
 
     if (studentResult.rows.length === 0) {
@@ -262,25 +255,22 @@ app.get("/students/:id", async (req, res) => {
     const student = studentResult.rows[0];
 
     const coursesResult = await client.query(
-      `
-      SELECT
-        e.id AS enrollment_id,
-        e.semester,
-        e.status,
-        co.code AS course_code,
-        co.name AS course_name,
-        co.credits,
-        g.components_json,
-        g.final_score,
-        g.letter,
-        g.gpa_points
-      FROM enrollments e
-      JOIN courses co ON co.id = e.course_id
-      LEFT JOIN grades g ON g.enrollment_id = e.id
-      WHERE e.student_id = $1
-      ORDER BY e.semester ASC, co.code ASC
-      `,
-      [id]
+        `
+          SELECT
+            e.id AS enrollment_id,
+            e.semester,
+            co.code AS course_code,
+            co.name AS course_name,
+            co.credits,
+            g.letter_grade AS letter,
+            g.gpa_points
+          FROM enrollments e
+                 JOIN courses co ON co.id = e.course_id
+                 LEFT JOIN grades g ON g.enrollment_id = e.id
+          WHERE e.student_id = $1
+          ORDER BY e.semester ASC, co.code ASC
+        `,
+        [id]
     );
 
     const courses = coursesResult.rows;
@@ -288,7 +278,6 @@ app.get("/students/:id", async (req, res) => {
     let totalCredits = 0;
     let totalWeightedGpa = 0;
     let hasF = false;
-    let hasRetake = false;
 
     for (const c of courses) {
       const credits = Number(c.credits || 0);
@@ -298,16 +287,14 @@ app.get("/students/:id", async (req, res) => {
       totalWeightedGpa += gpaPoints * credits;
 
       if (c.letter === "F") hasF = true;
-      if (c.status === "HOC_LAI") hasRetake = true;
     }
 
     const gpa =
-      totalCredits > 0 ? Number((totalWeightedGpa / totalCredits).toFixed(2)) : 0;
+        totalCredits > 0 ? Number((totalWeightedGpa / totalCredits).toFixed(2)) : 0;
 
     const warnings = [];
     if (gpa < 2.0) warnings.push("GPA thấp");
     if (hasF) warnings.push("Có môn rớt");
-    if (hasRetake) warnings.push("Đang học lại");
 
     return res.json({
       student,
@@ -320,6 +307,96 @@ app.get("/students/:id", async (req, res) => {
     return res.status(500).json({ message: "Lỗi server" });
   } finally {
     client.release();
+  }
+});
+
+/**
+ * CHI TIẾT 1 LỚP + DANH SÁCH SINH VIÊN KÈM GPA
+ * GET /classes/:code
+ */
+app.get("/classes/:code", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { code } = req.params;
+
+    const classResult = await client.query(
+        `SELECT c.code, c.name, c.cohort, c.program,
+              u.full_name AS advisor_name, u.email AS advisor_email
+       FROM admin_classes c
+       LEFT JOIN advisor_class ac ON ac.class_code = c.code
+       LEFT JOIN users u ON u.id = ac.advisor_id
+       WHERE c.code = $1`,
+        [code]
+    );
+
+    if (classResult.rows.length === 0) {
+      return res.status(404).json({ message: "Không tìm thấy lớp" });
+    }
+
+    const classInfo = classResult.rows[0];
+
+    const studentsResult = await client.query(
+        `SELECT
+         s.id, s.mssv, s.full_name,
+         COALESCE(
+           ROUND(
+             SUM(g.gpa_points * co.credits::numeric) / NULLIF(SUM(co.credits), 0)
+           , 2), 0
+         ) AS gpa,
+         COUNT(CASE WHEN g.letter_grade = 'F' THEN 1 END)::int AS fail_count
+       FROM students s
+       LEFT JOIN enrollments e  ON e.student_id = s.id
+       LEFT JOIN grades g       ON g.enrollment_id = e.id
+       LEFT JOIN courses co     ON co.id = e.course_id
+       WHERE s.class_code = $1
+       GROUP BY s.id, s.mssv, s.full_name
+       ORDER BY s.full_name ASC`,
+        [code]
+    );
+
+    return res.json({
+      classInfo,
+      students: studentsResult.rows,
+    });
+  } catch (err) {
+    console.error("GET CLASS DETAIL ERROR:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * GLOBAL SEARCH (Sinh viên & Lớp học)
+ * GET /api/search?q=keyword
+ */
+app.get("/api/search", async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.trim() === "") {
+      return res.json([]);
+    }
+
+    const searchPattern = `%${q}%`;
+
+    const result = await pool.query(
+        `
+          SELECT id, mssv AS code, full_name AS name, 'student' AS type
+          FROM students
+          WHERE mssv ILIKE $1 OR full_name ILIKE $1
+          UNION ALL
+          SELECT NULL::int AS id, code, cohort AS name, 'class' AS type
+          FROM admin_classes
+          WHERE code ILIKE $1 OR cohort ILIKE $1
+          LIMIT 10
+        `,
+        [searchPattern]
+    );
+
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("SEARCH ERROR:", err);
+    return res.status(500).json({ message: "Lỗi server" });
   }
 });
 

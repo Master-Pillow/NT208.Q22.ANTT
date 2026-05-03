@@ -82,13 +82,11 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
             </div>
           )}
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button className="flex items-center px-6 py-3 bg-white rounded-full text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all border border-slate-200">
-            <Download className="w-4 h-4 mr-2" /> Export
-          </button>
-          <button className="flex items-center px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-md shadow-primary/20 hover:shadow-lg transition-all">
-            <Plus className="w-4 h-4 mr-2" /> Add Note
-          </button>
+    );
+
+    if (loading) return (
+        <div className="flex items-center justify-center h-[60vh] gap-3 text-slate-400">
+            <Loader2 className="w-6 h-6 animate-spin" /><span>Đang tải dữ liệu lớp...</span>
         </div>
       </section>
 

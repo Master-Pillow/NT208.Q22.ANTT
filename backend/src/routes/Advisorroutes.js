@@ -17,41 +17,41 @@ router.get('/students', async (req, res) => {
         SELECT s.id, s.full_name, s.mssv, 
                cl.code AS class_code, cl.cohort
         FROM students s
-        JOIN admin_classes cl ON cl.code = s.class_code
-        JOIN advisor_class ac ON ac.class_code = cl.code
+               JOIN admin_classes cl ON cl.code = s.class_code
+               JOIN advisor_class ac ON ac.class_code = cl.code
         WHERE ac.advisor_id = $1
       ),
-      student_gpa AS (
-        SELECT e.student_id,
-          ROUND(
-            COALESCE(
-              SUM(g.gpa_points * c.credits) FILTER (WHERE g.letter_grade != 'F')
-              / NULLIF(SUM(c.credits) FILTER (WHERE g.letter_grade != 'F'), 0),
-            0.00)::numeric, 2
-          ) AS current_gpa
-        FROM enrollments e
-        JOIN grades   g ON g.enrollment_id = e.id
-        JOIN courses  c ON c.id = e.course_id
-        WHERE e.student_id IN (SELECT id FROM advisor_students)
-        GROUP BY e.student_id
-      ),
-      student_debt AS (
-        SELECT e.student_id,
-          COALESCE(SUM(c.credits), 0) AS credit_debt
-        FROM enrollments e
-        JOIN grades  g ON g.enrollment_id = e.id
-        JOIN courses c ON c.id = e.course_id
-        WHERE e.student_id IN (SELECT id FROM advisor_students)
-          AND g.letter_grade = 'F'
-        GROUP BY e.student_id
-      )
+           student_gpa AS (
+             SELECT e.student_id,
+                    ROUND(
+                        COALESCE(
+                            SUM(g.gpa_points * c.credits::numeric) FILTER (WHERE g.letter_grade != 'F')
+                          / NULLIF(SUM(c.credits::numeric) FILTER (WHERE g.letter_grade != 'F'), 0),
+                            0.00)::numeric, 2
+                    ) AS current_gpa
+             FROM enrollments e
+                    JOIN grades   g ON g.enrollment_id = e.id
+                    JOIN courses  c ON c.id = e.course_id
+             WHERE e.student_id IN (SELECT id FROM advisor_students)
+             GROUP BY e.student_id
+           ),
+           student_debt AS (
+             SELECT e.student_id,
+                    COALESCE(SUM(c.credits), 0) AS credit_debt
+             FROM enrollments e
+                    JOIN grades  g ON g.enrollment_id = e.id
+                    JOIN courses c ON c.id = e.course_id
+             WHERE e.student_id IN (SELECT id FROM advisor_students)
+               AND g.letter_grade = 'F'
+             GROUP BY e.student_id
+           )
       SELECT
         ast.*,
         COALESCE(sg.current_gpa, 0.00) AS current_gpa,
         COALESCE(sd.credit_debt, 0)    AS credit_debt
       FROM advisor_students ast
-      LEFT JOIN student_gpa  sg ON sg.student_id = ast.id
-      LEFT JOIN student_debt sd ON sd.student_id = ast.id
+             LEFT JOIN student_gpa  sg ON sg.student_id = ast.id
+             LEFT JOIN student_debt sd ON sd.student_id = ast.id
       ORDER BY ast.class_code, ast.full_name;
     `;
 
@@ -74,24 +74,24 @@ router.get('/dashboard/stats', async (req, res) => {
     const gpaQuery = `
       WITH advisor_students AS (
         SELECT s.id FROM students s
-        JOIN admin_classes cl ON cl.code = s.class_code
-        JOIN advisor_class ac ON ac.class_code = cl.code
+                           JOIN admin_classes cl ON cl.code = s.class_code
+                           JOIN advisor_class ac ON ac.class_code = cl.code
         WHERE ac.advisor_id = $1
       ),
-      student_gpa AS (
-        SELECT e.student_id,
-          ROUND(
-            COALESCE(
-              SUM(g.gpa_points * c.credits) FILTER (WHERE g.letter_grade != 'F')
-              / NULLIF(SUM(c.credits) FILTER (WHERE g.letter_grade != 'F'), 0),
-            0.00)::numeric, 2
-          ) AS gpa
-        FROM enrollments e
-        JOIN grades  g ON g.enrollment_id = e.id
-        JOIN courses c ON c.id = e.course_id
-        WHERE e.student_id IN (SELECT id FROM advisor_students)
-        GROUP BY e.student_id
-      )
+           student_gpa AS (
+             SELECT e.student_id,
+                    ROUND(
+                        COALESCE(
+                            SUM(g.gpa_points * c.credits::numeric) FILTER (WHERE g.letter_grade != 'F')
+                          / NULLIF(SUM(c.credits::numeric) FILTER (WHERE g.letter_grade != 'F'), 0),
+                            0.00)::numeric, 2
+                    ) AS gpa
+             FROM enrollments e
+                    JOIN grades  g ON g.enrollment_id = e.id
+                    JOIN courses c ON c.id = e.course_id
+             WHERE e.student_id IN (SELECT id FROM advisor_students)
+             GROUP BY e.student_id
+           )
       SELECT
         COUNT(*) FILTER (WHERE gpa >= 3.6)                AS excellent,
         COUNT(*) FILTER (WHERE gpa >= 3.2 AND gpa < 3.6)  AS good,
@@ -105,8 +105,8 @@ router.get('/dashboard/stats', async (req, res) => {
     const killerQuery = `
       WITH advisor_students AS (
         SELECT s.id FROM students s
-        JOIN admin_classes cl ON cl.code = s.class_code
-        JOIN advisor_class ac ON ac.class_code = cl.code
+                           JOIN admin_classes cl ON cl.code = s.class_code
+                           JOIN advisor_class ac ON ac.class_code = cl.code
         WHERE ac.advisor_id = $1
       )
       SELECT
@@ -115,8 +115,8 @@ router.get('/dashboard/stats', async (req, res) => {
         COUNT(*) FILTER (WHERE g.letter_grade = 'F')     AS fail_count,
         ROUND(COUNT(*) FILTER (WHERE g.letter_grade = 'F')::numeric / COUNT(*) * 100, 1) AS fail_rate
       FROM enrollments e
-      JOIN grades  g ON g.enrollment_id = e.id
-      JOIN courses c ON c.id = e.course_id
+             JOIN grades  g ON g.enrollment_id = e.id
+             JOIN courses c ON c.id = e.course_id
       WHERE e.student_id IN (SELECT id FROM advisor_students)
       GROUP BY c.id, c.code, c.name
       HAVING COUNT(*) >= 5

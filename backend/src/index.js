@@ -48,16 +48,8 @@ app.post("/auth/login", async (req, res) => {
 
     const user = result.rows[0];
 
-<<<<<<< Updated upstream
-    // MVP: password_hash đang dùng như password thường
     if (user.password_hash !== password) {
       return res.status(401).json({ message: "Sai mật khẩu" });
-=======
-    const isValid = (password === user.password_hash);
-
-    if (!isValid) {
-      return res.status(401).json({ message: 'Sai mật khẩu' });
->>>>>>> Stashed changes
     }
 
     return res.json({
@@ -229,12 +221,6 @@ app.get("/admin/classes", async (req, res) => {
 });
 
 /**
- * ADVISOR - XEM SINH VIÊN THUỘC CÁC LỚP MÌNH PHỤ TRÁCH
- * GET /advisor/students?advisorId=2
- */
-
-
-/**
  * CHI TIẾT 1 SINH VIÊN
  * GET /students/:id
  */
@@ -377,6 +363,10 @@ app.get("/classes/:code", async (req, res) => {
   }
 });
 
+/**
+ * GLOBAL SEARCH (Sinh viên & Lớp học)
+ * GET /api/search?q=keyword
+ */
 app.get("/api/search", async (req, res) => {
   try {
     const { q } = req.query;
@@ -384,7 +374,6 @@ app.get("/api/search", async (req, res) => {
       return res.json([]);
     }
 
-    // Dùng ILIKE trong PostgreSQL để tìm kiếm không phân biệt hoa thường
     const searchPattern = `%${q}%`;
 
     const result = await pool.query(
@@ -411,8 +400,3 @@ app.get("/api/search", async (req, res) => {
 app.listen(4000, () => {
   console.log("Backend running on http://localhost:4000");
 });
-
-/**
- * GLOBAL SEARCH (Sinh viên & Lớp học)
- * GET /api/search?q=keyword
- */

@@ -16,8 +16,7 @@ import {
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────────
-   StudentDetail — hiển thị hồ sơ chi tiết 1 sinh viên
-   Dùng chung cho: click từ search, click từ CohortDetails
+   StudentDetail
 ───────────────────────────────────────────────────────────────────────── */
 interface CourseRow {
   enrollment_id: number; semester: string; course_code: string;
@@ -96,7 +95,6 @@ function StudentDetail({
           <ArrowLeft className="w-4 h-4" /> Quay lại
         </button>
 
-        {/* Header */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="h-2 bg-gradient-to-r from-primary to-primary-container" />
           <div className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
@@ -146,7 +144,6 @@ function StudentDetail({
             </div>
         )}
 
-        {/* Transcripts by semester */}
         <div className="space-y-4">
           {Object.entries(semMap).sort(([a], [b]) => a.localeCompare(b)).map(([sem, rows]) => {
             const sc = rows.reduce((s, c) => s + Number(c.credits), 0);
@@ -158,9 +155,9 @@ function StudentDetail({
                   <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                     <span className="font-bold text-slate-700 text-sm">{sem}</span>
                     <span className="text-xs text-slate-500">
-                  GPA kỳ: <span className={`font-bold ${gpaColor(Number(sg))}`}>{sg}</span>
+                      GPA kỳ: <span className={`font-bold ${gpaColor(Number(sg))}`}>{sg}</span>
                       {' · '}{sc} TC
-                </span>
+                    </span>
                   </div>
                   <div className="divide-y divide-slate-50">
                     {rows.map(c => (
@@ -169,8 +166,8 @@ function StudentDetail({
                           <span className="text-sm text-slate-700 flex-1 min-w-0 truncate">{c.course_name}</span>
                           <span className="text-xs text-slate-400 shrink-0">{c.credits} TC</span>
                           <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${gradeColor(c.letter)}`}>
-                      {c.letter ?? '—'}
-                    </span>
+                            {c.letter ?? '—'}
+                          </span>
                         </div>
                     ))}
                   </div>
@@ -185,13 +182,21 @@ function StudentDetail({
 /* ─────────────────────────────────────────────────────────────────────────
    App root
 ───────────────────────────────────────────────────────────────────────── */
+
+interface SelectedContact {
+  id: number;
+  name: string;
+  mssv: string;
+}
+
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated]   = useState(false);
-  const [currentView, setCurrentView]           = useState('dashboard');
+  const [isAuthenticated, setIsAuthenticated]     = useState(false);
+  const [currentView, setCurrentView]             = useState('dashboard');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [selectedClassCode, setSelectedClassCode] = useState<string | null>(null);
-  // Lưu view trước đó để nút "Quay lại" trong StudentDetail biết về đâu
-  const [prevView, setPrevView]                 = useState('profiles');
+  const [prevView, setPrevView]                   = useState('profiles');
+
+  const [selectedContact, setSelectedContact] = useState<SelectedContact | null>(null);
 
   const goToStudent = (id: string, from: string = 'profiles') => {
     setPrevView(from);
@@ -204,7 +209,19 @@ export default function App() {
     setCurrentView('cohort');
   };
 
-  // Callback từ Toolbar search
+  // Dùng chung cho cả ClassList lẫn Dashboard khi bấm "Nhắn tin"
+  const handleMessageStudent = (student: SelectedContact) => {
+    setSelectedContact(student);
+    setCurrentView('messages');
+  };
+
+  const handleSetCurrentView = (view: string) => {
+    if (view !== 'messages') {
+      setSelectedContact(null);
+    }
+    setCurrentView(view);
+  };
+
   const handleSearchSelect = (item: { type: string; id: number | null; code: string }) => {
     if (item.type === 'student') goToStudent(String(item.id), currentView);
     else goToClass(item.code);
@@ -216,18 +233,23 @@ export default function App() {
 
   return (
       <div className="bg-surface font-body text-on-surface min-h-screen flex antialiased selection:bg-primary/20 selection:text-primary">
-        <Sidebar currentView={currentView} setCurrentView={setCurrentView} />
+        <Sidebar currentView={currentView} setCurrentView={handleSetCurrentView} />
         <main className="flex-grow lg:ml-[280px] flex flex-col min-h-screen relative overflow-hidden bg-surface">
           <Toolbar
-              setCurrentView={setCurrentView}
+              setCurrentView={handleSetCurrentView}
               onLogout={() => setIsAuthenticated(false)}
               onSearchSelect={handleSearchSelect}
           />
           <div className="flex-1 overflow-y-auto w-full pt-32 px-6 sm:px-10 pb-12">
-            {currentView === 'dashboard'     && <Dashboard />}
+            {currentView === 'dashboard'     && (
+                <Dashboard
+                    onNavigate={handleSetCurrentView}
+                    onMessageStudent={handleMessageStudent}
+                />
+            )}
             {currentView === 'profiles'      && (
                 <StudentProfiles
-                    onNavigate={setCurrentView}
+                    onNavigate={handleSetCurrentView}
                     onSelectClass={goToClass}
                 />
             )}
@@ -240,14 +262,21 @@ export default function App() {
             {currentView === 'cohort'        && (
                 <CohortDetails
                     classCode={selectedClassCode}
-                    onNavigate={setCurrentView}
+                    onNavigate={handleSetCurrentView}
                     onSelectStudent={(id) => goToStudent(id, 'cohort')}
                 />
             )}
-            {currentView === 'classlist'     && <ClassList onNavigate={setCurrentView} />}
+            {currentView === 'classlist'     && (
+                <ClassList
+                    onNavigate={handleSetCurrentView}
+                    onMessageStudent={handleMessageStudent}
+                />
+            )}
             {currentView === 'schedule'      && <Schedule />}
             {currentView === 'notes'         && <LogNotes />}
-            {currentView === 'messages'      && <Messages />}
+            {currentView === 'messages'      && (
+                <Messages initialContact={selectedContact} />
+            )}
             {currentView === 'profile'       && <AdvisorProfile />}
           </div>
         </main>

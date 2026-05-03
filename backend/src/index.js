@@ -1,14 +1,20 @@
 console.log("Running from:", import.meta.url);
-import advisorRouter from './routes/advisorRoutes.js'; // ← thêm
+import advisorRouter from './routes/advisorRoutes.js';
 import express from "express";
 import cors from "cors";
 import { pool } from "./db.js";
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { verifyToken } from './middleware/auth.js';
+
 const app = express();
+const JWT_SECRET = process.env.JWT_SECRET || 'uit_advisorhub_secret_2026';
 
 app.use(cors());
 app.use(express.json());
-app.use('/advisor', advisorRouter); // ← thêm
+
+// BẢO VỆ ROUTE ADVISOR: Yêu cầu phải có token hợp lệ mới được truy cập
+app.use('/advisor', verifyToken, advisorRouter); 
 
 pool.query("SELECT NOW()")
     .then((res) => {
@@ -24,8 +30,7 @@ app.get("/health", (req, res) => {
 
 /**
  * LOGIN
- * MVP: tạm so sánh password plain text với password_hash trong DB
- * Sau này đổi sang bcrypt
+ * Đã tích hợp JWT trả về token cho Client
  */
 app.post("/auth/login", async (req, res) => {
   try {
@@ -48,15 +53,24 @@ app.post("/auth/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    // MVP: password_hash đang dùng như password thường
-    //const isValid = await bcrypt.compare(password, user.password_hash);
+    // TODO: Chuyển sang dùng bcrypt để kiểm tra mật khẩu đã hash trong CSDL
+    // const isValid = await bcrypt.compare(password, user.password_hash);
     const isValid = (password === user.password_hash);
-if (!isValid) {
-  return res.status(401).json({ message: 'Sai mật khẩu' });
-}
+    
+    if (!isValid) {
+      return res.status(401).json({ message: 'Sai mật khẩu' });
+    }
+
+    // TẠO TOKEN: Lưu id, email, role vào token, thời hạn 8 tiếng
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
 
     return res.json({
       message: "Đăng nhập thành công",
+      token: token, // Trả về token cho Client
       user: {
         id: user.id,
         email: user.email,
@@ -89,11 +103,15 @@ app.post("/admin/advisors", async (req, res) => {
       return res.status(400).json({ message: "Email đã tồn tại" });
     }
 
+    // TODO: Hash password bằng bcrypt trước khi lưu
+    // const salt = await bcrypt.genSalt(10);
+    // const hashedPw = await bcrypt.hash(password, salt);
+    
     const result = await pool.query(
         `INSERT INTO users (email, password_hash, role)
            VALUES ($1, $2, 'ADVISOR')
              RETURNING id, email, role, created_at`,
-        [email, password]
+        [email, password] // Đổi thành hashedPw khi đã áp dụng bcrypt
     );
 
     return res.status(201).json({
@@ -225,9 +243,9 @@ app.get("/admin/classes", async (req, res) => {
 
 /**
  * CHI TIẾT 1 SINH VIÊN
- * GET /students/:id
+ * Bổ sung verifyToken nếu bạn chỉ muốn người đã đăng nhập mới xem được
  */
-app.get("/students/:id", async (req, res) => {
+app.get("/students/:id", verifyToken, async (req, res) => {
   const client = await pool.connect();
 
   try {
@@ -312,9 +330,8 @@ app.get("/students/:id", async (req, res) => {
 
 /**
  * CHI TIẾT 1 LỚP + DANH SÁCH SINH VIÊN KÈM GPA
- * GET /classes/:code
  */
-app.get("/classes/:code", async (req, res) => {
+app.get("/classes/:code", verifyToken, async (req, res) => {
   const client = await pool.connect();
   try {
     const { code } = req.params;
@@ -368,9 +385,8 @@ app.get("/classes/:code", async (req, res) => {
 
 /**
  * GLOBAL SEARCH (Sinh viên & Lớp học)
- * GET /api/search?q=keyword
  */
-app.get("/api/search", async (req, res) => {
+app.get("/api/search", verifyToken, async (req, res) => {
   try {
     const { q } = req.query;
     if (!q || q.trim() === "") {

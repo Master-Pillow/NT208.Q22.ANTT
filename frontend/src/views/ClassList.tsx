@@ -24,10 +24,7 @@ export const ClassList: React.FC<ClassListProps> = ({ onNavigate, onMessageStude
   useEffect(() => {
     async function fetchClassList() {
       try {
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) return;
-        const user = JSON.parse(userStr);
-        const { data } = await apiClient.get(`/advisor/students?advisorId=${user.id}`);
+        const { data } = await apiClient.get('/advisor/students');
         setStudents(data);
       } catch (error) {
         console.error('Lỗi lấy danh sách sinh viên:', error);

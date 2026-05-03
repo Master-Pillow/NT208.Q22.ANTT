@@ -33,10 +33,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
       try {
         setLoading(true);
         setError('');
-        const userStr = localStorage.getItem('currentUser');
-        if (!userStr) return;
-        const user = JSON.parse(userStr);
-        const { data } = await apiClient.get(`/advisor/students?advisorId=${user.id}`);
+        const { data } = await apiClient.get('/advisor/students');
         const mapped = (data ?? []).map((s: any) => ({
           ...s,
           current_gpa: Number(s.current_gpa),

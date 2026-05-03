@@ -20,13 +20,12 @@ export const Login = ({ onLogin }: LoginProps) => {
     setErrorMsg(''); // Xóa lỗi cũ (nếu có) trước khi gửi request mới
 
     try {
-      // 1. Gửi Email và Password xuống Backend Node.js
       const response = await apiClient.post('/auth/login', { email, password });
       
-      // 2. Nếu thành công, lưu thông tin User vào trình duyệt
+      // LƯU THÊM TOKEN:
+      localStorage.setItem('token', response.data.token);
       localStorage.setItem('currentUser', JSON.stringify(response.data.user));
       
-      // 3. Gọi hàm onLogin để chuyển hướng sang Dashboard
       onLogin();
     } catch (error: any) {
       // Bắt lỗi từ Backend (Ví dụ: Sai mật khẩu, Email không tồn tại)

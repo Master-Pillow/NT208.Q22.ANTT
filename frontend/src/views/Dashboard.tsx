@@ -55,7 +55,7 @@ export const Dashboard = () => {
   // Fetch 1: At-risk students
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    async function fetchData() {
+    async function fetchRiskStudents() {
       try {
         setIsLoadingStudents(true);
         setStudentsError('');

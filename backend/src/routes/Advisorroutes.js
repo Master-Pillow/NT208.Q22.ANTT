@@ -6,10 +6,7 @@ const router = Router();
 
 // GET /advisor/students?advisorId=<id>
 router.get('/students', async (req, res) => {
-  const advisorId = parseInt(req.query.advisorId, 10);
-  if (!advisorId) {
-    return res.status(400).json({ message: 'advisorId là bắt buộc.' });
-  }
+  const advisorId = req.user.id; // ✅ Chỉ lấy ID từ token
 
   try {
     const query = `

@@ -3,7 +3,7 @@ import advisorRouter from './routes/advisorRoutes.js'; // ← thêm
 import express from "express";
 import cors from "cors";
 import { pool } from "./db.js";
-
+import bcrypt from 'bcrypt';
 const app = express();
 
 app.use(cors());
@@ -48,9 +48,12 @@ app.post("/auth/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    if (user.password_hash !== password) {
-      return res.status(401).json({ message: "Sai mật khẩu" });
-    }
+    // MVP: password_hash đang dùng như password thường
+    //const isValid = await bcrypt.compare(password, user.password_hash);
+    const isValid = (password === user.password_hash);
+if (!isValid) {
+  return res.status(401).json({ message: 'Sai mật khẩu' });
+}
 
     return res.json({
       message: "Đăng nhập thành công",

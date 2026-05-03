@@ -9,9 +9,9 @@ import apiClient from '../lib/api';
 // ─────────────────────────────────────────────────────────────────
 interface PerformanceBucket {
   name:  string;
-  value: number;   // percentage 0-100
-  color: string;   // hex color
-  raw:   number;   // actual count
+  value: number;
+  color: string;
+  raw:   number;
 }
 
 interface KillerSubject {
@@ -20,8 +20,8 @@ interface KillerSubject {
   failRate:  number;
   failCount: number;
   total:     number;
-  color:     string;   // tailwind bg class
-  text:      string;   // tailwind text class
+  color:     string;
+  text:      string;
 }
 
 interface DashboardStats {
@@ -43,19 +43,16 @@ interface RiskStudent {
 // Component
 // ─────────────────────────────────────────────────────────────────
 export const Dashboard = () => {
-  // ── State: risk students (Red Flags table) ──
-  const [riskStudents, setRiskStudents] = useState<RiskStudent[]>([]);
+  const [riskStudents,      setRiskStudents]      = useState<RiskStudent[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
-  const [studentsError, setStudentsError] = useState('');
+  const [studentsError,     setStudentsError]     = useState('');
 
-  // ── State: dashboard aggregated stats ──
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats,          setStats]          = useState<DashboardStats | null>(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [statsError, setStatsError] = useState('');
+  const [statsError,     setStatsError]     = useState('');
 
   // ─────────────────────────────────────────────────────────────
-  // Fetch 1: At-risk students for the Red Flags panel
-  // Sorted by credit_debt desc then gpa asc so worst cases surface
+  // Fetch 1: At-risk students
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchData() {
@@ -70,8 +67,13 @@ export const Dashboard = () => {
         const { data } = await apiClient.get(`/advisor/students?advisorId=${user.id}`);
 
         if (data && Array.isArray(data)) {
-          // Surface students with debt > 0 first, then lowest GPA
-          const sorted = [...data].sort((a, b) => {
+          // Ép kiểu về number trước khi sort
+          const mapped = [...data].map((s: any) => ({
+            ...s,
+            current_gpa: Number(s.current_gpa),
+            credit_debt: Number(s.credit_debt),
+          }));
+          const sorted = mapped.sort((a: RiskStudent, b: RiskStudent) => {
             if (b.credit_debt !== a.credit_debt) return b.credit_debt - a.credit_debt;
             return a.current_gpa - b.current_gpa;
           });
@@ -89,7 +91,7 @@ export const Dashboard = () => {
   }, []);
 
   // ─────────────────────────────────────────────────────────────
-  // Fetch 2: Aggregated stats (performance chart + killer subjects)
+  // Fetch 2: Aggregated stats
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     async function fetchDashboardStats() {
@@ -118,7 +120,7 @@ export const Dashboard = () => {
   // Render helpers
   // ─────────────────────────────────────────────────────────────
   const getGpaDropDisplay = (gpa: number) => {
-    const drop = (4.0 - gpa).toFixed(2);
+    const drop = (4.0 - Number(gpa)).toFixed(2);
     return `-${drop}`;
   };
 
@@ -137,9 +139,7 @@ export const Dashboard = () => {
 
       <div className="grid grid-cols-12 gap-8">
 
-        {/* ══════════════════════════════════════════════════
-            RED FLAGS TABLE — real data from /advisor/students
-        ══════════════════════════════════════════════════ */}
+        {/* RED FLAGS TABLE */}
         <section className="col-span-12 lg:col-span-7 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -210,7 +210,6 @@ export const Dashboard = () => {
                           <span
                             className={`inline-flex items-center px-2 py-1 ${isErr ? 'bg-error-container/50 text-error' : 'bg-orange-100/50 text-orange-700'} rounded-full text-[10px] font-bold`}
                           >
-                            {/* GPA drop = distance from perfect 4.0 */}
                             {getGpaDropDisplay(s.current_gpa)}
                             <TrendingDown className="w-3 h-3 ml-1" />
                           </span>
@@ -229,9 +228,7 @@ export const Dashboard = () => {
           </div>
         </section>
 
-        {/* ══════════════════════════════════════════════════
-            PIE CHART — real performance distribution from API
-        ══════════════════════════════════════════════════ */}
+        {/* PIE CHART */}
         <section className="col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 flex flex-col">
           <div className="mb-6">
             <h3 className="text-xl font-headline font-bold text-blue-900">Performance Distribution</h3>
@@ -270,7 +267,7 @@ export const Dashboard = () => {
                   </PieChart>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-4xl font-black text-blue-900 font-serif">
-                      {stats.avgGpa.toFixed(2)}
+                      {Number(stats.avgGpa).toFixed(2)}
                     </span>
                     <span className="text-[9px] uppercase tracking-widest font-bold text-slate-400 mt-1">
                       Avg GPA
@@ -299,9 +296,7 @@ export const Dashboard = () => {
           </div>
         </section>
 
-        {/* ══════════════════════════════════════════════════
-            KILLER SUBJECTS — real failure rates from API
-        ══════════════════════════════════════════════════ */}
+        {/* KILLER SUBJECTS */}
         <section className="col-span-12 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
           <div className="mb-10">
             <h3 className="text-xl font-headline font-bold text-blue-900">Killer Subjects</h3>
@@ -348,6 +343,7 @@ export const Dashboard = () => {
             <p className="text-slate-400 text-sm">Chưa có dữ liệu môn học rủi ro.</p>
           )}
         </section>
+
       </div>
 
       {/* AI Support Widget */}

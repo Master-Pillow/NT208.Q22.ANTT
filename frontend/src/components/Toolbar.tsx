@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Settings, MessageSquare, Calendar, Check, User, UserCog, LogOut, Shield } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Loader2, Users } from 'lucide-react';
-
+import apiClient from '../lib/api';
 interface SearchItem {
   id: number | null;
   code: string;
@@ -54,9 +54,8 @@ export const Toolbar = ({ setCurrentView, onLogout, onSearchSelect }: ToolbarPro
       }
       setIsSearching(true);
       try {
-        const res  = await fetch(`http://localhost:4000/api/search?q=${encodeURIComponent(searchQuery)}`);
-        const data = await res.json();
-        setSearchResults(Array.isArray(data) ? data : []);
+        const { data } = await apiClient.get(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+setSearchResults(Array.isArray(data) ? data : []);
         setShowSearchDropdown(true);
       } catch {
         setSearchResults([]);

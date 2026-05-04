@@ -10,6 +10,7 @@ import { Messages } from './views/Messages';
 import { ClassList } from './views/ClassList';
 import { AdvisorProfile } from './views/AdvisorProfile';
 import { Login } from './views/Login';
+import apiClient from './lib/api';
 import {
   GraduationCap, BookOpen, TrendingUp, TrendingDown,
   AlertTriangle, ArrowLeft, Loader2, XCircle, Award,
@@ -56,11 +57,10 @@ function StudentDetail({
   useEffect(() => {
     if (!studentId) return;
     setLoading(true); setError(null); setData(null);
-    fetch(`http://localhost:4000/students/${studentId}`)
-        .then(r => r.json())
-        .then(d => { if (d.message) throw new Error(d.message); setData(d); })
-        .catch(e => setError(e.message))
-        .finally(() => setLoading(false));
+    apiClient.get(`/students/${studentId}`)
+  .then(({ data: d }) => { if (d.message) throw new Error(d.message); setData(d); })
+  .catch((e: any) => setError(e.response?.data?.message || e.message))
+  .finally(() => setLoading(false));
   }, [studentId]);
 
   if (!studentId) return (

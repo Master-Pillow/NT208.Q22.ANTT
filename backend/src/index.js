@@ -516,21 +516,15 @@ app.post('/conversations', verifyToken, async (req, res) => {
     const { student_id } = req.body;
     
     // Kiểm tra xem đã có conversation giữa advisor này và student này chưa
-    const existing = await pool.query(
-      `SELECT id FROM conversations WHERE advisor_id = $1 AND student_id = $2`,
-      [req.user.id, student_id]
-    );
+    const result = await pool.query(`
+  INSERT INTO conversations (advisor_id, student_id)
+  VALUES ($1, $2)
+  ON CONFLICT (advisor_id, student_id) DO UPDATE
+    SET advisor_id = EXCLUDED.advisor_id
+  RETURNING id
+`, [req.user.id, student_id]);
 
-    if (existing.rows.length > 0) {
-      return res.json(existing.rows[0]); // Trả về ID đã có
-    }
-
-    // Nếu chưa có, tạo mới
-    const result = await pool.query(
-      `INSERT INTO conversations (advisor_id, student_id) VALUES ($1, $2) RETURNING id`,
-      [req.user.id, student_id]
-    );
-    res.status(201).json(result.rows[0]);
+res.json(result.rows[0]);
   } catch (err) {
     console.error("Lỗi tạo cuộc hội thoại:", err.message);
     res.status(500).json({ message: 'Lỗi tạo cuộc hội thoại' });

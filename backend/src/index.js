@@ -7,11 +7,63 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { verifyToken } from './middleware/auth.js';
 
+// THÊM 2 DÒNG NÀY ĐỂ SETUP SOCKET.IO
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'uit_advisorhub_secret_2026';
 
 app.use(cors());
 app.use(express.json());
+
+// ==========================================
+// CẤU HÌNH SOCKET.IO CHO TÍNH NĂNG NHẮN TIN
+// ==========================================
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "http://localhost:3000", // Đảm bảo đúng port Frontend của bạn
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log('Một client đã kết nối:', socket.id);
+
+  // Khi client tham gia một cuộc hội thoại (room) cụ thể
+  socket.on('join_conversation', (conversationId) => {
+    socket.join(`conv_${conversationId}`);
+    console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
+  });
+
+  // Khi có người gửi tin nhắn
+  socket.on('send_message', async (data) => {
+    const { conversationId, senderId, senderRole, content } = data;
+    try {
+      // Lưu tin nhắn vào Database
+      const result = await pool.query(`
+        INSERT INTO messages (conversation_id, sender_role, sender_id, content)
+        VALUES ($1, $2, $3, $4) RETURNING *
+      `, [conversationId, senderRole, senderId, content]);
+
+      const newMessage = result.rows[0];
+
+      // Phát (broadcast) tin nhắn mới tới tất cả những người đang mở khung chat này
+      io.to(`conv_${conversationId}`).emit('new_message', newMessage);
+    } catch (err) {
+      console.error('Lỗi khi lưu/gửi tin nhắn:', err.message);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client ngắt kết nối:', socket.id);
+  });
+});
+
+// ==========================================
+// CÁC ROUTE CỦA HỆ THỐNG
+// ==========================================
 
 // BẢO VỆ ROUTE ADVISOR: Yêu cầu phải có token hợp lệ mới được truy cập
 app.use('/advisor', verifyToken, advisorRouter); 
@@ -243,7 +295,6 @@ app.get("/admin/classes", async (req, res) => {
 
 /**
  * CHI TIẾT 1 SINH VIÊN
- * Bổ sung verifyToken nếu bạn chỉ muốn người đã đăng nhập mới xem được
  */
 app.get("/students/:id", verifyToken, async (req, res) => {
   const client = await pool.connect();
@@ -338,11 +389,11 @@ app.get("/classes/:code", verifyToken, async (req, res) => {
 
     const classResult = await client.query(
         `SELECT c.code, c.name, c.cohort, c.program,
-              u.full_name AS advisor_name, u.email AS advisor_email
-       FROM admin_classes c
-       LEFT JOIN advisor_class ac ON ac.class_code = c.code
-       LEFT JOIN users u ON u.id = ac.advisor_id
-       WHERE c.code = $1`,
+               u.full_name AS advisor_name, u.email AS advisor_email
+        FROM admin_classes c
+        LEFT JOIN advisor_class ac ON ac.class_code = c.code
+        LEFT JOIN users u ON u.id = ac.advisor_id
+        WHERE c.code = $1`,
         [code]
     );
 
@@ -361,13 +412,13 @@ app.get("/classes/:code", verifyToken, async (req, res) => {
            , 2), 0
          ) AS gpa,
          COUNT(CASE WHEN g.letter_grade = 'F' THEN 1 END)::int AS fail_count
-       FROM students s
-       LEFT JOIN enrollments e  ON e.student_id = s.id
-       LEFT JOIN grades g       ON g.enrollment_id = e.id
-       LEFT JOIN courses co     ON co.id = e.course_id
-       WHERE s.class_code = $1
-       GROUP BY s.id, s.mssv, s.full_name
-       ORDER BY s.full_name ASC`,
+        FROM students s
+        LEFT JOIN enrollments e  ON e.student_id = s.id
+        LEFT JOIN grades g       ON g.enrollment_id = e.id
+        LEFT JOIN courses co     ON co.id = e.course_id
+        WHERE s.class_code = $1
+        GROUP BY s.id, s.mssv, s.full_name
+        ORDER BY s.full_name ASC`,
         [code]
     );
 
@@ -416,6 +467,71 @@ app.get("/api/search", verifyToken, async (req, res) => {
   }
 });
 
-app.listen(4000, () => {
-  console.log("Backend running on http://localhost:4000");
+// ==========================================
+// CÁC API MỚI CHO TÍNH NĂNG NHẮN TIN
+// ==========================================
+
+/**
+ * Lấy danh sách các cuộc hội thoại của Cố vấn hiện tại
+ */
+app.get('/conversations', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT c.id, c.student_id, s.full_name AS name, s.mssv AS idNumber,
+        (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS lastMessage,
+        (SELECT TO_CHAR(created_at, 'HH24:MI') FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) AS time
+      FROM conversations c
+      JOIN students s ON s.id = c.student_id
+      WHERE c.advisor_id = $1
+      ORDER BY c.created_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Lỗi lấy danh sách hội thoại:", err.message);
+    res.status(500).json({ message: 'Lỗi lấy danh sách chat' });
+  }
+});
+
+/**
+ * Lấy lịch sử tin nhắn của một cuộc hội thoại cụ thể
+ */
+app.get('/conversations/:id/messages', verifyToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC`,
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Lỗi lấy tin nhắn:", err.message);
+    res.status(500).json({ message: 'Lỗi lấy tin nhắn' });
+  }
+});
+
+/**
+ * Khởi tạo cuộc hội thoại mới (nếu chưa có)
+ */
+app.post('/conversations', verifyToken, async (req, res) => {
+  try {
+    const { student_id } = req.body;
+    
+    // Kiểm tra xem đã có conversation giữa advisor này và student này chưa
+    const result = await pool.query(`
+  INSERT INTO conversations (advisor_id, student_id)
+  VALUES ($1, $2)
+  ON CONFLICT (advisor_id, student_id) DO UPDATE
+    SET advisor_id = EXCLUDED.advisor_id
+  RETURNING id
+`, [req.user.id, student_id]);
+
+res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Lỗi tạo cuộc hội thoại:", err.message);
+    res.status(500).json({ message: 'Lỗi tạo cuộc hội thoại' });
+  }
+});
+
+// !!! QUAN TRỌNG: Dùng httpServer.listen thay vì app.listen !!!
+httpServer.listen(4000, () => {
+  console.log("Backend & Socket.io running on http://localhost:4000");
 });

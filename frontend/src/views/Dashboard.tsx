@@ -118,6 +118,16 @@ export const Dashboard = () => {
 
   const isErrorRow = (i: number) => i % 2 === 0;
 
+  const translatePerformanceName = (name: string) => {
+    const map: Record<string, string> = {
+      Excellent: 'Xuất sắc',
+      Good: 'Tốt',
+      Average: 'Trung bình',
+      Poor: 'Yếu',
+    };
+    return map[name] || name;
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-12 max-w-6xl mx-auto xl:mx-0">
       <div className="mb-10">
@@ -139,7 +149,7 @@ export const Dashboard = () => {
               <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">Theo dõi sinh viên có nguy cơ</p>
             </div>
             <button className="text-primary text-xs font-bold uppercase tracking-widest hover:opacity-70 transition-opacity cursor-pointer">
-              View All
+              Xem tất cả
             </button>
           </div>
 
@@ -178,7 +188,7 @@ export const Dashboard = () => {
                   </tr>
                 ) : (
                   riskStudents.map((s, i) => {
-                    const nameParts = (s.full_name || 'Anonymous').split(' ');
+                    const nameParts = (s.full_name || 'Chưa có tên').split(' ');
                     const initials = nameParts.length > 1
                       ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
                       : nameParts[0][0];
@@ -209,7 +219,7 @@ export const Dashboard = () => {
                         <td
                           className={`py-4 text-right font-mono ${isErr ? 'text-error' : 'text-orange-600'} font-bold`}
                         >
-                          {s.credit_debt > 0 ? `${s.credit_debt} CR` : '—'}
+                          {s.credit_debt > 0 ? `${s.credit_debt} TC` : '—'}
                         </td>
                       </tr>
                     );
@@ -225,7 +235,7 @@ export const Dashboard = () => {
           <div className="mb-6">
             <h3 className="text-xl font-headline font-bold text-blue-900">Phân bố học lực</h3>
             <p className="text-[10px] font-bold text-primary uppercase tracking-[0.1em] mt-1">
-              Học kỳ: Fall 2026 - UIT
+              Học kỳ: Thu 2026 - UIT
             </p>
           </div>
 
@@ -262,7 +272,7 @@ export const Dashboard = () => {
                       {Number(stats.avgGpa).toFixed(2)}
                     </span>
                     <span className="text-[9px] uppercase tracking-widest font-bold text-slate-400 mt-1">
-                      Avg GPA
+                      GPA TB
                     </span>
                   </div>
                 </div>
@@ -276,7 +286,7 @@ export const Dashboard = () => {
                       />
                       <div>
                         <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">
-                          {item.name}
+                          {translatePerformanceName(item.name)}
                         </p>
                         <p className="text-sm font-bold text-on-surface">{item.value}%</p>
                       </div>
@@ -291,9 +301,9 @@ export const Dashboard = () => {
         {/* KILLER SUBJECTS */}
         <section className="col-span-12 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
           <div className="mb-10">
-            <h3 className="text-xl font-headline font-bold text-blue-900">Killer Subjects</h3>
+            <h3 className="text-xl font-headline font-bold text-blue-900">Môn học có tỉ lệ rớt cao</h3>
             <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">
-              High Failure Rate Analysis (Current Term)
+              Phân tích các môn có tỉ lệ rớt cao trong học kỳ hiện tại
             </p>
           </div>
 

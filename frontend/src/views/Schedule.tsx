@@ -22,13 +22,13 @@ export const Schedule = () => {
   };
 
   const renderMonthView = () => {
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
     const calendarDays = Array.from({length: 31}, (_, i) => i + 1);
 
     return (
       <div className="bg-white rounded-[2rem] shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 p-6 sm:p-10 overflow-hidden mb-8 animate-in fade-in duration-500">
         <div className="flex justify-between items-center mb-8">
-            <h3 className="font-serif font-black text-2xl text-on-surface">October 2026</h3>
+            <h3 className="font-serif font-black text-2xl text-on-surface">Tháng 10 năm 2026</h3>
             <div className="flex gap-2">
                 <button className="p-2 border border-slate-200 rounded-full hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"><ChevronLeft className="w-5 h-5"/></button>
                 <button className="p-2 border border-slate-200 rounded-full hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"><ChevronRight className="w-5 h-5"/></button>
@@ -53,8 +53,8 @@ export const Schedule = () => {
                >
                  <span className={cn("text-xs sm:text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center mb-1", date === 23 ? "bg-primary text-white shadow-sm" : "text-slate-600")}>{date}</span>
                  <div className="mt-auto space-y-1 flex flex-col">
-                    {hasClass && <div className="text-[8px] sm:text-[9px] bg-primary-fixed text-on-primary-fixed-variant px-1.5 py-0.5 rounded font-bold truncate">2 Classes</div>}
-                    {hasMeet && <div className="text-[8px] sm:text-[9px] bg-secondary-fixed text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-bold truncate">1 Meeting</div>}
+                    {hasClass && <div className="text-[8px] sm:text-[9px] bg-primary-fixed text-on-primary-fixed-variant px-1.5 py-0.5 rounded font-bold truncate">2 lớp</div>}
+                    {hasMeet && <div className="text-[8px] sm:text-[9px] bg-secondary-fixed text-on-secondary-fixed-variant px-1.5 py-0.5 rounded font-bold truncate">1 cuộc họp</div>}
                  </div>
                </div>
              )
@@ -76,40 +76,40 @@ export const Schedule = () => {
       {/* Days Columns */}
       {[
         {
-          day: 'Mon', date: '23', events: [
-            { type: 'class', code: 'CS101', title: 'Data Structures', room: 'C214', time: '07:30 - 09:00', icon: MapPin },
-            { type: 'consult', subtitle: 'Office Hours', title: 'Walk-in Advising', time: '14:15 - 15:45' }
+          day: 'Thứ 2', date: '23', events: [
+            { type: 'class', code: 'CS101', title: 'Cấu trúc dữ liệu', room: 'C214', time: '07:30 - 09:00', icon: MapPin },
+            { type: 'consult', subtitle: 'Giờ tư vấn', title: 'Tư vấn trực tiếp', time: '14:15 - 15:45' }
           ]
         },
         {
-          day: 'Tue', date: '24', events: [
+          day: 'Thứ 3', date: '24', events: [
             { type: 'spacer', height: '140px' },
-            { type: 'admin', code: 'ADMIN', title: 'KHMT 2023.2 Cohort Meeting', room: 'B5.06', time: '09:15 - 11:30', icon: Users }
+            { type: 'admin', code: 'ADMIN', title: 'Họp lớp KHMT 2023.2', room: 'B5.06', time: '09:15 - 11:30', icon: Users }
           ]
         },
         {
-          day: 'Wed', date: '25', events: [
-            { type: 'class', code: 'CS204', title: 'Algorithm Design', room: 'Hall A', time: '07:30 - 09:30', icon: MapPin },
+          day: 'Thứ 4', date: '25', events: [
+            { type: 'class', code: 'CS204', title: 'Thiết kế thuật toán', room: 'Hội trường A', time: '07:30 - 09:30', icon: MapPin },
             { type: 'spacer', height: '20px' },
             { type: 'reserved' }
           ]
         },
         {
-          day: 'Thu', date: '26', events: [
+          day: 'Thứ 5', date: '26', events: [
             { type: 'spacer', height: '150px' },
-            { type: 'consult', subtitle: 'Faculty Advisory', title: 'Postgrad Review Panel', time: '12:30 - 14:00' },
-            { type: 'class', code: 'CS101', title: 'Data Structures', room: 'C214 Lab', time: '14:15 - 16:00' }
+            { type: 'consult', subtitle: 'Tư vấn khoa', title: 'Hội đồng xét sau đại học', time: '12:30 - 14:00' },
+            { type: 'class', code: 'CS101', title: 'Cấu trúc dữ liệu', room: 'C214 Lab', time: '14:15 - 16:00' }
           ]
         },
         {
-          day: 'Fri', date: '27', events: [
-            { type: 'admin', code: 'DEPT', title: 'Curriculum Sync', room: 'Zoom', time: '09:15 - 10:45', icon: Video },
+          day: 'Thứ 6', date: '27', events: [
+            { type: 'admin', code: 'DEPT', title: 'Đồng bộ chương trình đào tạo', room: 'Zoom', time: '09:15 - 10:45', icon: Video },
             { type: 'spacer', height: '40px' },
-            { type: 'break', title: 'Advising Break' }
+            { type: 'break', title: 'Nghỉ giữa buổi tư vấn' }
           ]
         },
         {
-          day: 'Sat', date: '28', events: [
+          day: 'Thứ 7', date: '28', events: [
             { type: 'weekend' }
           ]
         }
@@ -125,7 +125,7 @@ export const Schedule = () => {
             if (ev.type === 'spacer') return <div key={j} style={{ height: ev.height }}></div>;
             if (ev.type === 'reserved') return (
               <div key={j} onContextMenu={(e) => handleContextMenu(e, ev)} className="bg-slate-100/80 border border-slate-200/50 border-dashed h-32 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-slate-200/50 transition-colors">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Reserved</span>
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Đã đặt</span>
               </div>
             );
             if (ev.type === 'break') return (
@@ -135,7 +135,7 @@ export const Schedule = () => {
             );
             if (ev.type === 'weekend') return (
               <div key={j} className="bg-gradient-to-br from-slate-100 to-slate-200/50 h-[400px] border border-slate-200/50 rounded-3xl flex flex-col items-center justify-center gap-4 text-center p-6 opacity-70">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Departmental<br/>Rest Day</span>
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Ngày nghỉ<br/>của khoa</span>
               </div>
             );
             if (ev.type === 'consult') return (
@@ -183,10 +183,12 @@ export const Schedule = () => {
     <div className="space-y-12 animate-in fade-in duration-500 pt-8 pb-12 max-w-7xl mx-auto xl:mx-0">
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
         <div>
-          <h2 className="font-serif text-4xl font-black text-on-surface mb-2">Weekly Advisor Schedule</h2>
+          <h2 className="text-4xl font-sans font-black text-on-surface tracking-normal mb-2">
+  Lịch cố vấn trong tuần
+</h2>
           <p className="text-secondary font-medium flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 flex-shrink-0" />
-            October 2026
+            Tháng 10 năm 2026
           </p>
         </div>
         <div className="flex bg-surface-container-low p-1.5 rounded-2xl shadow-sm border border-slate-100/50">
@@ -219,19 +221,21 @@ export const Schedule = () => {
           <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
             <Users className="w-64 h-64 text-primary" />
           </div>
-          <h3 className="font-serif text-2xl font-bold text-on-surface mb-8 relative z-10">Advisor Summary</h3>
+          <h3 className="text-xl font-sans font-bold text-blue-900">
+  Tổng quan lịch cố vấn
+</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 relative z-10">
             <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Total Classes</p>
-              <p className="text-3xl font-black font-serif text-primary">14 <span className="text-sm font-medium text-slate-500 font-sans ml-1">hours/week</span></p>
+              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Tổng giờ lớp</p>
+              <p className="text-3xl font-black font-serif text-primary">14 <span className="text-sm font-medium text-slate-500 font-sans ml-1">giờ/tuần</span></p>
             </div>
             <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Consultations</p>
-              <p className="text-3xl font-black font-serif text-secondary">08 <span className="text-sm font-medium text-slate-500 font-sans ml-1">booked</span></p>
+              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Buổi tư vấn</p>
+              <p className="text-3xl font-black font-serif text-secondary">08 <span className="text-sm font-medium text-slate-500 font-sans ml-1">đã đặt</span></p>
             </div>
             <div>
-              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Room Occupancy</p>
-              <p className="text-3xl font-black font-serif text-green-600">82% <span className="text-sm font-medium text-slate-500 font-sans ml-1">efficiency</span></p>
+              <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Mức sử dụng phòng</p>
+              <p className="text-3xl font-black font-serif text-green-600">82% <span className="text-sm font-medium text-slate-500 font-sans ml-1">hiệu suất</span></p>
             </div>
           </div>
         </div>
@@ -239,12 +243,14 @@ export const Schedule = () => {
         <div className="w-full lg:w-96 bg-gradient-to-br from-primary to-primary-container p-10 rounded-[2.5rem] text-white shadow-xl shadow-primary/20 flex flex-col justify-between relative overflow-hidden group">
           <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:bg-white/20 transition-colors duration-700"></div>
           <div className="relative z-10">
-            <h4 className="font-serif text-2xl font-bold mb-3">Next Priority</h4>
-            <p className="text-primary-fixed text-sm opacity-90 leading-relaxed font-medium">Review degree paths for Cohort 2023.2 before Tuesday meeting.</p>
+            <h3 className="text-xl font-sans font-bold text-white">
+  Ưu tiên tiếp theo
+</h3>
+            <p className="text-primary-fixed text-sm opacity-90 leading-relaxed font-medium">Rà soát lộ trình tốt nghiệp của lớp 2023.2 trước cuộc họp thứ Ba.</p>
           </div>
           <button className="w-full mt-10 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-bold py-4 rounded-2xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer border border-white/20 relative z-10">
             <Edit className="w-4 h-4" />
-            Prepare Brief
+            Chuẩn bị tư vấn
           </button>
         </div>
       </div>

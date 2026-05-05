@@ -11,17 +11,17 @@ export const AISupportWidget = () => {
     {
       id: 1,
       isBot: true,
-      text: "Hello Dr. Thorne! I'm your AI Academic Assistant. How can I help you analyze your student data today?",
+      text: "Xin chào Thầy/Cô! Tôi là trợ lý học vụ AI. Tôi có thể giúp gì trong việc phân tích dữ liệu sinh viên hôm nay?",
     },
     {
       id: 2,
       isBot: true,
       type: 'suggestions',
       suggestions: [
-        "Which students are at highest risk?",
-        "Summarize the performance of KHMT 2023.2",
-        "Are there anomalies in Data Structures?",
-        "Draft an email to failing students"
+        "Sinh viên nào đang có nguy cơ cao nhất?",
+        "Tóm tắt tình hình học tập của KHMT 2023.2",
+        "Có điểm bất thường trong môn Cấu trúc dữ liệu không?",
+        "Soạn email gửi sinh viên rớt môn"
       ]
     }
   ]);
@@ -50,7 +50,7 @@ export const AISupportWidget = () => {
       setMessages(prev => [...prev, {
         id: Date.now(),
         isBot: true,
-        text: "I'm analyzing the requested data. Based on the current academic records: Elena Jenkins and Sarah Tish show the sharpest GPA drops. Would you like me to prepare an intervention report for them?"
+        text: "Tôi đang phân tích dữ liệu. Dựa trên hồ sơ học tập hiện tại, một số sinh viên có mức giảm GPA đáng chú ý và cần được theo dõi sớm. Thầy/Cô có muốn tôi lập báo cáo can thiệp không?"
       }]);
     }, 1000);
   };
@@ -83,8 +83,8 @@ export const AISupportWidget = () => {
               <Bot className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-bold text-sm leading-tight">AI Advisor Assistant</h3>
-              <p className="text-[10px] text-primary-fixed uppercase tracking-wider font-semibold">Online</p>
+              <h3 className="font-bold text-sm leading-tight">Trợ lý cố vấn AI</h3>
+              <p className="text-[10px] text-primary-fixed uppercase tracking-wider font-semibold">Đang trực tuyến</p>
             </div>
           </div>
           <button 
@@ -95,13 +95,13 @@ export const AISupportWidget = () => {
           </button>
         </div>
 
-        {/* Messages Body */}
+        {/* Nội dung tin nhắn */}
         <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 flex flex-col gap-4">
           {messages.map((msg) => (
             <React.Fragment key={msg.id}>
               {msg.type === 'suggestions' ? (
                 <div className="flex flex-col gap-2 mt-2 animate-in fade-in slide-in-from-bottom-2">
-                  <p className="text-xs text-slate-500 font-medium ml-1">Suggested questions:</p>
+                  <p className="text-xs text-slate-500 font-medium ml-1">Câu hỏi gợi ý:</p>
                   <div className="flex flex-wrap gap-2">
                     {msg.suggestions?.map((suggestion, idx) => (
                       <button
@@ -145,7 +145,7 @@ export const AISupportWidget = () => {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend(inputValue)}
-              placeholder="Ask anything about your cohorts..." 
+              placeholder="Nhập câu hỏi về lớp hoặc sinh viên..." 
               className="flex-1 bg-transparent border-none text-sm px-3 focus:ring-0 outline-none text-slate-700 placeholder:text-slate-400"
             />
             <button 

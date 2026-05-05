@@ -8,31 +8,31 @@ export const LogNotes = () => {
       id: 1,
       studentName: 'Elena Jenkins',
       studentId: '#2948-AD',
-      date: 'Oct 24, 2026',
-      type: 'Meeting',
-      content: 'Discussed recent drop in Advanced Calculus grade. Elena cited personal reasons and requested a tutor. Assigned peer tutor and scheduled follow-up for next week.',
+      date: '24/10/2026',
+      type: 'Buổi gặp',
+      content: 'Trao đổi về việc điểm Giải tích nâng cao giảm gần đây. Sinh viên nêu lý do cá nhân và đề nghị được hỗ trợ học tập. Đã phân công sinh viên hỗ trợ và lên lịch theo dõi vào tuần tới.',
       priority: 'high',
-      author: 'Dr. Aris Thorne'
+      author: 'TS. Aris Thorne'
     },
     {
       id: 2,
       studentName: 'Marcus Miller',
       studentId: '#3102-BC',
-      date: 'Oct 22, 2026',
-      type: 'Academic Warning',
-      content: 'Sent official warning regarding consecutive absences in Data Structures. Student has not responded to email.',
+      date: '22/10/2026',
+      type: 'Cảnh báo học vụ',
+      content: 'Đã gửi cảnh báo chính thức về việc vắng liên tiếp trong môn Cấu trúc dữ liệu. Sinh viên chưa phản hồi email.',
       priority: 'medium',
-      author: 'Dr. Aris Thorne'
+      author: 'TS. Aris Thorne'
     },
     {
       id: 3,
       studentName: 'Sarah Tish',
       studentId: '#1185-FX',
-      date: 'Oct 18, 2026',
-      type: 'Milestone',
-      content: 'Successfully completed all degree requirements with honors. Cleared for graduation ceremony.',
+      date: '18/10/2026',
+      type: 'Cột mốc',
+      content: 'Đã hoàn tất toàn bộ yêu cầu tốt nghiệp với thành tích tốt. Đủ điều kiện tham dự lễ tốt nghiệp.',
       priority: 'low',
-      author: 'Dr. Aris Thorne'
+      author: 'TS. Aris Thorne'
     }
   ];
 
@@ -40,13 +40,13 @@ export const LogNotes = () => {
     <div className="space-y-8 animate-in fade-in duration-500 pb-12 max-w-6xl mx-auto xl:mx-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-10">
         <div>
-          <h2 className="text-4xl font-headline font-black text-on-surface tracking-tight mb-2">Log Notes</h2>
-          <p className="text-on-surface-variant font-medium">Record and track advising interactions and student updates.</p>
+          <h2 className="text-4xl font-headline font-black text-on-surface tracking-tight mb-2">Ghi chú tư vấn</h2>
+          <p className="text-on-surface-variant font-medium">Ghi nhận và theo dõi các buổi tư vấn cùng cập nhật tình hình sinh viên.</p>
         </div>
         
         <button className="flex-shrink-0 bg-primary hover:bg-primary/90 text-on-primary px-6 py-3 rounded-full font-semibold text-sm shadow-sm transition-all flex items-center gap-2">
           <Plus className="w-5 h-5" />
-          New Note
+          Thêm ghi chú
         </button>
       </div>
 
@@ -56,14 +56,14 @@ export const LogNotes = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input 
               type="text" 
-              placeholder="Search notes, student names..." 
+              placeholder="Tìm ghi chú, tên sinh viên..." 
               className="w-full bg-white border border-slate-200 rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
             />
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2 border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 text-sm font-medium transition-colors">
               <Filter className="w-4 h-4" />
-              Filter
+              Lọc
             </button>
           </div>
         </div>
@@ -104,7 +104,7 @@ export const LogNotes = () => {
                 </p>
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
-                    Author: {note.author}
+                    Người ghi: {note.author}
                   </p>
                   <span className={cn(
                     "px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
@@ -112,7 +112,7 @@ export const LogNotes = () => {
                     note.priority === 'medium' ? "bg-orange-500/10 text-orange-600" :
                     "bg-green-500/10 text-green-600"
                   )}>
-                    {note.priority} Priority
+                    {note.priority === 'high' ? 'Ưu tiên cao' : note.priority === 'medium' ? 'Ưu tiên trung bình' : 'Ưu tiên thấp'}
                   </span>
                 </div>
               </div>

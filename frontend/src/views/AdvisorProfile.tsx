@@ -53,7 +53,7 @@ export const AdvisorProfile = () => {
                     {user?.role === 'ADVISOR' ? 'Cố vấn Học vụ' : 'Quản trị viên'}
                   </h1>
                   <p className="text-lg text-primary font-bold mt-1">
-                    {user?.email?.split('@')[0].toUpperCase() || 'Dr. Aris Thorne'}
+                    {user?.email?.split('@')[0].toUpperCase() || 'TS. Aris Thorne'}
                   </p>
                   <p className="text-sm font-medium text-slate-500 mt-1 flex items-center gap-1.5">
                     <Building className="w-4 h-4" />
@@ -113,7 +113,7 @@ export const AdvisorProfile = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-slate-900">Tiến sĩ Khoa học Máy tính</h4>
-                  <p className="text-[13px] text-slate-500 mt-0.5">Stanford University, 2012</p>
+                  <p className="text-[13px] text-slate-500 mt-0.5">Đại học Stanford, 2012</p>
                 </div>
               </div>
               <div className="flex gap-4 items-start">
@@ -149,7 +149,7 @@ export const AdvisorProfile = () => {
           <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-[0_10px_30px_rgba(0,0,0,0.02)]">
             <h3 className="font-bold text-lg text-slate-900 mb-4">Tiểu sử chuyên môn</h3>
             <p className="text-slate-600 leading-relaxed text-sm">
-              Với hơn 14 năm kinh nghiệm trong giáo dục đại học và phát triển chương trình giảng dạy. Chuyên sâu về Kỹ thuật Phần mềm và Cấu trúc dữ liệu nâng cao, Dr. Aris Thorne tận tâm thu hẹp khoảng cách giữa lý thuyết học thuật và thực hành công nghiệp. Với tư cách là Cố vấn học vụ cấp cao tại UIT, cô tập trung vào việc hướng dẫn sinh viên vượt qua các lộ trình học tập khắt khe và xây dựng môi trường học tập cộng tác.
+              Với hơn 14 năm kinh nghiệm trong giáo dục đại học và phát triển chương trình giảng dạy. Chuyên sâu về Kỹ thuật Phần mềm và Cấu trúc dữ liệu nâng cao, TS. Aris Thorne tận tâm thu hẹp khoảng cách giữa lý thuyết học thuật và thực hành công nghiệp. Với tư cách là Cố vấn học vụ cấp cao tại UIT, cô tập trung vào việc hướng dẫn sinh viên vượt qua các lộ trình học tập khắt khe và xây dựng môi trường học tập cộng tác.
             </p>
           </div>
 
@@ -164,8 +164,8 @@ export const AdvisorProfile = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { code: 'IT001', name: 'Cấu trúc dữ liệu', term: 'Fall 2026', students: 124, type: 'Cốt lõi' },
-                { code: 'SE302', name: 'Kiến trúc Phần mềm', term: 'Fall 2026', students: 85, type: 'Cốt lõi' },
+                { code: 'IT001', name: 'Cấu trúc dữ liệu', term: 'Thu 2026', students: 124, type: 'Cốt lõi' },
+                { code: 'SE302', name: 'Kiến trúc Phần mềm', term: 'Thu 2026', students: 85, type: 'Cốt lõi' },
               ].map((cls, idx) => (
                 <div key={idx} className="border border-slate-100 rounded-2xl p-5 hover:border-primary/30 transition-colors group">
                   <div className="flex justify-between items-start mb-3">

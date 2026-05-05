@@ -73,12 +73,12 @@ setSearchResults(Array.isArray(data) ? data : []);
   };
 
   const notifications = [
-    { id: 1, type: 'request', title: 'Room Booking Request',
-      message: 'Minh Quan Tran requested to book C.203 for group study.',
-      time: '10 min ago', icon: Calendar, color: 'bg-blue-100 text-blue-600' },
-    { id: 2, type: 'message', title: 'New Message',
-      message: 'Hoang Phuc Nguyen sent you a message regarding the assignment.',
-      time: '1 hour ago', icon: MessageSquare, color: 'bg-green-100 text-green-600' },
+    { id: 1, type: 'request', title: 'Yêu cầu đặt phòng',
+      message: 'Minh Quân Trần yêu cầu đặt phòng C.203 để học nhóm.',
+      time: '10 phút trước', icon: Calendar, color: 'bg-blue-100 text-blue-600' },
+    { id: 2, type: 'message', title: 'Tin nhắn mới',
+      message: 'Hoàng Phúc Nguyễn đã gửi tin nhắn về bài tập.',
+      time: '1 giờ trước', icon: MessageSquare, color: 'bg-green-100 text-green-600' },
   ];
 
   return (
@@ -86,7 +86,7 @@ setSearchResults(Array.isArray(data) ? data : []);
 
         {/* Title */}
         <div className="font-headline text-lg xl:text-xl font-black text-slate-900 dark:text-white tracking-tight shrink-0 truncate">
-          <span className="hidden md:block">University of Information Technology</span>
+          <span className="hidden md:block">Trường Đại học Công nghệ Thông tin</span>
           <span className="block md:hidden">UIT</span>
         </div>
 
@@ -160,8 +160,8 @@ setSearchResults(Array.isArray(data) ? data : []);
             {showNotifications && (
                 <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.12)] border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-4">
                   <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <h3 className="font-bold text-slate-900">Notifications</h3>
-                    <span className="text-[10px] bg-error text-white px-2 py-0.5 rounded-full font-bold">2 New</span>
+                    <h3 className="font-bold text-slate-900">Thông báo</h3>
+                    <span className="text-[10px] bg-error text-white px-2 py-0.5 rounded-full font-bold">2 mới</span>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
                     {notifications.map(notif => (
@@ -177,8 +177,8 @@ setSearchResults(Array.isArray(data) ? data : []);
                             <p className="text-xs text-slate-500 leading-relaxed">{notif.message}</p>
                             {notif.type === 'request' && (
                                 <div className="flex gap-2 mt-3">
-                                  <button className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-bold cursor-pointer">Approve</button>
-                                  <button className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold cursor-pointer">Decline</button>
+                                  <button className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-bold cursor-pointer">Duyệt</button>
+                                  <button className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold cursor-pointer">Từ chối</button>
                                 </div>
                             )}
                           </div>
@@ -191,7 +191,7 @@ setSearchResults(Array.isArray(data) ? data : []);
                     ))}
                   </div>
                   <div className="p-3 text-center border-t border-slate-100 bg-slate-50/50">
-                    <button className="text-xs font-bold text-primary hover:opacity-80">View All Notifications</button>
+                    <button className="text-xs font-bold text-primary hover:opacity-80">Xem tất cả thông báo</button>
                   </div>
                 </div>
             )}
@@ -200,8 +200,8 @@ setSearchResults(Array.isArray(data) ? data : []);
           {/* Profile / Settings */}
           <div className="relative flex items-center gap-3 pl-4 border-l border-slate-200" ref={settingsRef}>
             <div className="text-right hidden xl:block">
-              <p className="text-sm font-bold text-slate-900 leading-tight">Dr. Aris Thorne</p>
-              <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Senior Academic Advisor</p>
+              <p className="text-sm font-bold text-slate-900 leading-tight">TS. Aris Thorne</p>
+              <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Cố vấn học vụ cấp cao</p>
             </div>
             <img
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGPsoi6jtLoIOFqL61CHW3yEocR4W4i5PKkgw7SNXR_l1VLx0I4zWCL1FjhkUdJKr5puu4URCMvS16HZCbuVSnA-dyEl7sCaMiyKa1DWYQ7vm9SfRWlQVhZnE-NmA-4MatocjVq-Q4RpQtaRa6-T3LPItIqI_jDZJxpH2Jywz4pjFPQra3dtez7-P6eXYPpUlxbpF6-4ecTV8DViDRbB7oPkRfaVqn7Hm9zTXD32jXACIXpwFlWv6TjF9SRqPeE7EPdhNzhK3BH60"
@@ -223,13 +223,13 @@ setSearchResults(Array.isArray(data) ? data : []);
                         onClick={() => { setCurrentView?.('profile'); setShowSettings(false); }}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer"
                     >
-                      <User className="w-4 h-4 ml-1" /> View Profile
+                      <User className="w-4 h-4 ml-1" /> Xem hồ sơ
                     </button>
                     <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer">
                       <UserCog className="w-4 h-4 ml-1" /> Edit Account Info
                     </button>
                     <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer">
-                      <Shield className="w-4 h-4 ml-1" /> Privacy & Security
+                      <Shield className="w-4 h-4 ml-1" /> Quyền riêng tư & bảo mật
                     </button>
                   </div>
                   <div className="p-2 border-t border-slate-100 bg-slate-50/50">
@@ -237,7 +237,7 @@ setSearchResults(Array.isArray(data) ? data : []);
                         onClick={() => onLogout?.()}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 hover:text-red-700 rounded-2xl transition-colors cursor-pointer"
                     >
-                      <LogOut className="w-4 h-4 ml-1" /> Log Out
+                      <LogOut className="w-4 h-4 ml-1" /> Đăng xuất
                     </button>
                   </div>
                 </div>

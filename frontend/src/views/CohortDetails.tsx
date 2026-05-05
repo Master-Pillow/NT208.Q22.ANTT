@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Download, Plus, AlertCircle } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import apiClient from '../lib/api';
 
 interface Student {
@@ -53,6 +54,52 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
   const atRiskCount  = students.filter(isAtRisk).length;
   const onTrackCount = students.length - atRiskCount;
 
+  const handleExportExcel = () => {
+  if (loading) {
+    alert('Dữ liệu đang tải, vui lòng thử lại sau.');
+    return;
+  }
+
+  if (students.length === 0) {
+    alert('Không có dữ liệu sinh viên để xuất.');
+    return;
+  }
+
+  const exportData = students.map((student, index) => ({
+    STT: index + 1,
+    MSSV: student.mssv,
+    'Họ và tên': student.full_name,
+    'Lớp': student.class_code,
+    'Khóa': student.cohort,
+    GPA: Number.isNaN(Number(student.current_gpa))
+      ? ''
+      : Number(student.current_gpa).toFixed(2),
+    'Nợ tín chỉ': Number.isNaN(Number(student.credit_debt))
+      ? 0
+      : Number(student.credit_debt),
+    'Trạng thái': isAtRisk(student) ? 'At Risk' : 'On Track',
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+  worksheet['!cols'] = [
+    { wch: 6 },   // STT
+    { wch: 14 },  // MSSV
+    { wch: 28 },  // Họ và tên
+    { wch: 14 },  // Lớp
+    { wch: 10 },  // Khóa
+    { wch: 10 },  // GPA
+    { wch: 14 },  // Nợ tín chỉ
+    { wch: 14 },  // Trạng thái
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Danh sách sinh viên');
+
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(workbook, `danh_sach_sinh_vien_${today}.xlsx`);
+};
+
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pt-8 pb-12 max-w-7xl mx-auto xl:mx-0">
 
@@ -86,9 +133,13 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
           )}
         </div>
         <div className="flex flex-wrap gap-3">
-          <button className="flex items-center px-6 py-3 bg-white rounded-full text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all border border-slate-200">
-            <Download className="w-4 h-4 mr-2" /> Export
-          </button>
+          <button
+  onClick={handleExportExcel}
+  disabled={loading || students.length === 0}
+  className="flex items-center px-6 py-3 bg-white rounded-full text-slate-700 font-bold text-sm shadow-sm hover:shadow-md transition-all border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+>
+  <Download className="w-4 h-4 mr-2" /> Xuất Excel
+</button>
           <button className="flex items-center px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-md shadow-primary/20 hover:shadow-lg transition-all">
             <Plus className="w-4 h-4 mr-2" /> Add Note
           </button>

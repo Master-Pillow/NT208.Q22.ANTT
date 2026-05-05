@@ -122,10 +122,10 @@ export const Dashboard = () => {
     <div className="space-y-8 animate-in fade-in duration-500 pb-12 max-w-6xl mx-auto xl:mx-0">
       <div className="mb-10">
         <h2 className="text-4xl font-headline font-black text-on-surface tracking-tight mb-2">
-          Academic Overview
+          Tổng quan học tập
         </h2>
         <p className="text-on-surface-variant font-medium">
-          Curating the student journey with precision and care at University of Information Technology.
+          Theo dõi tình hình học tập, cảnh báo rủi ro và hỗ trợ sinh viên tại Trường Đại học Công nghệ Thông tin.
         </p>
       </div>
 
@@ -135,8 +135,8 @@ export const Dashboard = () => {
         <section className="col-span-12 lg:col-span-7 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h3 className="text-xl font-headline font-bold text-blue-900">Red Flags</h3>
-              <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">At-Risk Student Monitoring</p>
+              <h3 className="text-xl font-headline font-bold text-blue-900">Cảnh báo học vụ</h3>
+              <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">Theo dõi sinh viên có nguy cơ</p>
             </div>
             <button className="text-primary text-xs font-bold uppercase tracking-widest hover:opacity-70 transition-opacity cursor-pointer">
               View All
@@ -147,7 +147,7 @@ export const Dashboard = () => {
             <table className="w-full text-left">
               <thead>
                 <tr className="text-[10px] uppercase tracking-widest text-slate-400 border-b border-surface-container/50">
-                  <th className="pb-4 font-semibold">Student Name</th>
+                  <th className="pb-4 font-semibold">Họ tên sinh viên</th>
                   <th className="pb-4 font-semibold">MSSV</th>
                   <th className="pb-4 font-semibold">GPA</th>
                   <th className="pb-4 font-semibold text-center">Nợ tín chỉ</th>
@@ -223,7 +223,7 @@ export const Dashboard = () => {
         {/* PIE CHART */}
         <section className="col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 flex flex-col">
           <div className="mb-6">
-            <h3 className="text-xl font-headline font-bold text-blue-900">Performance Distribution</h3>
+            <h3 className="text-xl font-headline font-bold text-blue-900">Phân bố học lực</h3>
             <p className="text-[10px] font-bold text-primary uppercase tracking-[0.1em] mt-1">
               Học kỳ: Fall 2026 - UIT
             </p>

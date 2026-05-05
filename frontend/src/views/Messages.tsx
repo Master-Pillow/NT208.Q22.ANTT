@@ -341,7 +341,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
               </div>
             </div>
 
-            {/* Messages Area */}
+            {/* Khu vực tin nhắn */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
               {loadingMsgs ? (
                 <div className="flex items-center justify-center gap-2 py-12 text-slate-400">

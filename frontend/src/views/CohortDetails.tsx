@@ -77,7 +77,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
     'Nợ tín chỉ': Number.isNaN(Number(student.credit_debt))
       ? 0
       : Number(student.credit_debt),
-    'Trạng thái': isAtRisk(student) ? 'At Risk' : 'On Track',
+    'Trạng thái': isAtRisk(student) ? 'Có nguy cơ' : 'Ổn định',
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -108,26 +108,26 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="w-3 h-3 rounded-full bg-green-500 shadow-sm shadow-green-500/50 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Active Cohort</span>
+            <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Lớp đang phụ trách</span>
           </div>
           <h2 className="font-headline text-4xl sm:text-5xl font-black text-on-surface tracking-tight mb-2">
             KHMT 2023.2
           </h2>
           <p className="text-on-surface-variant font-medium text-lg max-w-2xl">
-            B.S. in Computer Science • Standard Program
+            Cử nhân Khoa học Máy tính • Chương trình chuẩn
           </p>
           {!loading && !error && (
             <div className="flex items-center gap-3 mt-4">
               <span className="px-3.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-blue-100 text-blue-700">
-                {onTrackCount} On Track
+                {onTrackCount} Ổn định
               </span>
               {atRiskCount > 0 && (
                 <span className="px-3.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-red-100 text-red-700">
-                  {atRiskCount} At Risk
+                  {atRiskCount} Có nguy cơ
                 </span>
               )}
               <span className="text-xs font-semibold text-slate-400">
-                {students.length} Sinh viên tổng
+                Tổng {students.length} sinh viên
               </span>
             </div>
           )}
@@ -141,7 +141,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
   <Download className="w-4 h-4 mr-2" /> Xuất Excel
 </button>
           <button className="flex items-center px-6 py-3 bg-primary text-white rounded-full font-bold text-sm shadow-md shadow-primary/20 hover:shadow-lg transition-all">
-            <Plus className="w-4 h-4 mr-2" /> Add Note
+            <Plus className="w-4 h-4 mr-2" /> Thêm ghi chú
           </button>
         </div>
       </section>
@@ -152,12 +152,12 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100/80">
-                <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Student Name</th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Student ID</th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">GPA (Live)</th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Credit Debt</th>
-                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Status</th>
-                <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Actions</th>
+                <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Họ tên sinh viên</th>
+                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">MSSV</th>
+                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">GPA hiện tại</th>
+                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400">Tín chỉ nợ</th>
+                <th className="px-6 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Trạng thái</th>
+                <th className="px-8 py-5 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -232,7 +232,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
                     <td className="px-6 py-5">
                       {student.credit_debt > 0 ? (
                         <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 text-red-600">
-                          {student.credit_debt} CR
+                          {student.credit_debt} TC
                         </span>
                       ) : (
                         <span className="text-slate-400 text-xs font-medium">—</span>
@@ -240,7 +240,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
                     </td>
                     <td className="px-6 py-5 text-center">
                       <span className={`px-3.5 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-widest ${risk ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {risk ? 'At Risk' : 'On Track'}
+                        {risk ? 'Có nguy cơ' : 'Ổn định'}
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right">
@@ -251,7 +251,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
                         <svg className="w-3.5 h-3.5 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                           <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
                         </svg>
-                        Message
+                        Nhắn tin
                       </button>
                     </td>
                   </tr>

@@ -58,14 +58,14 @@ export const Login = ({ onLogin }: LoginProps) => {
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-10">
               <div className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center text-xl font-bold shadow-lg">U</div>
-              <span className="font-headline font-black text-xl tracking-tight">UIT AdvisorHub</span>
+              <span className="font-headline font-black text-xl tracking-tight">Trung tâm tư vấn UIT</span>
             </div>
             
             <h1 className="text-4xl lg:text-5xl font-serif font-black leading-tight mb-6">
-              Empower student <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">success</span>.
+              Tạo điều kiện cho sự <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">thành công của sinh viên</span>.
             </h1>
             <p className="text-slate-300 text-lg leading-relaxed max-w-sm">
-              The unified academic advising platform. Track cohorts, manage schedules, and guide students seamlessly.
+              Nền tảng tư vấn học thuật thống nhất. Theo dõi lớp sinh hoạt, quản lý lịch và hỗ trợ sinh viên một cách liền mạch.
             </p>
           </div>
 
@@ -75,8 +75,8 @@ export const Login = ({ onLogin }: LoginProps) => {
                 <Users className="w-5 h-5" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-white">Smart Profiling</p>
-                <p className="text-xs opacity-80 mt-0.5">Instant access to student analytics.</p>
+                <p className="text-sm font-bold text-white">Hồ sơ thông minh</p>
+                <p className="text-xs opacity-80 mt-0.5">Truy cập nhanh dữ liệu phân tích sinh viên.</p>
               </div>
             </div>
             <div className="flex items-center gap-4 text-slate-300">
@@ -84,8 +84,8 @@ export const Login = ({ onLogin }: LoginProps) => {
                 <BookOpen className="w-5 h-5" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-white">Cohort Management</p>
-                <p className="text-xs opacity-80 mt-0.5">Track graduation progress effortlessly.</p>
+                <p className="text-sm font-bold text-white">Quản lý lớp sinh hoạt</p>
+                <p className="text-xs opacity-80 mt-0.5">Theo dõi tiến độ tốt nghiệp dễ dàng.</p>
               </div>
             </div>
           </div>
@@ -96,12 +96,12 @@ export const Login = ({ onLogin }: LoginProps) => {
           
           <div className="md:hidden flex items-center gap-2 mb-8">
             <div className="w-8 h-8 bg-primary text-white rounded-lg flex items-center justify-center text-lg font-bold shadow-sm">U</div>
-            <span className="font-headline font-black text-xl tracking-tight text-slate-900">UIT AdvisorHub</span>
+            <span className="font-headline font-black text-xl tracking-tight text-slate-900">Trung tâm tư vấn UIT</span>
           </div>
 
           <div className="mb-8">
-            <h2 className="text-3xl font-black text-slate-900 font-headline mb-3">Welcome back</h2>
-            <p className="text-slate-500 font-medium">Please sign in to access your advisor dashboard.</p>
+            <h2 className="text-3xl font-black text-slate-900 font-headline mb-3">Chào mừng trở lại</h2>
+            <p className="text-slate-500 font-medium">Vui lòng đăng nhập để truy cập bảng điều khiển cố vấn.</p>
           </div>
 
           {/* Block hiển thị lỗi nếu có */}
@@ -114,7 +114,7 @@ export const Login = ({ onLogin }: LoginProps) => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 block">Edu Email Address</label>
+              <label className="text-sm font-bold text-slate-700 block">Địa chỉ email UIT</label>
               <div className="relative group">
                 <Mail className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
                 <input 
@@ -130,8 +130,8 @@ export const Login = ({ onLogin }: LoginProps) => {
 
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <label className="text-sm font-bold text-slate-700 block">Password</label>
-                <a href="#" className="text-sm font-bold text-primary hover:text-primary-container transition-colors">Forgot password?</a>
+                <label className="text-sm font-bold text-slate-700 block">Mật khẩu</label>
+                <a href="#" className="text-sm font-bold text-primary hover:text-primary-container transition-colors">Quên mật khẩu?</a>
               </div>
               <div className="relative group">
                 <Lock className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
@@ -155,7 +155,7 @@ export const Login = ({ onLogin }: LoginProps) => {
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               ) : (
                 <>
-                  Sign In to Dashboard
+                  Đăng nhập vào bảng điều khiển
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </>
               )}
@@ -165,8 +165,8 @@ export const Login = ({ onLogin }: LoginProps) => {
           <div className="mt-10 pt-8 border-t border-slate-100 flex items-start gap-3 bg-slate-50 p-4 rounded-2xl">
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-bold text-slate-700">Secure University Gateway</p>
-              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">This connection is encrypted. Authorized personnel only. Your IP and login attempts are monitored by UIT IT services.</p>
+              <p className="text-xs font-bold text-slate-700">Cổng đăng nhập đại học an toàn</p>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">Kết nối này đã được mã hóa. Chỉ nhân sự được cấp quyền mới có thể truy cập. Địa chỉ IP và các lần đăng nhập của bạn được hệ thống CNTT UIT giám sát.</p>
             </div>
           </div>
           

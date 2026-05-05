@@ -22,14 +22,14 @@ export const Schedule = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal Thêm Lịch
+  // Modal Thêm/Sửa Lịch
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingApptId, setEditingApptId] = useState<number | null>(null); // Thêm state này để lưu ID lịch đang sửa
   const [formData, setFormData] = useState({ title: '', date: '', startTime: '08:00', endTime: '09:00', type: 'MEETING', location: '' });
   const [submitting, setSubmitting] = useState(false);
 
-  // Cố định hiển thị tháng 10/2026 để khớp với thiết kế & data demo
   const currentYear = 2026;
-  const currentMonth = 9; // 9 = October (0-indexed)
+  const currentMonth = 9;
 
   const fetchAppointments = async () => {
     try {
@@ -56,9 +56,38 @@ export const Schedule = () => {
     setContextMenu({ x: e.clientX, y: e.clientY, dateStr, targetAppt: appt });
   };
 
+  // Mở modal ĐẶT LỊCH MỚI
   const handleOpenModal = (dateStr?: string) => {
     const defaultDate = dateStr || `${currentYear}-10-23`;
-    setFormData(prev => ({ ...prev, date: defaultDate }));
+    setFormData({ title: '', date: defaultDate, startTime: '08:00', endTime: '09:00', type: 'MEETING', location: '' });
+    setEditingApptId(null); // Reset ID vì đây là tạo mới
+    setIsModalOpen(true);
+    setContextMenu(null);
+  };
+
+  // Mở modal SỬA LỊCH CŨ
+  const handleEditClick = () => {
+    if (!contextMenu?.targetAppt) return;
+    const appt = contextMenu.targetAppt;
+
+    // Chuyển đổi start_time và end_time thành dạng input hiểu được
+    const startDate = new Date(appt.start_time);
+    const endDate = new Date(appt.end_time);
+
+    const dateStr = startDate.getFullYear() + '-' + String(startDate.getMonth() + 1).padStart(2, '0') + '-' + String(startDate.getDate()).padStart(2, '0');
+    const startStr = String(startDate.getHours()).padStart(2, '0') + ':' + String(startDate.getMinutes()).padStart(2, '0');
+    const endStr = String(endDate.getHours()).padStart(2, '0') + ':' + String(endDate.getMinutes()).padStart(2, '0');
+
+    setFormData({
+      title: appt.title,
+      date: dateStr,
+      startTime: startStr,
+      endTime: endStr,
+      type: appt.type,
+      location: appt.location || ''
+    });
+
+    setEditingApptId(appt.id); // Lưu lại ID để update
     setIsModalOpen(true);
     setContextMenu(null);
   };
@@ -73,19 +102,35 @@ export const Schedule = () => {
     }
   };
 
+  // Hàm Submit Xử lý cả TẠO MỚI và CẬP NHẬT
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
       const startISO = new Date(`${formData.date}T${formData.startTime}:00`).toISOString();
       const endISO = new Date(`${formData.date}T${formData.endTime}:00`).toISOString();
-      await apiClient.post('/appointments', {
-        title: formData.title, location: formData.location, start_time: startISO, end_time: endISO, type: formData.type
-      });
+      
+      const payload = {
+        title: formData.title, 
+        location: formData.location, 
+        start_time: startISO, 
+        end_time: endISO, 
+        type: formData.type
+      };
+
+      if (editingApptId) {
+        // Nếu có ID -> Gọi API PATCH để sửa
+        await apiClient.patch(`/appointments/${editingApptId}`, payload);
+      } else {
+        // Nếu không có ID -> Gọi API POST để tạo mới
+        await apiClient.post('/appointments', payload);
+      }
+
       setIsModalOpen(false);
+      setEditingApptId(null);
       fetchAppointments();
     } catch (error) {
-      alert('Có lỗi xảy ra khi tạo lịch.');
+      alert('Có lỗi xảy ra khi lưu lịch.');
     } finally {
       setSubmitting(false);
     }
@@ -94,7 +139,6 @@ export const Schedule = () => {
   // --- LỊCH THÁNG ---
   const renderMonthView = () => {
     const daysLabel = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-    // Tháng 10/2026 bắt đầu vào Thứ 5 (cần 3 ô trống đầu)
     const emptyDays = Array.from({length: 3}); 
     const calendarDays = Array.from({length: 31}, (_, i) => i + 1);
 
@@ -115,12 +159,10 @@ export const Schedule = () => {
           
           {calendarDays.map((date) => {
              const dateStr = `${currentYear}-10-${String(date).padStart(2, '0')}`;
-             // Lọc event trong ngày
              const dayEvents = appointments.filter(a => a.start_time.startsWith(dateStr));
              const classCount = dayEvents.filter(a => a.type === 'CLASS' || a.type === 'ADMIN').length;
              const meetCount = dayEvents.filter(a => a.type === 'MEETING' || a.type === 'CONSULT').length;
-             
-             const isToday = date === 23; // Giả lập hôm nay là ngày 23 theo design
+             const isToday = date === 23; 
 
              return (
                <div 
@@ -147,7 +189,6 @@ export const Schedule = () => {
 
   // --- LỊCH TUẦN ---
   const renderWeekView = () => {
-    // Tuần chứa ngày 23/10/2026 (Mon 19 -> Sun 25, ta lấy 23 đến 28 như design)
     const weekDays = [
       { day: 'MON', date: 23, fullDate: '2026-10-23' },
       { day: 'TUE', date: 24, fullDate: '2026-10-24' },
@@ -159,14 +200,12 @@ export const Schedule = () => {
 
     return (
       <div className="grid grid-cols-[80px_repeat(6,1fr)] gap-4 overflow-x-auto pb-4 animate-in fade-in duration-500">
-        {/* Cột thời gian */}
         <div className="pt-20 space-y-16 flex flex-col flex-shrink-0 min-w-[80px]">
           {['07:30', '09:15', '12:30', '14:15', '16:00'].map(time => (
             <div key={time} className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{time}</div>
           ))}
         </div>
 
-        {/* Cột các ngày */}
         {weekDays.map((col, i) => {
           const dayAppointments = appointments.filter(a => a.start_time.startsWith(col.fullDate));
 
@@ -193,7 +232,6 @@ export const Schedule = () => {
                   const startTimeStr = new Date(appt.start_time).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
                   const endTimeStr = new Date(appt.end_time).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
                   
-                  // Style logic dựa vào type
                   if (appt.type === 'CONSULT' || appt.type === 'MEETING') {
                     return (
                       <div key={appt.id} onContextMenu={(e) => handleContextMenu(e, col.fullDate, appt)} className="bg-blue-50/50 p-5 rounded-2xl border border-dashed border-blue-200 cursor-pointer hover:bg-blue-50 transition-colors">
@@ -204,7 +242,6 @@ export const Schedule = () => {
                     );
                   }
 
-                  // Class & Admin style
                   const isClass = appt.type === 'CLASS';
                   return (
                     <div key={appt.id} onContextMenu={(e) => handleContextMenu(e, col.fullDate, appt)} className="group cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all relative overflow-hidden">
@@ -269,12 +306,14 @@ export const Schedule = () => {
         </div>
       </div>
 
-      {/* MODAL THÊM LỊCH */}
+      {/* MODAL THÊM / SỬA LỊCH */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100]">
           <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-lg text-slate-800">Thêm Lịch Mới</h3>
+              <h3 className="font-bold text-lg text-slate-800">
+                {editingApptId ? 'Sửa Thông Tin Lịch' : 'Thêm Lịch Mới'}
+              </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -331,7 +370,8 @@ export const Schedule = () => {
             </button>
           ) : (
             <>
-              <button className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-slate-50 text-slate-700">
+              {/* NÚT SỬA THÔNG TIN ĐÃ CÓ onClick */}
+              <button onClick={handleEditClick} className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-slate-50 text-slate-700">
                 <PenLine className="w-4 h-4 text-orange-600" /> Sửa thông tin
               </button>
               <div className="h-px bg-slate-100 my-1 mx-2"></div>

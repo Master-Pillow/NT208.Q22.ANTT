@@ -1,54 +1,176 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, MapPin, Video, Users, Edit, MoreHorizontal, CalendarPlus, CalendarX, PenLine, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, Video, Users, Edit, MoreHorizontal, CalendarPlus, CalendarX, PenLine, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import apiClient from '../lib/api';
+
+// --- TYPES ---
+interface Appointment {
+  id: number;
+  student_id: number | null;
+  title: string;
+  location: string;
+  start_time: string;
+  end_time: string;
+  type: string;
+}
 
 export const Schedule = () => {
-  const [scheduleView, setScheduleView] = useState<'day' | 'week' | 'month'>('week');
-  const [contextMenu, setContextMenu] = useState<{x: number, y: number, item: any} | null>(null);
+  const [scheduleView, setScheduleView] = useState<'week' | 'month'>('week');
+  const [contextMenu, setContextMenu] = useState<{x: number, y: number, dateStr?: string, targetAppt?: Appointment} | null>(null);
+  
+  // Dữ liệu API
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal Thêm/Sửa Lịch
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingApptId, setEditingApptId] = useState<number | null>(null); // Thêm state này để lưu ID lịch đang sửa
+  const [formData, setFormData] = useState({ title: '', date: '', startTime: '08:00', endTime: '09:00', type: 'MEETING', location: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  const currentYear = 2026;
+  const currentMonth = 9;
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+      const { data } = await apiClient.get('/appointments');
+      setAppointments(data);
+    } catch (error) {
+      console.error("Lỗi khi tải lịch hẹn:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
+    fetchAppointments();
     const handleClick = () => setContextMenu(null);
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
 
-  const handleContextMenu = (e: React.MouseEvent, item: any) => {
+  const handleContextMenu = (e: React.MouseEvent, dateStr?: string, appt?: Appointment) => {
     e.preventDefault();
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      item
-    });
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, dateStr, targetAppt: appt });
   };
 
+  // Mở modal ĐẶT LỊCH MỚI
+  const handleOpenModal = (dateStr?: string) => {
+    const defaultDate = dateStr || `${currentYear}-10-23`;
+    setFormData({ title: '', date: defaultDate, startTime: '08:00', endTime: '09:00', type: 'MEETING', location: '' });
+    setEditingApptId(null); // Reset ID vì đây là tạo mới
+    setIsModalOpen(true);
+    setContextMenu(null);
+  };
+
+  // Mở modal SỬA LỊCH CŨ
+  const handleEditClick = () => {
+    if (!contextMenu?.targetAppt) return;
+    const appt = contextMenu.targetAppt;
+
+    // Chuyển đổi start_time và end_time thành dạng input hiểu được
+    const startDate = new Date(appt.start_time);
+    const endDate = new Date(appt.end_time);
+
+    const dateStr = startDate.getFullYear() + '-' + String(startDate.getMonth() + 1).padStart(2, '0') + '-' + String(startDate.getDate()).padStart(2, '0');
+    const startStr = String(startDate.getHours()).padStart(2, '0') + ':' + String(startDate.getMinutes()).padStart(2, '0');
+    const endStr = String(endDate.getHours()).padStart(2, '0') + ':' + String(endDate.getMinutes()).padStart(2, '0');
+
+    setFormData({
+      title: appt.title,
+      date: dateStr,
+      startTime: startStr,
+      endTime: endStr,
+      type: appt.type,
+      location: appt.location || ''
+    });
+
+    setEditingApptId(appt.id); // Lưu lại ID để update
+    setIsModalOpen(true);
+    setContextMenu(null);
+  };
+
+  const handleDeleteAppt = async (id: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn hủy lịch này?')) return;
+    try {
+      await apiClient.delete(`/appointments/${id}`);
+      fetchAppointments();
+    } catch (error) {
+      alert('Không thể hủy lịch.');
+    }
+  };
+
+  // Hàm Submit Xử lý cả TẠO MỚI và CẬP NHẬT
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const startISO = new Date(`${formData.date}T${formData.startTime}:00`).toISOString();
+      const endISO = new Date(`${formData.date}T${formData.endTime}:00`).toISOString();
+      
+      const payload = {
+        title: formData.title, 
+        location: formData.location, 
+        start_time: startISO, 
+        end_time: endISO, 
+        type: formData.type
+      };
+
+      if (editingApptId) {
+        // Nếu có ID -> Gọi API PATCH để sửa
+        await apiClient.patch(`/appointments/${editingApptId}`, payload);
+      } else {
+        // Nếu không có ID -> Gọi API POST để tạo mới
+        await apiClient.post('/appointments', payload);
+      }
+
+      setIsModalOpen(false);
+      setEditingApptId(null);
+      fetchAppointments();
+    } catch (error) {
+      alert('Có lỗi xảy ra khi lưu lịch.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // --- LỊCH THÁNG ---
+  // --- LỊCH THÁNG ---
   const renderMonthView = () => {
     const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
     const calendarDays = Array.from({length: 31}, (_, i) => i + 1);
 
     return (
-      <div className="bg-white rounded-[2rem] shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 p-6 sm:p-10 overflow-hidden mb-8 animate-in fade-in duration-500">
+      <div className="bg-white rounded-[2rem] shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 p-6 sm:p-10 mb-8 animate-in fade-in duration-500">
         <div className="flex justify-between items-center mb-8">
             <h3 className="font-serif font-black text-2xl text-on-surface">Tháng 10 năm 2026</h3>
             <div className="flex gap-2">
-                <button className="p-2 border border-slate-200 rounded-full hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"><ChevronLeft className="w-5 h-5"/></button>
-                <button className="p-2 border border-slate-200 rounded-full hover:bg-slate-50 text-slate-500 transition-colors cursor-pointer"><ChevronRight className="w-5 h-5"/></button>
+                <button className="p-2 border border-slate-200 rounded-full hover:bg-slate-50 text-slate-500"><ChevronLeft className="w-5 h-5"/></button>
+                <button className="p-2 border border-slate-200 rounded-full hover:bg-slate-50 text-slate-500"><ChevronRight className="w-5 h-5"/></button>
             </div>
         </div>
         <div className="grid grid-cols-7 gap-2 sm:gap-4 mb-4">
-          {days.map(d => <div key={d} className="text-center text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">{d}</div>)}
+          {daysLabel.map(d => <div key={d} className="text-center text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">{d}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-2 sm:gap-4">
-          {Array.from({length: 3}).map((_, i) => <div key={`empty-${i}`} className="h-16 sm:h-28 rounded-2xl bg-slate-50/50 border border-transparent"></div>)}
+          {emptyDays.map((_, i) => <div key={`empty-${i}`} className="h-24 sm:h-32 rounded-2xl bg-slate-50/50"></div>)}
+          
           {calendarDays.map((date) => {
-             const hasClass = date % 3 === 0 || date === 23;
-             const hasMeet = date % 5 === 0 || date === 26;
+             const dateStr = `${currentYear}-10-${String(date).padStart(2, '0')}`;
+             // Lọc event trong ngày
+             const dayEvents = appointments.filter(a => a.start_time.startsWith(dateStr));
+             const isToday = date === 23; 
+
              return (
                <div 
                  key={date} 
-                 onContextMenu={(e) => handleContextMenu(e, {date, type: 'day'})} 
+                 // Click chuột phải vào Ô TRỐNG -> Đặt lịch mới
+                 onContextMenu={(e) => handleContextMenu(e, dateStr)} 
                  className={cn(
-                   "h-20 sm:h-28 rounded-xl sm:rounded-2xl border p-2 flex flex-col transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5", 
-                   date === 23 ? "border-primary bg-primary/5" : "border-slate-100 hover:border-primary/30 bg-white"
+                   "h-24 sm:h-32 rounded-xl sm:rounded-2xl border p-2 flex flex-col transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden", 
+                   isToday ? "border-primary bg-primary/5" : "border-slate-100 hover:border-primary/30 bg-white"
                  )}
                >
                  <span className={cn("text-xs sm:text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center mb-1", date === 23 ? "bg-primary text-white shadow-sm" : "text-slate-600")}>{date}</span>
@@ -64,14 +186,16 @@ export const Schedule = () => {
     );
   };
 
-  const renderWeekView = () => (
-    <div className="grid grid-cols-[80px_repeat(6,1fr)] gap-4 overflow-x-auto pb-4 animate-in fade-in duration-500">
-      {/* Time Column */}
-      <div className="pt-16 space-y-16 flex flex-col flex-shrink-0 min-w-[80px]">
-        {['07:30', '09:15', '12:30', '14:15', '16:00'].map(time => (
-          <div key={time} className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{time}</div>
-        ))}
-      </div>
+  // --- LỊCH TUẦN ---
+  const renderWeekView = () => {
+    const weekDays = [
+      { day: 'MON', date: 23, fullDate: '2026-10-23' },
+      { day: 'TUE', date: 24, fullDate: '2026-10-24' },
+      { day: 'WED', date: 25, fullDate: '2026-10-25' },
+      { day: 'THU', date: 26, fullDate: '2026-10-26' },
+      { day: 'FRI', date: 27, fullDate: '2026-10-27' },
+      { day: 'SAT', date: 28, fullDate: '2026-10-28', isWeekend: true }
+    ];
 
       {/* Days Columns */}
       {[
@@ -175,13 +299,75 @@ export const Schedule = () => {
             );
           })}
         </div>
-      ))}
-    </div>
-  );
+
+        {weekDays.map((col, i) => {
+          const dayAppointments = appointments.filter(a => a.start_time.startsWith(col.fullDate));
+
+          return (
+            <div key={i} className="space-y-5 min-w-[170px] flex flex-col" onContextMenu={(e) => handleContextMenu(e, col.fullDate)}>
+              <div className="text-center pb-4 border-b-2 border-transparent relative">
+                <span className="block text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">{col.day}</span>
+                <span className={cn("text-3xl font-serif font-black", col.date === 26 ? 'text-primary' : 'text-slate-800')}>{col.date}</span>
+                {col.date === 26 && <div className="absolute bottom-[-2px] left-1/4 right-1/4 h-1 bg-primary rounded-full"></div>}
+              </div>
+
+              {col.isWeekend ? (
+                <div className="bg-slate-50 border border-slate-200/50 h-[400px] rounded-3xl flex items-center justify-center text-center p-6 opacity-70">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Departmental<br/>Rest Day</span>
+                </div>
+              ) : loading ? (
+                 <div className="flex justify-center pt-10"><Loader2 className="w-5 h-5 animate-spin text-slate-300"/></div>
+              ) : dayAppointments.length === 0 ? (
+                 <div onClick={() => handleOpenModal(col.fullDate)} className="h-32 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer text-xs text-slate-400 font-medium hover:bg-slate-100">
+                    + Đặt lịch trống
+                 </div>
+              ) : (
+                dayAppointments.map((appt) => {
+                  const startTimeStr = new Date(appt.start_time).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
+                  const endTimeStr = new Date(appt.end_time).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'});
+                  
+                  if (appt.type === 'CONSULT' || appt.type === 'MEETING') {
+                    return (
+                      <div key={appt.id} onContextMenu={(e) => handleContextMenu(e, col.fullDate, appt)} className="bg-blue-50/50 p-5 rounded-2xl border border-dashed border-blue-200 cursor-pointer hover:bg-blue-50 transition-colors">
+                        <p className="text-[9px] font-bold text-blue-700 uppercase mb-1.5 tracking-wider">{appt.type === 'CONSULT' ? 'OFFICE HOURS' : 'MEETING'}</p>
+                        <h4 className="text-sm font-bold text-blue-900 leading-tight mb-2">{appt.title}</h4>
+                        <div className="text-[11px] font-semibold text-blue-600/70">{startTimeStr} - {endTimeStr}</div>
+                      </div>
+                    );
+                  }
+
+                  const isClass = appt.type === 'CLASS';
+                  return (
+                    <div key={appt.id} onContextMenu={(e) => handleContextMenu(e, col.fullDate, appt)} className="group cursor-pointer bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:-translate-y-1 transition-all relative overflow-hidden">
+                      <div className={cn("absolute left-0 top-0 bottom-0 w-1.5", isClass ? 'bg-primary' : 'bg-indigo-500')}></div>
+                      
+                      <div className="flex justify-between items-start mb-3 pl-2">
+                        <span className={cn("text-[9px] font-bold px-2 py-1 rounded bg-slate-100 uppercase tracking-widest", isClass ? 'text-primary' : 'text-indigo-600')}>{appt.type}</span>
+                        <MoreHorizontal size={14} className="text-slate-300" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800 mb-2 leading-snug pl-2">{appt.title}</h4>
+                      
+                      {appt.location && (
+                        <p className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5 mb-3 pl-2">
+                          <MapPin size={12} className={isClass ? "text-primary/70" : "text-indigo-500/70"} /> {appt.location}
+                        </p>
+                      )}
+                      <div className="text-[11px] font-medium text-slate-400 pl-2">{startTimeStr} - {endTimeStr}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-500 pt-8 pb-12 max-w-7xl mx-auto xl:mx-0">
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+    <div className="space-y-8 animate-in fade-in duration-500 pt-4 pb-12 max-w-7xl mx-auto xl:mx-0">
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
         <div>
           <h2 className="text-4xl font-sans font-black text-on-surface tracking-normal mb-2">
   Lịch cố vấn trong tuần
@@ -191,29 +377,13 @@ export const Schedule = () => {
             Tháng 10 năm 2026
           </p>
         </div>
-        <div className="flex bg-surface-container-low p-1.5 rounded-2xl shadow-sm border border-slate-100/50">
-          <button 
-            onClick={() => setScheduleView('day')}
-            className={cn("px-6 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer", scheduleView === 'day' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-800')}
-          >
-            Day
-          </button>
-          <button 
-            onClick={() => setScheduleView('week')}
-            className={cn("px-6 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer", scheduleView === 'week' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-800')}
-          >
-            Week
-          </button>
-          <button 
-            onClick={() => setScheduleView('month')}
-            className={cn("px-6 py-2.5 rounded-xl text-sm font-bold transition-all cursor-pointer", scheduleView === 'month' ? 'bg-white shadow-sm text-primary' : 'text-slate-500 hover:text-slate-800')}
-          >
-            Month
-          </button>
+        <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+          <button onClick={() => setScheduleView('week')} className={cn("px-6 py-2.5 rounded-xl text-sm font-bold transition-all", scheduleView === 'week' ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-800')}>Week</button>
+          <button onClick={() => setScheduleView('month')} className={cn("px-6 py-2.5 rounded-xl text-sm font-bold transition-all", scheduleView === 'month' ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-800')}>Month</button>
         </div>
       </div>
 
-      {scheduleView === 'month' ? renderMonthView() : renderWeekView()}
+      {scheduleView === 'week' ? renderWeekView() : renderMonthView()}
 
       {/* Analytics Footer Section */}
       <div className="mt-16 flex flex-col lg:flex-row gap-8">
@@ -253,31 +423,29 @@ export const Schedule = () => {
             Chuẩn bị tư vấn
           </button>
         </div>
-      </div>
+      )}
 
-      {/* Custom Context Menu */}
+      {/* CONTEXT MENU */}
       {contextMenu && (
-        <div 
-          className="fixed z-[100] bg-white rounded-xl shadow-[0_15px_40px_rgba(0,0,0,0.15)] border border-slate-100 py-2 min-w-[200px] overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-          style={{ top: Math.min(contextMenu.y, window.innerHeight - 150), left: Math.min(contextMenu.x, window.innerWidth - 220) }}
-        >
-          <button className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer">
-            <CalendarPlus className="w-4 h-4 text-primary" />
-            Đặt lịch (Book)
-          </button>
-          <button className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer relative">
-            <PenLine className="w-4 h-4 text-orange-600" />
-            Note trực tiếp
-            <span className="absolute right-4 w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
-          </button>
-          <div className="h-px bg-slate-100 my-1 mx-2"></div>
-          <button className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-red-50 text-red-600 transition-colors cursor-pointer">
-            <CalendarX className="w-4 h-4" />
-            Hủy lịch (Cancel)
-          </button>
+        <div className="fixed z-[90] bg-white rounded-xl shadow-xl border border-slate-100 py-2 min-w-[200px]" style={{ top: Math.min(contextMenu.y, window.innerHeight - 150), left: Math.min(contextMenu.x, window.innerWidth - 220) }}>
+          {!contextMenu.targetAppt ? (
+            <button onClick={() => handleOpenModal(contextMenu.dateStr)} className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-slate-50 text-slate-700">
+              <CalendarPlus className="w-4 h-4 text-primary" /> Đặt lịch (Book)
+            </button>
+          ) : (
+            <>
+              {/* NÚT SỬA THÔNG TIN ĐÃ CÓ onClick */}
+              <button onClick={handleEditClick} className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-slate-50 text-slate-700">
+                <PenLine className="w-4 h-4 text-orange-600" /> Sửa thông tin
+              </button>
+              <div className="h-px bg-slate-100 my-1 mx-2"></div>
+              <button onClick={() => handleDeleteAppt(contextMenu.targetAppt!.id)} className="w-full px-4 py-3 text-left text-sm font-semibold flex items-center gap-3 hover:bg-red-50 text-red-600">
+                <CalendarX className="w-4 h-4" /> Hủy lịch (Cancel)
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
   );
 };
-

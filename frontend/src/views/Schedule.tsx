@@ -137,6 +137,7 @@ export const Schedule = () => {
   };
 
   // --- LỊCH THÁNG ---
+  // --- LỊCH THÁNG ---
   const renderMonthView = () => {
     const daysLabel = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
     const emptyDays = Array.from({length: 3}); 
@@ -155,29 +156,45 @@ export const Schedule = () => {
           {daysLabel.map(d => <div key={d} className="text-center text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest">{d}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-2 sm:gap-4">
-          {emptyDays.map((_, i) => <div key={`empty-${i}`} className="h-16 sm:h-28 rounded-2xl bg-slate-50/50"></div>)}
+          {emptyDays.map((_, i) => <div key={`empty-${i}`} className="h-24 sm:h-32 rounded-2xl bg-slate-50/50"></div>)}
           
           {calendarDays.map((date) => {
              const dateStr = `${currentYear}-10-${String(date).padStart(2, '0')}`;
+             // Lọc event trong ngày
              const dayEvents = appointments.filter(a => a.start_time.startsWith(dateStr));
-             const classCount = dayEvents.filter(a => a.type === 'CLASS' || a.type === 'ADMIN').length;
-             const meetCount = dayEvents.filter(a => a.type === 'MEETING' || a.type === 'CONSULT').length;
              const isToday = date === 23; 
 
              return (
                <div 
                  key={date} 
+                 // Click chuột phải vào Ô TRỐNG -> Đặt lịch mới
                  onContextMenu={(e) => handleContextMenu(e, dateStr)} 
                  className={cn(
-                   "h-24 sm:h-32 rounded-xl sm:rounded-2xl border p-2 flex flex-col transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5", 
+                   "h-24 sm:h-32 rounded-xl sm:rounded-2xl border p-2 flex flex-col transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden", 
                    isToday ? "border-primary bg-primary/5" : "border-slate-100 hover:border-primary/30 bg-white"
                  )}
                >
-                 <span className={cn("text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center mb-1", isToday ? "bg-primary text-white shadow-sm" : "text-slate-600")}>{date}</span>
+                 <span className={cn("text-sm font-bold w-7 h-7 rounded-full flex items-center justify-center mb-1 shrink-0", isToday ? "bg-primary text-white shadow-sm" : "text-slate-600")}>{date}</span>
                  
-                 <div className="mt-auto space-y-1.5 flex flex-col">
-                    {classCount > 0 && <div className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold truncate">{classCount} Classes</div>}
-                    {meetCount > 0 && <div className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold truncate">{meetCount} Meeting</div>}
+                 {/* Hiển thị chi tiết TỪNG LỊCH HẸN thành thanh nhỏ */}
+                 <div className="mt-1 space-y-1.5 overflow-y-auto flex-1 pb-1">
+                    {dayEvents.map(appt => {
+                      const isClass = appt.type === 'CLASS' || appt.type === 'ADMIN';
+                      return (
+                        <div
+                          key={appt.id}
+                          // Click chuột phải vào THANH SỰ KIỆN -> Sửa / Hủy
+                          onContextMenu={(e) => handleContextMenu(e, dateStr, appt)}
+                          className={cn(
+                            "text-[9px] px-1.5 py-1 rounded-md font-bold truncate cursor-pointer transition-colors",
+                            isClass ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                          )}
+                          title={appt.title} // Hiện tên đầy đủ khi di chuột vào
+                        >
+                          {appt.title}
+                        </div>
+                      )
+                    })}
                  </div>
                </div>
              )

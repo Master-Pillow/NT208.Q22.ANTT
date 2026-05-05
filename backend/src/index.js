@@ -1,5 +1,6 @@
 console.log("Running from:", import.meta.url);
 import advisorRouter from './routes/advisorRoutes.js';
+import appointmentRouter from './routes/appointmentRoutes.js';
 import express from "express";
 import cors from "cors";
 import { pool } from "./db.js";
@@ -67,7 +68,7 @@ io.on('connection', (socket) => {
 
 // BẢO VỆ ROUTE ADVISOR: Yêu cầu phải có token hợp lệ mới được truy cập
 app.use('/advisor', verifyToken, advisorRouter); 
-
+app.use('/appointments', verifyToken, appointmentRouter);
 pool.query("SELECT NOW()")
     .then((res) => {
       console.log("DB connected:", res.rows[0]);

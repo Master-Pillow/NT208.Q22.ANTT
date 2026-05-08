@@ -550,6 +550,28 @@ JOIN students s ON s.class_code = ac.class_code
 WHERE u.role = 'ADVISOR';
 
 COMMIT;
+CREATE TABLE notifications (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title      VARCHAR(255) NOT NULL,
+  content    TEXT,
+  type       VARCHAR(50) DEFAULT 'INFO',
+  is_read    BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Bảng đánh giá advisor
+CREATE TABLE advisor_evaluations (
+  id              BIGSERIAL PRIMARY KEY,
+  advisor_id      BIGINT NOT NULL REFERENCES users(id),
+  semester        VARCHAR(20),
+  avg_student_gpa NUMERIC(4,2),
+  at_risk_count   INT DEFAULT 0,
+  total_students  INT DEFAULT 0,
+  score           NUMERIC(4,2),
+  note            TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- ===============================================================
 -- 13) DEMO ACCOUNTS

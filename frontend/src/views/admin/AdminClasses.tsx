@@ -71,7 +71,7 @@ export const AdminClasses = () => {
           <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-widest">Chọn Lớp Sinh Hoạt</label>
           <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 outline-none focus:border-primary/50">
             <option value="">-- Chọn mã lớp --</option>
-            {classes.map(c => <option key={c.class_code} value={c.class_code}>{c.class_code} (Khóa {c.cohort})</option>)}
+            {classes.map(c => <option key={c.code} value={c.code}>{c.code} (Khóa {c.cohort})</option>)}
           </select>
         </div>
         <div className="flex-1 w-full">
@@ -103,10 +103,10 @@ export const AdminClasses = () => {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {classes.map((cls) => (
-                <tr key={cls.class_code} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-8 py-5 font-black text-slate-800 text-lg">{cls.class_code}</td>
+                <tr key={cls.code} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-8 py-5 font-black text-slate-800 text-lg">{cls.code}</td>
                   <td className="px-6 py-5 text-center font-bold text-slate-500">{cls.cohort}</td>
-                  <td className="px-6 py-5 text-center font-bold text-slate-500">{Number(cls.student_count)}</td>
+                  <td className="px-6 py-5 text-center font-bold text-slate-500">{Number(cls.student_count || 0)}</td>
                   <td className="px-6 py-5">
                     {cls.advisor_name ? (
                       <div className="flex flex-col">
@@ -119,7 +119,7 @@ export const AdminClasses = () => {
                   </td>
                   <td className="px-8 py-5 text-right">
                     {cls.advisor_id && (
-                      <button onClick={() => handleRemove(cls.advisor_id, cls.class_code)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors inline-flex">
+                      <button onClick={() => handleRemove(cls.advisor_id, cls.code)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors inline-flex">
                         <Trash2 className="w-5 h-5" />
                       </button>
                     )}

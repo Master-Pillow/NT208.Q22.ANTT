@@ -30,7 +30,7 @@ import { StudentAppointments } from './views/student/StudentAppointments';
 
 // --- ADMIN IMPORTS ---
 import { AdminDashboard } from './views/admin/AdminDashboard';
-import { AdminAdvisor } from './views/admin/AdminAdvisor'; 
+import { AdminAdvisors } from './views/admin/AdminAdvisor'; 
 import { AdminClasses } from './views/admin/AdminClasses';
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -461,7 +461,7 @@ export default function App() {
 
           {/* ──────────────── ADMIN VIEWS ──────────────── */}
           {isAdmin && currentView === 'adminDashboard' && <AdminDashboard />}
-          {isAdmin && currentView === 'adminAdvisors' && <AdminAdvisor />}
+          {isAdmin && currentView === 'adminAdvisors' && <AdminAdvisors />}
           {isAdmin && currentView === 'adminClasses' && <AdminClasses />}
 
 

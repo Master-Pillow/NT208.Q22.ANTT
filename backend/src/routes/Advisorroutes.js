@@ -156,3 +156,239 @@ router.get('/dashboard/stats', async (req, res) => {
 });
 
 export default router;
+// ===============================================================
+// LOG NOTES - Ghi chú tư vấn CRUD
+// ===============================================================
+
+const requireAdvisor = (req, res, next) => {
+  if (req.user?.role !== 'ADVISOR') {
+    return res.status(403).json({ message: 'Chỉ advisor mới được truy cập.' });
+  }
+  next();
+};
+
+const checkStudentInAdvisorScope = async (advisorId, studentId) => {
+  const result = await pool.query(
+      `
+    SELECT s.id
+    FROM students s
+    JOIN advisor_class ac ON ac.class_code = s.class_code
+    WHERE s.id = $1
+      AND ac.advisor_id = $2
+    LIMIT 1
+    `,
+      [studentId, advisorId]
+  );
+
+  return result.rows.length > 0;
+};
+
+// GET /advisor/log-notes
+// GET /advisor/log-notes?studentId=1&q=gpa
+router.get('/log-notes', requireAdvisor, async (req, res) => {
+  const advisorId = req.user.id;
+  const { studentId, q } = req.query;
+
+  try {
+    const params = [advisorId];
+    let where = `
+      WHERE al.advisor_user_id = $1
+        AND EXISTS (
+          SELECT 1
+          FROM advisor_class ac
+          WHERE ac.advisor_id = $1
+            AND ac.class_code = s.class_code
+        )
+    `;
+
+    if (studentId) {
+      params.push(studentId);
+      where += ` AND al.student_id = $${params.length}`;
+    }
+
+    if (q && q.trim()) {
+      params.push(`%${q.trim()}%`);
+      where += `
+        AND (
+          s.full_name ILIKE $${params.length}
+          OR s.mssv ILIKE $${params.length}
+          OR al.reason ILIKE $${params.length}
+          OR al.action_plan ILIKE $${params.length}
+          OR al.note ILIKE $${params.length}
+        )
+      `;
+    }
+
+    const result = await pool.query(
+        `
+      SELECT
+        al.id,
+        al.student_id,
+        s.full_name AS student_name,
+        s.mssv,
+        s.class_code,
+        al.advisor_user_id,
+        u.full_name AS advisor_name,
+        al.reason,
+        al.action_plan,
+        al.note,
+        al.created_at
+      FROM advising_logs al
+      JOIN students s ON s.id = al.student_id
+      JOIN users u ON u.id = al.advisor_user_id
+      ${where}
+      ORDER BY al.created_at DESC, al.id DESC
+      `,
+        params
+    );
+
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('GET /advisor/log-notes ERROR:', err.message);
+    return res.status(500).json({ message: 'Lỗi server khi lấy ghi chú tư vấn.' });
+  }
+});
+
+// POST /advisor/log-notes
+router.post('/log-notes', requireAdvisor, async (req, res) => {
+  const advisorId = req.user.id;
+  const { student_id, reason, action_plan, note } = req.body;
+
+  if (!student_id) {
+    return res.status(400).json({ message: 'Thiếu student_id.' });
+  }
+
+  if (!reason?.trim() && !action_plan?.trim() && !note?.trim()) {
+    return res.status(400).json({ message: 'Cần nhập ít nhất 1 nội dung ghi chú.' });
+  }
+
+  try {
+    const inScope = await checkStudentInAdvisorScope(advisorId, student_id);
+
+    if (!inScope) {
+      return res.status(403).json({
+        message: 'Bạn không có quyền ghi chú cho sinh viên này.',
+      });
+    }
+
+    const result = await pool.query(
+        `
+      INSERT INTO advising_logs (
+        student_id,
+        advisor_user_id,
+        reason,
+        action_plan,
+        note
+      )
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+      `,
+        [
+          student_id,
+          advisorId,
+          reason?.trim() || null,
+          action_plan?.trim() || null,
+          note?.trim() || null,
+        ]
+    );
+
+    return res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('POST /advisor/log-notes ERROR:', err.message);
+    return res.status(500).json({ message: 'Lỗi server khi tạo ghi chú tư vấn.' });
+  }
+});
+
+// PATCH /advisor/log-notes/:id
+router.patch('/log-notes/:id', requireAdvisor, async (req, res) => {
+  const advisorId = req.user.id;
+  const logId = req.params.id;
+  const { student_id, reason, action_plan, note } = req.body;
+
+  try {
+    if (student_id) {
+      const inScope = await checkStudentInAdvisorScope(advisorId, student_id);
+
+      if (!inScope) {
+        return res.status(403).json({
+          message: 'Bạn không có quyền chuyển ghi chú sang sinh viên này.',
+        });
+      }
+    }
+
+    const result = await pool.query(
+        `
+      UPDATE advising_logs al
+      SET
+        student_id = COALESCE($1, al.student_id),
+        reason = COALESCE($2, al.reason),
+        action_plan = COALESCE($3, al.action_plan),
+        note = COALESCE($4, al.note)
+      FROM students s
+      WHERE al.id = $5
+        AND al.advisor_user_id = $6
+        AND s.id = al.student_id
+        AND EXISTS (
+          SELECT 1
+          FROM advisor_class ac
+          WHERE ac.advisor_id = $6
+            AND ac.class_code = s.class_code
+        )
+      RETURNING al.*
+      `,
+        [
+          student_id || null,
+          reason !== undefined ? reason.trim() || null : null,
+          action_plan !== undefined ? action_plan.trim() || null : null,
+          note !== undefined ? note.trim() || null : null,
+          logId,
+          advisorId,
+        ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy ghi chú tư vấn.' });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error('PATCH /advisor/log-notes/:id ERROR:', err.message);
+    return res.status(500).json({ message: 'Lỗi server khi cập nhật ghi chú tư vấn.' });
+  }
+});
+
+// DELETE /advisor/log-notes/:id
+router.delete('/log-notes/:id', requireAdvisor, async (req, res) => {
+  const advisorId = req.user.id;
+  const logId = req.params.id;
+
+  try {
+    const result = await pool.query(
+        `
+      DELETE FROM advising_logs al
+      USING students s
+      WHERE al.id = $1
+        AND al.advisor_user_id = $2
+        AND s.id = al.student_id
+        AND EXISTS (
+          SELECT 1
+          FROM advisor_class ac
+          WHERE ac.advisor_id = $2
+            AND ac.class_code = s.class_code
+        )
+      RETURNING al.id
+      `,
+        [logId, advisorId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy ghi chú tư vấn.' });
+    }
+
+    return res.json({ message: 'Đã xóa ghi chú tư vấn.' });
+  } catch (err) {
+    console.error('DELETE /advisor/log-notes/:id ERROR:', err.message);
+    return res.status(500).json({ message: 'Lỗi server khi xóa ghi chú tư vấn.' });
+  }
+});
+

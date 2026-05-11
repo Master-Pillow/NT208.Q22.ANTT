@@ -37,9 +37,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'studentAppointments', label: 'Lịch tư vấn', icon: Calendar },
   ];
 
-  const navItems = role === 'STUDENT' ? studentItems : advisorItems;
+  const normalizedRole = String(role || '').trim().toUpperCase();
+  const isStudent = normalizedRole === 'STUDENT';
 
-  const subtitle = role === 'STUDENT' ? 'Sinh viên' : 'Cố vấn học vụ';
+  const navItems = isStudent ? studentItems : advisorItems;
+
+  const subtitle = isStudent ? 'Sinh viên' : 'Cố vấn học vụ';
 
   const isItemActive = (itemId: string) => {
     if (currentView === itemId) return true;
@@ -91,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="mt-auto flex flex-col gap-4">
-        {role === 'STUDENT' ? (
+        {isStudent ? (
           <button
             onClick={() => setCurrentView('studentAppointments')}
             className="bg-gradient-to-br from-primary to-primary-container text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform"

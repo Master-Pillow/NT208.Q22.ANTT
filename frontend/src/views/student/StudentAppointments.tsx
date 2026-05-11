@@ -30,13 +30,13 @@ export const StudentAppointments = () => {
   const statusText: Record<string, string> = {
     pending: 'Chờ duyệt',
     confirmed: 'Đã xác nhận',
-    cancelled: 'Đã hủy',
+    cancelled: 'Đã từ chối',
     completed: 'Hoàn tất',
 
     // phòng trường hợp dữ liệu cũ còn chữ hoa
     PENDING: 'Chờ duyệt',
     CONFIRMED: 'Đã xác nhận',
-    CANCELLED: 'Đã hủy',
+    CANCELLED: 'Đã từ chối',
     COMPLETED: 'Hoàn tất',
   };
 
@@ -111,14 +111,9 @@ export const StudentAppointments = () => {
       setErrorMsg('');
       setSuccessMsg('');
 
-      /**
-       * Backend hiện tại của bạn đang insert:
-       * title, start_time, end_time
-       *
-       * Nếu DB chưa có cột description thì KHÔNG gửi description.
-       */
       await apiClient.post('/student/appointments', {
         title: form.title.trim(),
+        description: form.description.trim(),
         start_time: form.start_time,
         end_time: form.end_time,
       });
@@ -206,7 +201,7 @@ export const StudentAppointments = () => {
               placeholder="Ví dụ: Em muốn hỏi về tín chỉ nợ và cách cải thiện GPA."
             />
             <p className="text-[11px] text-slate-400 mt-1">
-              Lưu ý: nội dung này hiện chỉ hiển thị trên form. Muốn lưu vào database thì cần thêm cột description.
+              Nội dung này sẽ được gửi cho cố vấn cùng yêu cầu đặt lịch.
             </p>
           </div>
 

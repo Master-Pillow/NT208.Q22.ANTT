@@ -10,12 +10,14 @@ import { Server } from "socket.io";
 import { pool } from "./db.js";
 import { verifyToken } from "./middleware/auth.js";
 
-import advisorRouter from "./routes/AdvisorRoutes.js";
+import advisorRouter from "./routes/Advisorroutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "uit_advisorhub_secret_2026";
+
+const normalizeRole = (role) => String(role || "").trim().toUpperCase();
 
 app.use(cors());
 app.use(express.json());
@@ -35,6 +37,12 @@ app.set("io", io);
 
 io.on("connection", (socket) => {
   console.log("Một client đã kết nối:", socket.id);
+
+  socket.on("join_user", (userId) => {
+    if (!userId) return;
+    socket.join(`user_${userId}`);
+    console.log(`Socket ${socket.id} joined user room ${userId}`);
+  });
 
   socket.on("join_conversation", (conversationId) => {
     socket.join(`conv_${conversationId}`);
@@ -117,6 +125,7 @@ app.post("/auth/login", async (req, res) => {
     }
 
     const user = result.rows[0];
+    const normalizedUserRole = normalizeRole(user.role);
 
     let isValid = false;
 
@@ -137,7 +146,7 @@ app.post("/auth/login", async (req, res) => {
       {
         id: user.id,
         email: user.email,
-        role: user.role,
+        role: normalizedUserRole,
         student_id: user.student_id,
       },
       JWT_SECRET,
@@ -151,7 +160,7 @@ app.post("/auth/login", async (req, res) => {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        role: user.role,
+        role: normalizedUserRole,
         student_id: user.student_id,
       },
     });
@@ -173,7 +182,7 @@ app.use("/student", verifyToken, studentRouter);
 // ==========================================
 app.post("/admin/advisors", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "ADMIN") {
+    if (normalizeRole(req.user.role) !== "ADMIN") {
       return res.status(403).json({ message: "Chỉ ADMIN mới được truy cập" });
     }
 
@@ -216,7 +225,7 @@ app.post("/admin/advisors", verifyToken, async (req, res) => {
 // ==========================================
 app.post("/admin/classes", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "ADMIN") {
+    if (normalizeRole(req.user.role) !== "ADMIN") {
       return res.status(403).json({ message: "Chỉ ADMIN mới được truy cập" });
     }
 
@@ -259,7 +268,7 @@ app.post("/admin/classes", verifyToken, async (req, res) => {
 // ==========================================
 app.post("/admin/assign-advisor", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "ADMIN") {
+    if (normalizeRole(req.user.role) !== "ADMIN") {
       return res.status(403).json({ message: "Chỉ ADMIN mới được truy cập" });
     }
 
@@ -280,7 +289,7 @@ app.post("/admin/assign-advisor", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy cố vấn" });
     }
 
-    if (advisorCheck.rows[0].role !== "ADVISOR") {
+    if (normalizeRole(advisorCheck.rows[0].role) !== "ADVISOR") {
       return res.status(400).json({ message: "User này không phải ADVISOR" });
     }
 
@@ -321,7 +330,7 @@ app.post("/admin/assign-advisor", verifyToken, async (req, res) => {
 // ==========================================
 app.get("/admin/classes", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "ADMIN") {
+    if (normalizeRole(req.user.role) !== "ADMIN") {
       return res.status(403).json({ message: "Chỉ ADMIN mới được truy cập" });
     }
 
@@ -544,7 +553,7 @@ app.get("/api/search", verifyToken, async (req, res) => {
 // ==========================================
 app.get("/conversations", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "ADVISOR" && req.user.role !== "ADMIN") {
+    if (req.user.role !== "ADVISOR" && normalizeRole(req.user.role) !== "ADMIN") {
       return res.status(403).json({ message: "Chỉ cố vấn mới được xem danh sách hội thoại" });
     }
 

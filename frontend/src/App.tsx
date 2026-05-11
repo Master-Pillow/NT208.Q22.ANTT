@@ -363,10 +363,14 @@ export default function App() {
   };
 
   const handleLogin = (user?: CurrentUser) => {
-    setCurrentUser(user || null);
+    const normalizedUser = user
+      ? { ...user, role: String(user.role || '').trim().toUpperCase() }
+      : null;
+
+    setCurrentUser(normalizedUser);
     setIsAuthenticated(true);
 
-    if (user?.role === 'STUDENT') {
+    if (normalizedUser?.role === 'STUDENT') {
       setCurrentView('studentDashboard');
     } else {
       setCurrentView('dashboard');
@@ -387,7 +391,7 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  const isStudent = currentUser?.role === 'STUDENT';
+  const isStudent = String(currentUser?.role || '').trim().toUpperCase() === 'STUDENT';
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen flex antialiased selection:bg-primary/20 selection:text-primary">

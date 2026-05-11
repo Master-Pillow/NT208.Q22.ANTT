@@ -399,10 +399,11 @@ export default function App() {
 
       <main className="flex-grow lg:ml-[280px] flex flex-col min-h-screen relative overflow-hidden bg-surface">
         <Toolbar
-          setCurrentView={handleSetCurrentView}
-          onLogout={handleLogout}
-          onSearchSelect={handleSearchSelect}
-        />
+  currentUser={currentUser}
+  setCurrentView={handleSetCurrentView}
+  onLogout={handleLogout}
+  onSearchSelect={handleSearchSelect}
+/>
 
         <div className="flex-1 overflow-y-auto w-full pt-32 px-6 sm:px-10 pb-12">
           {!isStudent && currentView === 'dashboard' && (

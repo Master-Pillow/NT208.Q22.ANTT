@@ -143,7 +143,7 @@ router.get('/appointments', requireStudent, async (req, res) => {
       SELECT
         a.id,
         COALESCE(a.title, 'Lịch tư vấn') AS title,
-        '' AS description,
+        COALESCE(a.note, '') AS description,
         a.start_time,
         a.end_time,
         COALESCE(a.status, 'PENDING') AS status,
@@ -171,7 +171,7 @@ router.get('/appointments', requireStudent, async (req, res) => {
 // POST /student/appointments
 router.post('/appointments', requireStudent, async (req, res) => {
   try {
-    const { title, start_time, end_time } = req.body;
+    const { title, description, start_time, end_time } = req.body;
 
     if (!title || !start_time || !end_time) {
       return res.status(400).json({ message: 'Thiếu thông tin lịch hẹn' });
@@ -196,20 +196,21 @@ router.post('/appointments', requireStudent, async (req, res) => {
     const { student_id, advisor_id } = studentResult.rows[0];
 
     const insertResult = await pool.query(
-      `
-      INSERT INTO appointments (
-        advisor_id,
-        student_id,
-        title,
-        start_time,
-        end_time,
-        status
-      )
-      VALUES ($1, $2, $3, $4, $5, 'pending')
-      RETURNING *
-      `,
-      [advisor_id, student_id, title, start_time, end_time]
-    );
+  `
+  INSERT INTO appointments (
+    advisor_id,
+    student_id,
+    title,
+    start_time,
+    end_time,
+    status,
+    note
+  )
+  VALUES ($1, $2, $3, $4, $5, 'pending', $6)
+  RETURNING *
+  `,
+  [advisor_id, student_id, title, start_time, end_time, description?.trim() || null]
+);
 
     res.status(201).json(insertResult.rows[0]);
   } catch (err) {
@@ -333,7 +334,15 @@ router.post('/messages', requireStudent, async (req, res) => {
       [conversationId, req.user.id, content.trim()]
     );
 
-    res.status(201).json(insertResult.rows[0]);
+    const newMessage = insertResult.rows[0];
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`conv_${conversationId}`).emit('new_message', newMessage);
+    }
+
+    res.status(201).json(newMessage);
+    
   } catch (err) {
     console.error('[student/send message]', err);
     res.status(500).json({

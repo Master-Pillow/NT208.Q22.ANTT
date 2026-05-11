@@ -54,7 +54,7 @@ const getSocket = (): Socket => {
 // Helper lấy currentUser an toàn
 const getCurrentUser = () => {
   try {
-    const str = localStorage.getItem('currentUser');
+    const str = localStorage.getItem('user');
     return str ? JSON.parse(str) : null;
   } catch {
     return null;

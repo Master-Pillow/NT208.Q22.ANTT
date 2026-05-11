@@ -10,7 +10,7 @@ import { Server } from "socket.io";
 import { pool } from "./db.js";
 import { verifyToken } from "./middleware/auth.js";
 
-import advisorRouter from "./routes/advisorRoutes.js";
+import advisorRouter from "./routes/AdvisorRoutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
@@ -32,6 +32,7 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"],
   },
 });
+app.set("io", io);
 
 io.on("connection", (socket) => {
   console.log("Một client đã kết nối:", socket.id);
@@ -545,6 +546,10 @@ app.get("/api/search", verifyToken, async (req, res) => {
 // ==========================================
 app.get("/conversations", verifyToken, async (req, res) => {
   try {
+    if (req.user.role !== "ADVISOR" && req.user.role !== "ADMIN") {
+      return res.status(403).json({ message: "Chỉ cố vấn mới được xem danh sách hội thoại" });
+    }
+
     const result = await pool.query(
       `
       SELECT
@@ -552,32 +557,31 @@ app.get("/conversations", verifyToken, async (req, res) => {
         c.student_id,
         s.full_name AS name,
         s.mssv AS idNumber,
-        (
-          SELECT content
-          FROM messages
-          WHERE conversation_id = c.id
-          ORDER BY created_at DESC
-          LIMIT 1
-        ) AS lastMessage,
-        (
-          SELECT TO_CHAR(created_at, 'HH24:MI')
-          FROM messages
-          WHERE conversation_id = c.id
-          ORDER BY created_at DESC
-          LIMIT 1
-        ) AS time
+        latest.content AS lastMessage,
+        TO_CHAR(latest.created_at, 'HH24:MI') AS time,
+        latest.created_at AS lastMessageAt
       FROM conversations c
       JOIN students s ON s.id = c.student_id
+      LEFT JOIN LATERAL (
+        SELECT content, created_at
+        FROM messages
+        WHERE conversation_id = c.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) latest ON true
       WHERE c.advisor_id = $1
-      ORDER BY c.created_at DESC
+      ORDER BY latest.created_at DESC NULLS LAST, c.created_at DESC
       `,
       [req.user.id]
     );
 
     res.json(result.rows);
   } catch (err) {
-    console.error("Lỗi lấy danh sách hội thoại:", err.message);
-    res.status(500).json({ message: "Lỗi lấy danh sách chat" });
+    console.error("Lỗi lấy danh sách hội thoại:", err);
+    res.status(500).json({
+      message: "Lỗi lấy danh sách chat",
+      detail: err.message,
+    });
   }
 });
 

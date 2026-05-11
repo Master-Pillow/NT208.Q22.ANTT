@@ -8,10 +8,14 @@ interface Appointment {
   id: number;
   student_id: number | null;
   title: string;
-  location: string;
+  location: string | null;
   start_time: string;
   end_time: string;
   type: string;
+  status?: string;
+  note?: string | null;
+  student_name?: string | null;
+  student_mssv?: string | null;
 }
 
 export const Schedule = () => {
@@ -102,6 +106,16 @@ export const Schedule = () => {
     }
   };
 
+  const handleUpdateStatus = async (id: number, status: 'confirmed' | 'cancelled') => {
+  try {
+    await apiClient.patch(`/appointments/${id}`, { status });
+    await fetchAppointments();
+  } catch (error) {
+    console.error('Không thể cập nhật trạng thái lịch:', error);
+    alert('Không thể cập nhật trạng thái lịch.');
+  }
+};
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -174,7 +188,7 @@ export const Schedule = () => {
                  {/* Hiển thị chi tiết TỪNG LỊCH HẸN thành thanh nhỏ */}
                  <div className="mt-1 space-y-1.5 overflow-y-auto flex-1 pb-1">
                     {dayEvents.map(appt => {
-                      const isClass = appt.type === 'CLASS' || appt.type === 'ADMIN';
+                      const isClass = appt.type === 'MEETING' || appt.type === 'FOLLOW_UP';
                       return (
                         <div
                           key={appt.id}
@@ -300,6 +314,86 @@ export const Schedule = () => {
         </div>
       </div>
 
+	<div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6">
+  <div className="flex items-center justify-between mb-5">
+    <div>
+      <h3 className="text-xl font-bold text-blue-900">Lịch tư vấn chờ duyệt</h3>
+      <p className="text-sm text-slate-500">
+        Sinh viên gửi yêu cầu đặt lịch sẽ hiện ở đây để cố vấn xác nhận.
+      </p>
+    </div>
+
+    <button
+      onClick={fetchAppointments}
+      className="px-4 py-2 text-sm font-bold rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200"
+    >
+      Làm mới
+    </button>
+  </div>
+
+  {loading ? (
+    <div className="flex items-center gap-2 text-slate-400 text-sm">
+      <Loader2 className="w-4 h-4 animate-spin" />
+      Đang tải lịch hẹn...
+    </div>
+  ) : appointments.filter((appt) => appt.status === 'pending').length === 0 ? (
+    <p className="text-sm text-slate-400">Không có lịch nào đang chờ duyệt.</p>
+  ) : (
+    <div className="space-y-3">
+      {appointments
+        .filter((appt) => appt.status === 'pending')
+        .map((appt) => (
+          <div
+            key={appt.id}
+            className="p-4 rounded-2xl border border-orange-100 bg-orange-50/40 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+          >
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-bold text-slate-900">{appt.title}</h4>
+
+                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-orange-50 text-orange-600 border border-orange-100 uppercase">
+                  Chờ duyệt
+                </span>
+              </div>
+
+              <p className="text-sm text-slate-500">
+                Sinh viên: {appt.student_name || 'Chưa có tên'}
+                {appt.student_mssv ? ` - ${appt.student_mssv}` : ''}
+              </p>
+
+              {appt.note && (
+                <p className="text-sm text-slate-500 mt-1">
+                  Nội dung: {appt.note}
+                </p>
+              )}
+
+              <p className="text-sm font-semibold text-blue-700 mt-1">
+                {new Date(appt.start_time).toLocaleString('vi-VN')} -{' '}
+                {new Date(appt.end_time).toLocaleString('vi-VN')}
+              </p>
+            </div>
+
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={() => handleUpdateStatus(appt.id, 'confirmed')}
+                className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
+              >
+                Duyệt
+              </button>
+
+              <button
+                onClick={() => handleUpdateStatus(appt.id, 'cancelled')}
+                className="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-100 text-sm font-bold"
+              >
+                Từ chối
+              </button>
+            </div>
+          </div>
+        ))}
+    </div>
+  )}
+</div>
+
       {scheduleView === 'week' ? renderWeekView() : renderMonthView()}
 
       {/* FOOTER SUMMARY */}
@@ -361,10 +455,10 @@ export const Schedule = () => {
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Loại</label>
                   <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} className="w-full border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none">
-                    <option value="CLASS">Giảng dạy (Class)</option>
-                    <option value="CONSULT">Tư vấn (Consult)</option>
-                    <option value="MEETING">Họp nhóm (Meeting)</option>
-                    <option value="ADMIN">Hành chính (Admin)</option>
+                <option value="MEETING">Gặp trực tiếp</option>
+		<option value="ONLINE">Online</option>
+		<option value="PHONE">Điện thoại</option>
+		<option value="FOLLOW_UP">Theo dõi sau tư vấn</option>
                   </select>
                 </div>
                 <div>

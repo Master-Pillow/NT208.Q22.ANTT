@@ -8,6 +8,8 @@ import {
   GraduationCap,
   MessageSquare,
   BookOpen,
+  Award, // Thêm icon cho Đánh giá
+  Bell,  // Thêm icon cho Thông báo
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -22,6 +24,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setCurrentView,
   role,
 }) => {
+  // 1. MẢNG MENU CHO TỪNG ROLE
+  const adminItems = [
+    { id: 'adminDashboard', label: 'Tổng quan', icon: LayoutDashboard },
+    { id: 'adminAdvisors', label: 'Quản lý Cố vấn', icon: Users },
+    { id: 'adminClasses', label: 'Phân công lớp', icon: BookOpen },
+    { id: 'adminEvaluations', label: 'Đánh giá', icon: Award },
+    { id: 'adminNotifications', label: 'Thông báo', icon: Bell },
+  ];
+
   const advisorItems = [
     { id: 'dashboard', label: 'Bảng điều khiển', icon: LayoutDashboard },
     { id: 'profiles', label: 'Hồ sơ sinh viên', icon: Users },
@@ -49,12 +60,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     if (itemId === 'profiles' && currentView === 'cohort') return true;
     if (itemId === 'profiles' && currentView === 'studentDetail') return true;
+    // Có thể thêm active cho Admin Classes nếu ở trang chi tiết
+    if (itemId === 'adminAdvisors' && currentView === 'adminAdvisorDetail') return true;
 
     return false;
   };
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 m-4 rounded-3xl bg-slate-50/50 dark:bg-slate-800/50 backdrop-blur-lg flex flex-col p-6 space-y-8 z-40 border border-slate-200">
+      {/* HEADER LOGO */}
       <div className="flex flex-col items-center gap-2 mb-4">
         <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-sm">
           <GraduationCap className="w-8 h-8 text-blue-800 dark:text-blue-400" />
@@ -70,7 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <nav className="flex flex-col gap-2 flex-grow">
+      {/* RENDER LIST MENU */}
+      <nav className="flex flex-col gap-2 flex-grow overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = isItemActive(item.id);
@@ -93,6 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
+      {/* FOOTER ACTIONS */}
       <div className="mt-auto flex flex-col gap-4">
         {isStudent ? (
           <button
@@ -100,6 +116,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="bg-gradient-to-br from-primary to-primary-container text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform"
           >
             Đặt lịch tư vấn
+          </button>
+        ) : role === 'ADMIN' ? (
+          <button className="bg-gradient-to-br from-slate-700 to-slate-900 text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-slate-900/20 active:scale-95 transition-transform">
+            Báo cáo hệ thống
           </button>
         ) : (
           <button className="bg-gradient-to-br from-primary to-primary-container text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform">

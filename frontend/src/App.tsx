@@ -28,6 +28,11 @@ import { StudentAcademic } from './views/student/StudentAcademic';
 import { StudentMessages } from './views/student/StudentMessages';
 import { StudentAppointments } from './views/student/StudentAppointments';
 
+// --- ADMIN IMPORTS ---
+import { AdminDashboard } from './views/admin/AdminDashboard';
+import { AdminAdvisors } from './views/admin/AdminAdvisor'; 
+import { AdminClasses } from './views/admin/AdminClasses';
+
 /* ─────────────────────────────────────────────────────────────────────────
    Types
 ───────────────────────────────────────────────────────────────────────── */
@@ -350,7 +355,6 @@ export default function App() {
     if (view !== 'messages') {
       setSelectedContact(null);
     }
-
     setCurrentView(view);
   };
 
@@ -372,6 +376,8 @@ export default function App() {
 
     if (normalizedUser?.role === 'STUDENT') {
       setCurrentView('studentDashboard');
+    } else if (user?.role === 'ADMIN') {
+      setCurrentView('adminDashboard');
     } else {
       setCurrentView('dashboard');
     }
@@ -410,28 +416,30 @@ export default function App() {
 />
 
         <div className="flex-1 overflow-y-auto w-full pt-32 px-6 sm:px-10 pb-12">
-          {!isStudent && currentView === 'dashboard' && (
+          
+          {/* ──────────────── ADVISOR VIEWS ──────────────── */}
+          {isAdvisor && currentView === 'dashboard' && (
             <Dashboard
               onNavigate={handleSetCurrentView}
               onMessageStudent={handleMessageStudent}
             />
           )}
 
-          {!isStudent && currentView === 'profiles' && (
+          {isAdvisor && currentView === 'profiles' && (
             <StudentProfiles
               onNavigate={handleSetCurrentView}
               onSelectClass={goToClass}
             />
           )}
 
-          {!isStudent && currentView === 'studentDetail' && (
+          {isAdvisor && currentView === 'studentDetail' && (
             <StudentDetail
               studentId={selectedStudentId}
               onBack={() => setCurrentView(prevView)}
             />
           )}
 
-          {!isStudent && currentView === 'cohort' && (
+          {isAdvisor && currentView === 'cohort' && (
             <CohortDetails
               classCode={selectedClassCode}
               onNavigate={handleSetCurrentView}
@@ -439,25 +447,36 @@ export default function App() {
             />
           )}
 
-          {!isStudent && currentView === 'classlist' && (
+          {isAdvisor && currentView === 'classlist' && (
             <ClassList
               onNavigate={handleSetCurrentView}
               onMessageStudent={handleMessageStudent}
             />
           )}
 
-          {!isStudent && currentView === 'schedule' && <Schedule />}
-          {!isStudent && currentView === 'notes' && <LogNotes />}
-          {!isStudent && currentView === 'messages' && (
+          {isAdvisor && currentView === 'schedule' && <Schedule />}
+          {isAdvisor && currentView === 'notes' && <LogNotes />}
+          {isAdvisor && currentView === 'messages' && (
             <Messages initialContact={selectedContact} />
           )}
+
+          {/* ──────────────── ADMIN VIEWS ──────────────── */}
+          {isAdmin && currentView === 'adminDashboard' && <AdminDashboard />}
+          {isAdmin && currentView === 'adminAdvisors' && <AdminAdvisors />}
+          {isAdmin && currentView === 'adminClasses' && <AdminClasses />}
+
+
+          {/* ──────────────── SHARED VIEWS (ADMIN & ADVISOR) ──────────────── */}
           {!isStudent && currentView === 'profile' && <AdvisorProfile />}
 
+
+          {/* ──────────────── STUDENT VIEWS ──────────────── */}
           {isStudent && currentView === 'studentDashboard' && <StudentDashboard />}
           {isStudent && currentView === 'studentAcademic' && <StudentAcademic />}
           {isStudent && currentView === 'studentMessages' && <StudentMessages />}
           {isStudent && currentView === 'studentAppointments' && <StudentAppointments />}
 
+          {/* Fallback cho Student nếu currentView không hợp lệ */}
           {isStudent &&
             ![
               'studentDashboard',

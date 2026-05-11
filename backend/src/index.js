@@ -13,6 +13,7 @@ import { verifyToken } from "./middleware/auth.js";
 import advisorRouter from "./routes/Advisorroutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
+import adminRouter from "./routes/adminRoutes.js";
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "uit_advisorhub_secret_2026";
@@ -176,6 +177,7 @@ app.post("/auth/login", async (req, res) => {
 app.use("/advisor", verifyToken, advisorRouter);
 app.use("/appointments", verifyToken, appointmentRouter);
 app.use("/student", verifyToken, studentRouter);
+app.use("/admin", verifyToken, adminRouter);
 
 // ==========================================
 // ADMIN - TẠO ADVISOR

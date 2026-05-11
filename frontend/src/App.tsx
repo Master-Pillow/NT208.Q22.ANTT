@@ -367,11 +367,14 @@ export default function App() {
   };
 
   const handleLogin = (user?: CurrentUser) => {
-    setCurrentUser(user || null);
+    const normalizedUser = user
+      ? { ...user, role: String(user.role || '').trim().toUpperCase() }
+      : null;
+
+    setCurrentUser(normalizedUser);
     setIsAuthenticated(true);
 
-    // Cập nhật điều hướng mặc định theo Role
-    if (user?.role === 'STUDENT') {
+    if (normalizedUser?.role === 'STUDENT') {
       setCurrentView('studentDashboard');
     } else if (user?.role === 'ADMIN') {
       setCurrentView('adminDashboard');
@@ -394,10 +397,7 @@ export default function App() {
     return <Login onLogin={handleLogin} />;
   }
 
-  // Các biến Helper phân quyền View
-  const isStudent = currentUser?.role === 'STUDENT';
-  const isAdmin = currentUser?.role === 'ADMIN';
-  const isAdvisor = currentUser?.role === 'ADVISOR';
+  const isStudent = String(currentUser?.role || '').trim().toUpperCase() === 'STUDENT';
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen flex antialiased selection:bg-primary/20 selection:text-primary">

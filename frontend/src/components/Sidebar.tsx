@@ -48,17 +48,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'studentAppointments', label: 'Lịch tư vấn', icon: Calendar },
   ];
 
-  // 2. LOGIC ĐIỀU HƯỚNG MENU & SUBTITLE THEO ROLE
-  let navItems = advisorItems; // Mặc định
-  let subtitle = 'Cố vấn học vụ';
+  const normalizedRole = String(role || '').trim().toUpperCase();
+  const isStudent = normalizedRole === 'STUDENT';
 
-  if (role === 'ADMIN') {
-    navItems = adminItems;
-    subtitle = 'Quản trị viên';
-  } else if (role === 'STUDENT') {
-    navItems = studentItems;
-    subtitle = 'Sinh viên';
-  }
+  const navItems = isStudent ? studentItems : advisorItems;
+
+  const subtitle = isStudent ? 'Sinh viên' : 'Cố vấn học vụ';
 
   const isItemActive = (itemId: string) => {
     if (currentView === itemId) return true;
@@ -115,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* FOOTER ACTIONS */}
       <div className="mt-auto flex flex-col gap-4">
-        {role === 'STUDENT' ? (
+        {isStudent ? (
           <button
             onClick={() => setCurrentView('studentAppointments')}
             className="bg-gradient-to-br from-primary to-primary-container text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform"

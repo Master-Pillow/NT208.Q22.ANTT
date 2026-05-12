@@ -38,6 +38,25 @@ const appointmentTypeLabel: Record<string, string> = {
   FOLLOW_UP: 'Theo dõi sau tư vấn',
 };
 
+type PeriodSlot = {
+  label: string;
+  start: string;
+  end: string;
+};
+
+const periodSlots: PeriodSlot[] = [
+  { label: 'Tiết 1', start: '07:30', end: '08:15' },
+  { label: 'Tiết 2', start: '08:15', end: '09:00' },
+  { label: 'Tiết 3', start: '09:00', end: '09:45' },
+  { label: 'Tiết 4', start: '10:00', end: '10:45' },
+  { label: 'Tiết 5', start: '10:45', end: '11:30' },
+  { label: 'Tiết 6', start: '13:00', end: '13:45' },
+  { label: 'Tiết 7', start: '13:45', end: '14:30' },
+  { label: 'Tiết 8', start: '14:30', end: '15:15' },
+  { label: 'Tiết 9', start: '15:30', end: '16:15' },
+  { label: 'Tiết 10', start: '16:15', end: '17:00' },
+];
+
 const toDateInputValue = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -65,6 +84,33 @@ const formatDateTime = (value: string) =>
     minute: '2-digit',
   });
 
+const getWeekStart = (date: Date) => {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  return start;
+};
+
+const setSlotTimeOnDate = (date: Date, time: string) => {
+  const [hour, minute] = time.split(':').map(Number);
+  const value = new Date(date);
+  value.setHours(hour, minute, 0, 0);
+  return value;
+};
+
+const getOverlappedSlotIndexes = (appointment: Appointment, day: Date) => {
+  const start = new Date(appointment.start_time);
+  const end = new Date(appointment.end_time);
+
+  return periodSlots
+    .map((slot, index) => {
+      const slotStart = setSlotTimeOnDate(day, slot.start);
+      const slotEnd = setSlotTimeOnDate(day, slot.end);
+      return start < slotEnd && end > slotStart ? index : -1;
+    })
+    .filter((index) => index >= 0);
+};
+
 export const Schedule = () => {
   const [scheduleView, setScheduleView] = useState<'week' | 'month'>('week');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -77,6 +123,8 @@ export const Schedule = () => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
+
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(new Date()));
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingApptId, setEditingApptId] = useState<number | null>(null);
@@ -148,26 +196,30 @@ export const Schedule = () => {
     };
   }, [currentMonth]);
 
-  const weekDays = useMemo(() => {
-    const today = new Date();
-    const start = new Date(today);
-    start.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  const weekDays = useMemo(
+    () =>
+      Array.from({ length: 6 }, (_, index) => {
+        const date = new Date(currentWeekStart);
+        date.setDate(currentWeekStart.getDate() + index);
+        return date;
+      }),
+    [currentWeekStart]
+  );
 
-    return Array.from({ length: 6 }, (_, index) => {
-      const date = new Date(start);
-      date.setDate(start.getDate() + index);
-      return date;
-    });
-  }, []);
+  const weekRangeLabel = useMemo(() => {
+    const start = weekDays[0];
+    const end = weekDays[weekDays.length - 1];
+    return `${start.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })} - ${end.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+  }, [weekDays]);
 
-  const handleOpenModal = (date?: Date) => {
+  const handleOpenModal = (date?: Date, slot?: PeriodSlot) => {
     const selectedDate = date || new Date();
     setEditingApptId(null);
     setFormData({
       title: '',
       date: toDateInputValue(selectedDate),
-      startTime: '08:00',
-      endTime: '09:00',
+      startTime: slot?.start || '07:30',
+      endTime: slot?.end || '08:15',
       type: 'MEETING',
       location: '',
       note: '',
@@ -540,63 +592,158 @@ export const Schedule = () => {
   );
 
   const renderWeekView = () => (
-    <section className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 sm:p-8 animate-in fade-in duration-300">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {weekDays.map((day) => {
-          const dateKey = toLocalDateKey(day);
-          const dayEvents = sortedConfirmedAppointments.filter(
-            (appt) => toLocalDateKey(appt.start_time) === dateKey
-          );
+    <section className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-4 sm:p-6 animate-in fade-in duration-300">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
+        <div>
+          <h3 className="text-xl font-bold text-blue-900">Thời khóa biểu tư vấn tuần</h3>
+          <p className="text-sm text-slate-500">
+            Hiển thị 10 tiết/ngày, 6 ngày từ Thứ 2 đến Thứ 7. Bấm vào ô trống để tạo lịch đúng tiết.
+          </p>
+        </div>
 
-          return (
-            <div key={dateKey} className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 min-h-52">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-                    {day.toLocaleDateString('vi-VN', { weekday: 'long' })}
-                  </p>
-                  <p className="text-2xl font-black text-slate-800">{day.getDate()}</p>
-                </div>
-                <button
-                  onClick={() => handleOpenModal(day)}
-                  className="p-2 rounded-xl bg-white border border-slate-100 text-blue-600 hover:bg-blue-50"
-                  title="Tạo lịch trong ngày này"
-                >
-                  <CalendarPlus className="w-4 h-4" />
-                </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() =>
+              setCurrentWeekStart((prev) => {
+                const next = new Date(prev);
+                next.setDate(prev.getDate() - 7);
+                return next;
+              })
+            }
+            className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-500"
+            title="Tuần trước"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="min-w-48 text-center px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold text-slate-700">
+            {weekRangeLabel}
+          </div>
+          <button
+            onClick={() =>
+              setCurrentWeekStart((prev) => {
+                const next = new Date(prev);
+                next.setDate(prev.getDate() + 7);
+                return next;
+              })
+            }
+            className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-500"
+            title="Tuần sau"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50">
+        <div
+          className="relative grid min-w-[1120px] bg-white"
+          style={{
+            gridTemplateColumns: '132px repeat(6, minmax(155px, 1fr))',
+            gridTemplateRows: `56px repeat(${periodSlots.length}, 88px)`,
+          }}
+        >
+          <div
+            className="sticky left-0 z-30 flex items-center justify-center border-r border-b border-slate-200 bg-slate-100 text-sm font-black text-slate-700"
+            style={{ gridColumn: 1, gridRow: 1 }}
+          >
+            Thứ / Tiết
+          </div>
+
+          {weekDays.map((day, dayIndex) => {
+            const dateKey = toLocalDateKey(day);
+            const isToday = dateKey === toDateInputValue(new Date());
+
+            return (
+              <div
+                key={dateKey}
+                className={cn(
+                  'z-20 flex flex-col items-center justify-center border-b border-r border-slate-200 bg-white px-2 text-center',
+                  isToday && 'bg-blue-50'
+                )}
+                style={{ gridColumn: dayIndex + 2, gridRow: 1 }}
+              >
+                <span className="text-xs font-black uppercase text-slate-500">
+                  {day.toLocaleDateString('vi-VN', { weekday: 'long' })}
+                </span>
+                <span className={cn('text-xs font-semibold text-slate-400', isToday && 'text-blue-700')}>
+                  {day.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                </span>
               </div>
+            );
+          })}
 
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
-              ) : dayEvents.length === 0 ? (
-                <p className="text-sm text-slate-400">Chưa có lịch đã xác nhận.</p>
-              ) : (
-                <div className="space-y-3">
-                  {dayEvents.map((appt) => (
-                    <div
-                      key={appt.id}
-                      onClick={() => handleEditAppointment(appt)}
-                      className="bg-white p-4 rounded-2xl border border-blue-100 cursor-pointer hover:shadow-sm transition-shadow"
-                    >
-                      <p className="text-[10px] font-bold text-blue-700 uppercase mb-1">
-                        {appointmentTypeLabel[appt.type] || appt.type}
-                      </p>
-                      <h4 className="text-sm font-bold text-slate-900 leading-tight mb-2">
-                        {appt.title}
-                      </h4>
-                      <p className="text-xs font-semibold text-blue-700">
-                        {formatTime(appt.start_time)} - {formatTime(appt.end_time)}
-                      </p>
-                      {appt.student_name && (
-                        <p className="text-xs text-slate-500 mt-1 truncate">{appt.student_name}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+          {periodSlots.map((slot, slotIndex) => (
+            <div
+              key={slot.label}
+              className="sticky left-0 z-20 flex flex-col items-center justify-center border-r border-b border-slate-200 bg-slate-50 px-2 text-center"
+              style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
+            >
+              <span className="text-sm font-black text-slate-700">{slot.label}</span>
+              <span className="text-xs font-semibold text-slate-500">
+                ({slot.start} - {slot.end})
+              </span>
             </div>
-          );
-        })}
+          ))}
+
+          {weekDays.flatMap((day, dayIndex) =>
+            periodSlots.map((slot, slotIndex) => (
+              <button
+                type="button"
+                key={`${toLocalDateKey(day)}-${slot.label}`}
+                onClick={() => handleOpenModal(day, slot)}
+                className="border-r border-b border-slate-200 bg-white hover:bg-blue-50/60 transition-colors"
+                style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}
+                title={`Tạo lịch ${slot.label} ngày ${toLocalDateKey(day)}`}
+              />
+            ))
+          )}
+
+          {weekDays.flatMap((day, dayIndex) => {
+            const dateKey = toLocalDateKey(day);
+            return sortedConfirmedAppointments
+              .filter((appt) => toLocalDateKey(appt.start_time) === dateKey)
+              .map((appt) => {
+                const overlappedIndexes = getOverlappedSlotIndexes(appt, day);
+                if (overlappedIndexes.length === 0) return null;
+
+                const firstSlot = overlappedIndexes[0];
+                const lastSlot = overlappedIndexes[overlappedIndexes.length - 1];
+
+                return (
+                  <button
+                    type="button"
+                    key={`${dateKey}-${appt.id}`}
+                    onClick={() => handleEditAppointment(appt)}
+                    className="z-10 m-2 overflow-hidden rounded-xl border border-blue-100 border-l-4 border-l-blue-500 bg-white/95 p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                    style={{
+                      gridColumn: dayIndex + 2,
+                      gridRow: `${firstSlot + 2} / ${lastSlot + 3}`,
+                    }}
+                    title="Bấm để sửa lịch"
+                  >
+                    <p className="text-[10px] font-black uppercase tracking-wide text-blue-700">
+                      {appointmentTypeLabel[appt.type] || appt.type}
+                    </p>
+                    <h4 className="mt-1 line-clamp-2 text-sm font-black leading-tight text-slate-900">
+                      {appt.title}
+                    </h4>
+                    <p className="mt-1 text-xs font-bold text-slate-500">
+                      {formatTime(appt.start_time)} - {formatTime(appt.end_time)}
+                    </p>
+                    {appt.student_name && (
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {appt.student_name}
+                        {appt.student_mssv ? ` · ${appt.student_mssv}` : ''}
+                      </p>
+                    )}
+                    {appt.location && (
+                      <p className="mt-1 truncate text-[11px] text-slate-400">{appt.location}</p>
+                    )}
+                  </button>
+                );
+              });
+          })}
+        </div>
       </div>
     </section>
   );

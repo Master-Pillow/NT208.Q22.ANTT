@@ -398,6 +398,8 @@ export default function App() {
   }
 
   const isStudent = String(currentUser?.role || '').trim().toUpperCase() === 'STUDENT';
+  const isAdmin = String(currentUser?.role || '').trim().toUpperCase() === 'ADMIN';
+  const isAdvisor = String(currentUser?.role || '').trim().toUpperCase() === 'ADVISOR';
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen flex antialiased selection:bg-primary/20 selection:text-primary">

@@ -366,7 +366,7 @@ export default function App() {
     }
   };
 
-  const handleLogin = (user?: CurrentUser) => {
+const handleLogin = (user?: CurrentUser) => {
     const normalizedUser = user
       ? { ...user, role: String(user.role || '').trim().toUpperCase() }
       : null;
@@ -376,7 +376,7 @@ export default function App() {
 
     if (normalizedUser?.role === 'STUDENT') {
       setCurrentView('studentDashboard');
-    } else if (user?.role === 'ADMIN') {
+    } else if (normalizedUser?.role === 'ADMIN') { // <-- Sửa dòng này
       setCurrentView('adminDashboard');
     } else {
       setCurrentView('dashboard');

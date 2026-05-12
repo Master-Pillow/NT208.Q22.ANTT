@@ -48,19 +48,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'studentAppointments', label: 'Lịch tư vấn', icon: Calendar },
   ];
 
+  // Chuẩn hóa role để tránh lỗi khoảng trắng hay in hoa/thường
   const normalizedRole = String(role || '').trim().toUpperCase();
-  const isStudent = normalizedRole === 'STUDENT';
 
-  const navItems = isStudent ? studentItems : advisorItems;
+  // 2. LOGIC CHỌN MENU VÀ SUBTITLE
+  let navItems = advisorItems; // Mặc định là cố vấn
+  let subtitle = 'Cố vấn học vụ';
 
-  const subtitle = isStudent ? 'Sinh viên' : 'Cố vấn học vụ';
+  if (normalizedRole === 'ADMIN') {
+    navItems = adminItems;
+    subtitle = 'Quản trị viên';
+  } else if (normalizedRole === 'STUDENT') {
+    navItems = studentItems;
+    subtitle = 'Sinh viên';
+  }
 
   const isItemActive = (itemId: string) => {
     if (currentView === itemId) return true;
 
     if (itemId === 'profiles' && currentView === 'cohort') return true;
     if (itemId === 'profiles' && currentView === 'studentDetail') return true;
-    // Có thể thêm active cho Admin Classes nếu ở trang chi tiết
+    // Thêm active cho Admin Classes nếu ở trang chi tiết
     if (itemId === 'adminAdvisors' && currentView === 'adminAdvisorDetail') return true;
 
     return false;
@@ -110,14 +118,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* FOOTER ACTIONS */}
       <div className="mt-auto flex flex-col gap-4">
-        {isStudent ? (
+        {normalizedRole === 'STUDENT' ? (
           <button
             onClick={() => setCurrentView('studentAppointments')}
             className="bg-gradient-to-br from-primary to-primary-container text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform"
           >
             Đặt lịch tư vấn
           </button>
-        ) : role === 'ADMIN' ? (
+        ) : normalizedRole === 'ADMIN' ? (
           <button className="bg-gradient-to-br from-slate-700 to-slate-900 text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-slate-900/20 active:scale-95 transition-transform">
             Báo cáo hệ thống
           </button>

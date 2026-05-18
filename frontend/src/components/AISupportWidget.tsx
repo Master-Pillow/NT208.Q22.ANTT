@@ -1,13 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Sparkles, User } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { runAiQuery } from '../lib/api';
+
+interface ChatMessage {
+  id: number;
+  isBot: boolean;
+  text?: string;
+  type?: 'suggestions';
+  suggestions?: string[];
+}
 
 export const AISupportWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 1,
       isBot: true,
@@ -34,7 +43,7 @@ export const AISupportWidget = () => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  const handleSend = (text: string) => {
+  const handleSendLegacy = (text: string) => {
     if (!text.trim()) return;
 
     // Add user message
@@ -53,6 +62,32 @@ export const AISupportWidget = () => {
         text: "Tôi đang phân tích dữ liệu. Dựa trên hồ sơ học tập hiện tại, một số sinh viên có mức giảm GPA đáng chú ý và cần được theo dõi sớm. Thầy/Cô có muốn tôi lập báo cáo can thiệp không?"
       }]);
     }, 1000);
+  };
+
+  const handleSend = async (text: string) => {
+    if (!text.trim()) return;
+
+    setMessages(prev => [...prev, { id: Date.now(), isBot: false, text }]);
+    setInputValue('');
+    setMessages(prev => prev.filter(m => m.type !== 'suggestions'));
+
+    try {
+      const { data } = await runAiQuery({ question: text });
+      const rowCount = data.rows?.length ? `\n\nSo dong: ${data.rows.length}` : '';
+      const chartNote = data.chart ? `\n\nDa tao du lieu bieu do: ${data.chart.title}` : '';
+
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        isBot: true,
+        text: `${data.summary || 'Da truy van du lieu hoc vu.'}${rowCount}${chartNote}`,
+      }]);
+    } catch (err: any) {
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        isBot: true,
+        text: err.response?.data?.message || 'Toi chua truy van duoc du lieu cho cau hoi nay.',
+      }]);
+    }
   };
 
   return (

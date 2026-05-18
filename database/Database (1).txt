@@ -572,6 +572,75 @@ CREATE TABLE advisor_evaluations (
   note            TEXT,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS ai_anomaly_runs (
+  id BIGSERIAL PRIMARY KEY,
+  run_type VARCHAR(30) NOT NULL DEFAULT 'MANUAL'
+    CHECK (run_type IN ('MANUAL', 'GRADE_UPDATE', 'SCHEDULED')),
+  status VARCHAR(30) NOT NULL DEFAULT 'RUNNING'
+    CHECK (status IN ('RUNNING', 'DONE', 'FAILED')),
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMPTZ,
+  summary_json JSONB,
+  error_message TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ai_student_anomalies (
+  id BIGSERIAL PRIMARY KEY,
+  student_id BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  advisor_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  severity VARCHAR(20) NOT NULL DEFAULT 'MEDIUM'
+    CHECK (severity IN ('LOW', 'MEDIUM', 'HIGH')),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  anomaly_type VARCHAR(60) NOT NULL,
+  course_id BIGINT REFERENCES courses(id) ON DELETE SET NULL,
+  evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  suggested_action TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'OPEN'
+    CHECK (status IN ('OPEN', 'RESOLVED', 'DISMISSED')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_student_anomalies_student_status
+  ON ai_student_anomalies(student_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_ai_student_anomalies_advisor_created
+  ON ai_student_anomalies(advisor_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_ai_student_anomalies_type_course
+  ON ai_student_anomalies(anomaly_type, course_id);
+
+CREATE TABLE IF NOT EXISTS ai_anomaly_patterns (
+  id BIGSERIAL PRIMARY KEY,
+  source_course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  target_course_id BIGINT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+  support_count INT NOT NULL,
+  confidence NUMERIC(6,4) NOT NULL,
+  lift NUMERIC(6,4) NOT NULL,
+  description TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (source_course_id, target_course_id)
+);
+
+CREATE TABLE IF NOT EXISTS ai_briefs (
+  id BIGSERIAL PRIMARY KEY,
+  advisor_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  class_code VARCHAR(50) REFERENCES admin_classes(code) ON DELETE SET NULL,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  stats_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sent_status VARCHAR(30) NOT NULL DEFAULT 'DRAFT'
+    CHECK (sent_status IN ('DRAFT', 'NOTIFIED', 'SENT', 'FAILED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_briefs_advisor_class_created
+  ON ai_briefs(advisor_id, class_code, created_at DESC);
+
+COMMIT;
 
 -- ===============================================================
 -- 13) DEMO ACCOUNTS

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CalendarPlus, ChevronLeft, ChevronRight, Clock, RefreshCw } from 'lucide-react';
-import apiClient from '../../lib/api';
+import apiClient from '../lib/api';
 
 interface Appointment {
   id: number;

@@ -8,6 +8,7 @@ import {
   GraduationCap,
   MessageSquare,
   BookOpen,
+  Bot,
   Award, // Thêm icon cho Đánh giá
   Bell,  // Thêm icon cho Thông báo
 } from 'lucide-react';
@@ -40,6 +41,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'notes', label: 'Ghi chú tư vấn', icon: FileText },
     { id: 'schedule', label: 'Lịch tư vấn', icon: Calendar },
   ];
+
+  adminItems.splice(3, 0, { id: 'ai', label: 'AI học vụ', icon: Bot });
+  advisorItems.splice(4, 0, { id: 'ai', label: 'AI học vụ', icon: Bot });
 
   const studentItems = [
     { id: 'studentDashboard', label: 'Tổng quan', icon: LayoutDashboard },

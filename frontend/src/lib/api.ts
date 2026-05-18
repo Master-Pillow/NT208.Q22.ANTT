@@ -31,3 +31,31 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+export interface AiQueryRequest {
+  question: string;
+}
+
+export interface AiAnomalyFilters {
+  classCode?: string;
+  severity?: string;
+  status?: string;
+  anomalyType?: string;
+}
+
+export const runAiQuery = (payload: AiQueryRequest) =>
+  apiClient.post('/ai/query', payload);
+
+export const runAnomalyDetection = (classCode?: string) =>
+  apiClient.post('/ai/anomalies/run', { classCode: classCode || undefined });
+
+export const getAnomalies = (filters: AiAnomalyFilters = {}) =>
+  apiClient.get('/ai/anomalies', { params: filters });
+
+export const updateAnomalyStatus = (id: number | string, status: string) =>
+  apiClient.patch(`/ai/anomalies/${id}/status`, { status });
+
+export const getAnomalyPatterns = () => apiClient.get('/ai/anomaly-patterns');
+
+export const generateAiBrief = (classCode: string) =>
+  apiClient.post('/ai/briefs/generate', { classCode });

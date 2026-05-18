@@ -14,6 +14,8 @@ import advisorRouter from "./routes/Advisorroutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
+import aiAnomalyRouter from "./routes/aiAnomalyRoutes.js";
+import aiQueryRouter from "./routes/aiQueryRoutes.js";
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "uit_advisorhub_secret_2026";
@@ -178,6 +180,8 @@ app.use("/advisor", verifyToken, advisorRouter);
 app.use("/appointments", verifyToken, appointmentRouter);
 app.use("/student", verifyToken, studentRouter);
 app.use("/admin", verifyToken, adminRouter);
+app.use("/ai", verifyToken, aiQueryRouter);
+app.use("/ai", verifyToken, aiAnomalyRouter);
 
 // ==========================================
 // ADMIN - TẠO ADVISOR

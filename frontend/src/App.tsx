@@ -10,6 +10,7 @@ import { Messages } from './views/Messages';
 import { ClassList } from './views/ClassList';
 import { AdvisorProfile } from './views/AdvisorProfile';
 import { Login } from './views/Login';
+import { AIAnomalyDashboard } from './views/AIAnomalyDashboard';
 import apiClient from './lib/api';
 import {
   GraduationCap,
@@ -470,6 +471,9 @@ const handleLogin = (user?: CurrentUser) => {
 
           {/* ──────────────── SHARED VIEWS (ADMIN & ADVISOR) ──────────────── */}
           {!isStudent && currentView === 'profile' && <AdvisorProfile />}
+          {!isStudent && currentView === 'ai' && (
+            <AIAnomalyDashboard currentUser={currentUser} />
+          )}
 
 
           {/* ──────────────── STUDENT VIEWS ──────────────── */}

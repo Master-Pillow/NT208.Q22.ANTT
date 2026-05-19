@@ -11,6 +11,46 @@ const HIGH_RISK_COURSE_CODES = new Set([
   'NT101',
 ]);
 
+const getAnomalyDisplayText = ({ anomaly_type, course_name, evidence_json = {} }) => {
+  const evidenceCourseName = evidence_json?.course_name;
+  const courseName = course_name || evidenceCourseName;
+
+  switch (anomaly_type) {
+    case 'GPA_DROP':
+      return {
+        title: 'GPA học kỳ giảm mạnh',
+        suggested_action:
+          'CVHT nên hẹn gặp sinh viên để tìm nguyên nhân và điều chỉnh kế hoạch học tập.',
+      };
+    case 'LOW_GPA':
+      return {
+        title: 'GPA dưới ngưỡng an toàn',
+        suggested_action:
+          'Ưu tiên tư vấn kế hoạch học lại, giảm tải môn học và theo dõi tiến độ trong 2 tuần.',
+      };
+    case 'MULTIPLE_FAILURES':
+      return {
+        title: 'Có từ 2 môn F trở lên',
+        suggested_action:
+          'CVHT nên lập danh sách môn cần học lại và khuyến nghị sinh viên đăng ký phụ đạo.',
+      };
+    case 'COURSE_FAILURE':
+      return {
+        title: courseName ? `Nguy cơ rớt môn ${courseName}` : 'Nguy cơ rớt môn',
+        suggested_action:
+          'Liên hệ sinh viên và đề xuất kế hoạch học lại hoặc phụ đạo cho môn này.',
+      };
+    case 'LOW_ACCUMULATED_CREDITS':
+      return {
+        title: 'Tín chỉ tích lũy thấp hơn mặt bằng lớp',
+        suggested_action:
+          'Kiểm tra tiến độ tích lũy tín chỉ và lập lộ trình đăng ký học phần phù hợp.',
+      };
+    default:
+      return {};
+  }
+};
+
 const normalizeRole = (role) => String(role || '').trim().toUpperCase();
 
 const semesterRank = (semester) => {
@@ -429,6 +469,12 @@ const hasDuplicateOpenAnomaly = async (client, anomaly) => {
 };
 
 const insertAnomaly = async (client, anomaly) => {
+  const displayText = getAnomalyDisplayText({
+    anomaly_type: anomaly.anomaly_type,
+    evidence_json: anomaly.evidence_json,
+  });
+  const anomalyToInsert = { ...anomaly, ...displayText };
+
   const result = await client.query(
     `
     INSERT INTO ai_student_anomalies (
@@ -446,28 +492,28 @@ const insertAnomaly = async (client, anomaly) => {
     RETURNING *
     `,
     [
-      anomaly.student_id,
-      anomaly.advisor_id,
-      anomaly.severity,
-      anomaly.title,
-      anomaly.description,
-      anomaly.anomaly_type,
-      anomaly.course_id,
-      JSON.stringify(anomaly.evidence_json || {}),
-      anomaly.suggested_action,
+      anomalyToInsert.student_id,
+      anomalyToInsert.advisor_id,
+      anomalyToInsert.severity,
+      anomalyToInsert.title,
+      anomalyToInsert.description,
+      anomalyToInsert.anomaly_type,
+      anomalyToInsert.course_id,
+      JSON.stringify(anomalyToInsert.evidence_json || {}),
+      anomalyToInsert.suggested_action,
     ]
   );
 
-  if (anomaly.advisor_id) {
+  if (anomalyToInsert.advisor_id) {
     await client.query(
       `
       INSERT INTO notifications (user_id, title, content, type)
       VALUES ($1, $2, $3, 'WARNING')
       `,
       [
-        anomaly.advisor_id,
-        anomaly.title,
-        `${anomaly.description || ''} Gợi ý: ${anomaly.suggested_action || ''}`,
+        anomalyToInsert.advisor_id,
+        anomalyToInsert.title,
+        `${anomalyToInsert.description || ''} Gợi ý: ${anomalyToInsert.suggested_action || ''}`,
       ]
     );
   }
@@ -738,7 +784,10 @@ export const getAnomalies = async ({ user, filters = {} }) => {
     params
   );
 
-  return result.rows;
+  return result.rows.map((row) => ({
+    ...row,
+    ...getAnomalyDisplayText(row),
+  }));
 };
 
 export const updateAnomalyStatus = async ({ user, anomalyId, status }) => {
@@ -746,7 +795,7 @@ export const updateAnomalyStatus = async ({ user, anomalyId, status }) => {
   await ensureAiTables(pool);
 
   if (!['OPEN', 'RESOLVED', 'DISMISSED'].includes(status)) {
-    const error = new Error('Trang thai khong hop le.');
+    const error = new Error('Trạng thái không hợp lệ.');
     error.status = 400;
     throw error;
   }

@@ -223,7 +223,7 @@ export const Toolbar = ({
   };
 
   return (
-    <header className="fixed top-0 left-72 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-30 shadow-[0_4px_24px_rgba(0,0,0,0.02)] px-8 py-4 flex justify-between items-center mr-4 mt-4 rounded-3xl border border-slate-100 gap-4">
+    <header className="fixed top-0 left-16 right-0 lg:left-72 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-30 shadow-[0_4px_24px_rgba(0,0,0,0.02)] px-4 sm:px-8 py-4 flex justify-between items-center mr-4 mt-4 rounded-3xl border border-slate-100 gap-4">
       <div className="font-headline text-lg xl:text-xl font-black text-slate-900 dark:text-white tracking-tight shrink-0 truncate">
         <span className="hidden md:block">Trường Đại học Công nghệ Thông tin</span>
         <span className="block md:hidden">UIT</span>

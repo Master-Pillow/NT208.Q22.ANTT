@@ -36,6 +36,7 @@ interface CurrentUser {
 
 interface AIAnomalyDashboardProps {
   currentUser?: CurrentUser | null;
+  mode?: 'all' | 'query' | 'anomaly' | 'brief' | 'patterns';
 }
 
 interface Anomaly {
@@ -155,12 +156,14 @@ const safeEvidenceText = (value: any, anomalyType?: string) => {
   return parts.length > 0 ? parts.join(' · ') : 'Không có dữ liệu chi tiết';
 };
 
-export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentUser }) => {
+export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentUser, mode = 'all' }) => {
   const [classes, setClasses] = useState<string[]>([]);
   const [classCode, setClassCode] = useState('');
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('OPEN');
   const [anomalyType, setAnomalyType] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [patterns, setPatterns] = useState<Pattern[]>([]);
@@ -176,6 +179,10 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
   const [queryResult, setQueryResult] = useState<any>(null);
 
   const role = String(currentUser?.role || '').trim().toUpperCase();
+  const showQuery = mode === 'all' || mode === 'query';
+  const showAnomaly = mode === 'all' || mode === 'anomaly';
+  const showBrief = mode === 'all' || mode === 'brief';
+  const showPatterns = mode === 'all' || mode === 'patterns';
 
   const fetchClasses = async () => {
     if (role === 'ADMIN') {
@@ -218,6 +225,25 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
   useEffect(() => {
     fetchDashboard();
   }, [classCode, severity, status, anomalyType]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [classCode, severity, status, anomalyType, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(anomalies.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = anomalies.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize;
+  const pageEndIndex = Math.min(pageStartIndex + pageSize, anomalies.length);
+  const paginatedAnomalies = useMemo(
+    () => anomalies.slice(pageStartIndex, pageEndIndex),
+    [anomalies, pageStartIndex, pageEndIndex]
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const metrics = useMemo(() => {
     const highRiskStudents = new Set(
@@ -322,14 +348,16 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
           </p>
         </div>
 
-        <button
-          onClick={handleRunDetection}
-          disabled={running}
-          className="inline-flex items-center justify-center gap-2 bg-primary text-white px-5 py-3 rounded-xl font-bold shadow-sm hover:bg-primary/90 disabled:opacity-60"
-        >
-          {running ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-          Chạy phát hiện bất thường
-        </button>
+        {showAnomaly && (
+          <button
+            onClick={handleRunDetection}
+            disabled={running}
+            className="inline-flex items-center justify-center gap-2 bg-primary text-white px-5 py-3 rounded-xl font-bold shadow-sm hover:bg-primary/90 disabled:opacity-60"
+          >
+            {running ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
+            Chạy phát hiện bất thường
+          </button>
+        )}
       </div>
 
       {message && (
@@ -338,7 +366,7 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
         </div>
       )}
 
-      <section className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
+      {showQuery && <section className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
             <Bot className="w-5 h-5" />
@@ -419,9 +447,9 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
             )}
           </div>
         )}
-      </section>
+      </section>}
 
-      <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {showAnomaly && <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           { label: 'Tổng cảnh báo', value: metrics.total, Icon: ShieldAlert },
           { label: 'Sinh viên rủi ro cao', value: metrics.highRiskStudents, Icon: AlertTriangle },
@@ -436,34 +464,38 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
             </div>
           </div>
         ))}
-      </section>
+      </section>}
 
-      <section className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      {(showAnomaly || showBrief) && <section className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm">
+        <div className={`grid grid-cols-1 gap-3 ${showAnomaly ? 'md:grid-cols-4' : 'md:grid-cols-2'}`}>
           <select value={classCode} onChange={(event) => setClassCode(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold">
             <option value="">Tất cả lớp</option>
             {classes.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <select value={severity} onChange={(event) => setSeverity(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold">
-            <option value="">Tất cả mức độ</option>
-            <option value="HIGH">HIGH</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="LOW">LOW</option>
-          </select>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold">
-            <option value="">Tất cả trạng thái</option>
-            <option value="OPEN">OPEN</option>
-            <option value="RESOLVED">RESOLVED</option>
-            <option value="DISMISSED">DISMISSED</option>
-          </select>
-          <select value={anomalyType} onChange={(event) => setAnomalyType(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold">
-            <option value="">Tất cả loại</option>
-            {Object.entries(typeLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-          </select>
+          {showAnomaly && (
+            <>
+              <select value={severity} onChange={(event) => setSeverity(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold">
+                <option value="">Tất cả mức độ</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LOW">LOW</option>
+              </select>
+              <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold">
+                <option value="">Tất cả trạng thái</option>
+                <option value="OPEN">OPEN</option>
+                <option value="RESOLVED">RESOLVED</option>
+                <option value="DISMISSED">DISMISSED</option>
+              </select>
+              <select value={anomalyType} onChange={(event) => setAnomalyType(event.target.value)} className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold">
+                <option value="">Tất cả loại</option>
+                {Object.entries(typeLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select>
+            </>
+          )}
         </div>
-      </section>
+      </section>}
 
-      <section className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
+      {showAnomaly && <section className="bg-white border border-slate-100 rounded-xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-bold text-slate-900">Danh sách anomaly</h3>
           {loading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
@@ -491,7 +523,7 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
                   </td>
                 </tr>
               ) : (
-                anomalies.map((item) => (
+                paginatedAnomalies.map((item) => (
                   <tr key={item.id} className="align-top hover:bg-slate-50/60">
                     <td className="px-5 py-4 font-bold text-slate-800">{item.student_name}</td>
                     <td className="px-4 py-4 font-mono text-xs text-slate-500">{item.mssv}</td>
@@ -525,10 +557,50 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
             </tbody>
           </table>
         </div>
-      </section>
+        <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm font-semibold text-slate-500">
+            Hiển thị {anomalies.length === 0 ? 0 : pageStartIndex + 1}–{pageEndIndex} trong {anomalies.length} kết quả
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+              Số dòng
+              <select
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:border-primary"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={safeCurrentPage <= 1}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                &lt;&lt; Trang trước
+              </button>
+              <span className="min-w-28 text-center text-sm font-bold text-slate-600">
+                Trang {safeCurrentPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={safeCurrentPage >= totalPages}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Trang sau &gt;&gt;
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <section className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
+      {(showPatterns || showBrief) && <div className={`grid grid-cols-1 gap-6 ${mode === 'all' ? 'xl:grid-cols-2' : ''}`}>
+        {showPatterns && <section className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
           <h3 className="font-bold text-slate-900 mb-4">Pattern rớt môn</h3>
           <div className="space-y-3">
             {patterns.length === 0 ? (
@@ -546,9 +618,9 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
               ))
             )}
           </div>
-        </section>
+        </section>}
 
-        <section className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
+        {showBrief && <section className="bg-white border border-slate-100 rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between gap-4 mb-4">
             <h3 className="font-bold text-slate-900">AI Brief</h3>
             <button
@@ -563,8 +635,8 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
           <div className="min-h-72 rounded-xl bg-slate-50 border border-slate-100 p-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
             {brief || 'Chọn lớp ở bộ lọc, sau đó bấm Sinh brief để tạo bản tin học vụ bằng AI.'}
           </div>
-        </section>
-      </div>
+        </section>}
+      </div>}
     </div>
   );
 };

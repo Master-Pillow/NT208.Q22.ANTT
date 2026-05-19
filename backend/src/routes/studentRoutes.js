@@ -292,10 +292,19 @@ router.get('/messages', requireStudent, async (req, res) => {
       SELECT
         c.id,
         advisor.full_name AS advisor_name,
-        advisor.email AS advisor_email
+        advisor.email AS advisor_email,
+        COALESCE(unread.unread_count, 0)::int AS unread_count,
+        (COALESCE(unread.unread_count, 0) > 0) AS is_unread
       FROM conversations c
       JOIN users advisor ON advisor.id = c.advisor_id
       JOIN users student_user ON student_user.student_id = c.student_id
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS unread_count
+        FROM messages
+        WHERE conversation_id = c.id
+          AND sender_role = 'ADVISOR'
+          AND COALESCE(is_read, FALSE) = FALSE
+      ) unread ON true
       WHERE student_user.id = $1
       LIMIT 1
       `,
@@ -313,7 +322,7 @@ router.get('/messages', requireStudent, async (req, res) => {
 
     const messagesResult = await pool.query(
       `
-      SELECT id, sender_role, sender_id, content, created_at
+      SELECT id, conversation_id, sender_role, sender_id, content, created_at, is_read
       FROM messages
       WHERE conversation_id = $1
       ORDER BY created_at ASC

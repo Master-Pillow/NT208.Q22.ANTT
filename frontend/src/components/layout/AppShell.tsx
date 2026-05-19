@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../Sidebar';
 import { Toolbar } from '../Toolbar';
 import { useAuth } from '../../auth/AuthContext';
+import { preloadRoleRoutes } from '../../routes/preload';
 
 const legacyViewRoutes: Record<string, string> = {
   adminDashboard: '/admin/dashboard',
@@ -28,8 +30,12 @@ export const routeForRole = (role: string) => {
 };
 
 export const AppShell = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, role } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    void preloadRoleRoutes(role);
+  }, [role]);
 
   const navigateLegacyView = (view: string) => {
     if (view === 'profile') {

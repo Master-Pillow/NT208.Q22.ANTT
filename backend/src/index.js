@@ -22,6 +22,44 @@ const JWT_SECRET = process.env.JWT_SECRET || "uit_advisorhub_secret_2026";
 
 const normalizeRole = (role) => String(role || "").trim().toUpperCase();
 
+const getMessageReaderRole = (role) => {
+  return normalizeRole(role) === "STUDENT" ? "STUDENT" : "ADVISOR";
+};
+
+const getConversationForUser = async (conversationId, user) => {
+  const result = await pool.query(
+    `
+    SELECT
+      c.id,
+      c.advisor_id,
+      c.student_id,
+      student_user.id AS student_user_id
+    FROM conversations c
+    LEFT JOIN users student_user ON student_user.student_id = c.student_id
+    WHERE c.id = $1
+    LIMIT 1
+    `,
+    [conversationId]
+  );
+
+  const conversation = result.rows[0];
+  if (!conversation) return null;
+
+  const role = normalizeRole(user.role);
+  const userId = Number(user.id);
+  const userStudentId = Number(user.student_id);
+  const advisorId = Number(conversation.advisor_id);
+  const studentId = Number(conversation.student_id);
+  const studentUserId = Number(conversation.student_user_id);
+
+  const canAccess =
+    role === "ADMIN" ||
+    (role === "ADVISOR" && advisorId === userId) ||
+    (role === "STUDENT" && (studentId === userStudentId || studentUserId === userId));
+
+  return canAccess ? conversation : null;
+};
+
 app.use(cors());
 app.use(express.json());
 
@@ -569,10 +607,12 @@ app.get("/conversations", verifyToken, async (req, res) => {
         c.id,
         c.student_id,
         s.full_name AS name,
-        s.mssv AS idNumber,
-        latest.content AS lastMessage,
+        s.mssv AS "idNumber",
+        latest.content AS "lastMessage",
         TO_CHAR(latest.created_at, 'HH24:MI') AS time,
-        latest.created_at AS lastMessageAt
+        latest.created_at AS "lastMessageAt",
+        COALESCE(unread.unread_count, 0)::int AS "unreadCount",
+        (COALESCE(unread.unread_count, 0) > 0) AS "isUnread"
       FROM conversations c
       JOIN students s ON s.id = c.student_id
       LEFT JOIN LATERAL (
@@ -582,6 +622,13 @@ app.get("/conversations", verifyToken, async (req, res) => {
         ORDER BY created_at DESC
         LIMIT 1
       ) latest ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS unread_count
+        FROM messages
+        WHERE conversation_id = c.id
+          AND sender_role = 'STUDENT'
+          AND COALESCE(is_read, FALSE) = FALSE
+      ) unread ON true
       WHERE c.advisor_id = $1
       ORDER BY latest.created_at DESC NULLS LAST, c.created_at DESC
       `,
@@ -600,6 +647,12 @@ app.get("/conversations", verifyToken, async (req, res) => {
 
 app.get("/conversations/:id/messages", verifyToken, async (req, res) => {
   try {
+    const conversation = await getConversationForUser(req.params.id, req.user);
+
+    if (!conversation) {
+      return res.status(403).json({ message: "Bạn không có quyền xem hội thoại này" });
+    }
+
     const result = await pool.query(
       `
       SELECT *
@@ -614,6 +667,48 @@ app.get("/conversations/:id/messages", verifyToken, async (req, res) => {
   } catch (err) {
     console.error("Lỗi lấy tin nhắn:", err.message);
     res.status(500).json({ message: "Lỗi lấy tin nhắn" });
+  }
+});
+
+app.patch("/conversations/:id/read", verifyToken, async (req, res) => {
+  try {
+    const conversation = await getConversationForUser(req.params.id, req.user);
+
+    if (!conversation) {
+      return res.status(403).json({ message: "Bạn không có quyền cập nhật hội thoại này" });
+    }
+
+    const readerRole = getMessageReaderRole(req.user.role);
+    const result = await pool.query(
+      `
+      UPDATE messages
+      SET is_read = TRUE
+      WHERE conversation_id = $1
+        AND sender_role <> $2
+        AND COALESCE(is_read, FALSE) = FALSE
+      RETURNING id
+      `,
+      [req.params.id, readerRole]
+    );
+
+    const readMessageIds = result.rows.map((row) => row.id);
+
+    if (readMessageIds.length > 0) {
+      io.to(`conv_${req.params.id}`).emit("messages_read", {
+        conversationId: Number(req.params.id),
+        readerRole,
+        messageIds: readMessageIds,
+      });
+    }
+
+    return res.json({
+      conversation_id: Number(req.params.id),
+      reader_role: readerRole,
+      read_message_ids: readMessageIds,
+    });
+  } catch (err) {
+    console.error("Lỗi cập nhật trạng thái đã đọc:", err.message);
+    return res.status(500).json({ message: "Lỗi cập nhật trạng thái đã đọc" });
   }
 });
 

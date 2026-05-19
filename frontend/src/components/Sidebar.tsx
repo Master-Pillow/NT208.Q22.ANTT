@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../auth/AuthContext';
+import { preloadRoute } from '../routes/preload';
 
 interface NavItem {
   to: string;
@@ -88,6 +89,8 @@ export const Sidebar: React.FC = () => {
             <NavLink
               key={item.to}
               to={item.to}
+              onMouseEnter={() => preloadRoute(item.to)}
+              onFocus={() => preloadRoute(item.to)}
               onClick={() => setOpen(false)}
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-xl hover:translate-x-1 transition-transform duration-200 text-left',

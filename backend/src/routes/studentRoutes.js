@@ -3,16 +3,51 @@ import { pool } from '../db.js';
 
 const router = express.Router();
 
-function requireStudent(req, res, next) {
+function normalizeRole(role) {
+  return String(role || '').trim().toUpperCase();
+}
+
+function isStudentRole(role) {
+  const normalized = normalizeRole(role);
+  return normalized === 'STUDENT' || normalized === 'SINHVIEN' || normalized === 'SINH_VIEN';
+}
+
+async function requireStudent(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ message: 'Chưa đăng nhập' });
   }
 
-  if (req.user.role !== 'STUDENT') {
-    return res.status(403).json({ message: 'Chỉ sinh viên mới được truy cập' });
+  // Ưu tiên kiểm tra role trong JWT, nhưng vẫn kiểm tra lại DB để tránh lỗi token cũ/localStorage lệch user.
+  if (isStudentRole(req.user.role)) {
+    req.user.role = 'STUDENT';
+    return next();
   }
 
-  next();
+  try {
+    const userResult = await pool.query(
+      `SELECT id, role, student_id FROM users WHERE id = $1 LIMIT 1`,
+      [req.user.id]
+    );
+
+    const dbUser = userResult.rows[0];
+
+    if (dbUser && isStudentRole(dbUser.role)) {
+      req.user.role = 'STUDENT';
+      req.user.student_id = dbUser.student_id;
+      return next();
+    }
+
+    return res.status(403).json({
+      message: 'Chỉ sinh viên mới được truy cập',
+      detail: 'Token hiện tại không thuộc tài khoản sinh viên. Hãy đăng xuất, xóa localStorage và đăng nhập lại bằng tài khoản sinh viên.',
+    });
+  } catch (err) {
+    console.error('[requireStudent]', err);
+    return res.status(500).json({
+      message: 'Lỗi kiểm tra quyền sinh viên',
+      detail: err.message,
+    });
+  }
 }
 
 // GET /student/me
@@ -143,7 +178,7 @@ router.get('/appointments', requireStudent, async (req, res) => {
       SELECT
         a.id,
         COALESCE(a.title, 'Lịch tư vấn') AS title,
-        '' AS description,
+        COALESCE(a.note, '') AS description,
         a.start_time,
         a.end_time,
         COALESCE(a.status, 'PENDING') AS status,
@@ -171,7 +206,7 @@ router.get('/appointments', requireStudent, async (req, res) => {
 // POST /student/appointments
 router.post('/appointments', requireStudent, async (req, res) => {
   try {
-    const { title, start_time, end_time } = req.body;
+    const { title, description, start_time, end_time } = req.body;
 
     if (!title || !start_time || !end_time) {
       return res.status(400).json({ message: 'Thiếu thông tin lịch hẹn' });
@@ -194,6 +229,7 @@ router.post('/appointments', requireStudent, async (req, res) => {
     }
 
     const { student_id, advisor_id } = studentResult.rows[0];
+    const note = description?.trim() || null;
 
     const insertResult = await pool.query(
       `
@@ -203,15 +239,42 @@ router.post('/appointments', requireStudent, async (req, res) => {
         title,
         start_time,
         end_time,
-        status
+        status,
+        note,
+        type
       )
-      VALUES ($1, $2, $3, $4, $5, 'pending')
+      VALUES ($1, $2, $3, $4, $5, 'pending', $6, 'MEETING')
       RETURNING *
       `,
-      [advisor_id, student_id, title, start_time, end_time]
+      [advisor_id, student_id, title.trim(), start_time, end_time, note]
     );
 
-    res.status(201).json(insertResult.rows[0]);
+    const appointment = insertResult.rows[0];
+
+    const notifyResult = await pool.query(
+      `
+      INSERT INTO notifications (user_id, title, content, type)
+      SELECT
+        $1,
+        'Yêu cầu đặt lịch tư vấn mới',
+        s.full_name || ' (' || s.mssv || ') muốn đặt lịch: ' || $2,
+        'APPOINTMENT'
+      FROM students s
+      WHERE s.id = $3
+      RETURNING *
+      `,
+      [advisor_id, title.trim(), student_id]
+    );
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${advisor_id}`).emit('appointment_request_created', {
+        ...appointment,
+        notification: notifyResult.rows[0] || null,
+      });
+    }
+
+    res.status(201).json(appointment);
   } catch (err) {
     console.error('[student/create appointment] SQL ERROR:', err);
     res.status(500).json({
@@ -333,7 +396,15 @@ router.post('/messages', requireStudent, async (req, res) => {
       [conversationId, req.user.id, content.trim()]
     );
 
-    res.status(201).json(insertResult.rows[0]);
+    const newMessage = insertResult.rows[0];
+    const io = req.app.get('io');
+
+    if (io) {
+      io.to(`conv_${conversationId}`).emit('new_message', newMessage);
+    }
+
+    res.status(201).json(newMessage);
+    
   } catch (err) {
     console.error('[student/send message]', err);
     res.status(500).json({

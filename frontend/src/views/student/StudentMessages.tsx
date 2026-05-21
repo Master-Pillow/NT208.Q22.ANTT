@@ -1,38 +1,105 @@
-import React, { useEffect, useState } from 'react';
-import { Send } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { AlertCircle, Send } from 'lucide-react';
 import apiClient from '../../lib/api';
+import { io, Socket } from 'socket.io-client';
 
 interface Message {
   id: number;
+  conversation_id: number;
   sender_role: 'ADVISOR' | 'STUDENT';
   content: string;
   created_at: string;
 }
 
+interface Conversation {
+  id: number;
+  advisor_name: string;
+  advisor_email: string;
+}
+
+let socket: Socket | null = null;
+
+const getSocket = (): Socket => {
+  if (!socket) {
+    socket = io('http://localhost:4000', { transports: ['websocket'] });
+  }
+
+  return socket;
+};
+
 export const StudentMessages = () => {
-  const [conversation, setConversation] = useState<any>(null);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const bottomRef = useRef<HTMLDivElement | null>(null);
 
   async function loadMessages() {
     const { data } = await apiClient.get('/student/messages');
-    setConversation(data.conversation);
+
+    setConversation(data.conversation || null);
     setMessages(data.messages || []);
   }
 
   useEffect(() => {
     loadMessages()
-      .catch((err) => console.error('[StudentMessages]', err))
+      .catch((err) => {
+        console.error('[StudentMessages]', err);
+        setErrorMsg(err.response?.data?.message || 'Không thể tải tin nhắn.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleSend() {
-    if (!content.trim()) return;
+  useEffect(() => {
+    if (!conversation?.id) return;
 
-    await apiClient.post('/student/messages', { content });
-    setContent('');
-    await loadMessages();
+    const sock = getSocket();
+    sock.emit('join_conversation', conversation.id);
+
+    const handleNewMessage = (msg: Message) => {
+      if (msg.conversation_id !== conversation.id) return;
+
+      setMessages((prev) => {
+        if (prev.some((item) => item.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    };
+
+    sock.on('new_message', handleNewMessage);
+
+    return () => {
+      sock.off('new_message', handleNewMessage);
+    };
+  }, [conversation?.id]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  async function handleSend() {
+    const trimmedContent = content.trim();
+
+    if (!trimmedContent || sending) return;
+
+    try {
+      setSending(true);
+      setErrorMsg('');
+
+      await apiClient.post('/student/messages', {
+        content: trimmedContent,
+      });
+
+      setContent('');
+      await loadMessages();
+    } catch (err: any) {
+      console.error('[StudentMessages/send]', err);
+      setErrorMsg(err.response?.data?.message || 'Không thể gửi tin nhắn.');
+    } finally {
+      setSending(false);
+    }
   }
 
   if (loading) {
@@ -50,14 +117,27 @@ export const StudentMessages = () => {
         </p>
       </div>
 
+      {errorMsg && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-semibold flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          {errorMsg}
+        </div>
+      )}
+
       <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b bg-slate-50">
           <p className="text-xs uppercase font-bold text-slate-400">Cố vấn học tập</p>
+
           <h3 className="text-xl font-bold text-blue-900 mt-1">
             {conversation?.advisor_name || 'Chưa có hội thoại'}
           </h3>
-          {conversation?.advisor_email && (
+
+          {conversation?.advisor_email ? (
             <p className="text-sm text-slate-500">{conversation.advisor_email}</p>
+          ) : (
+            <p className="text-sm text-slate-400 mt-1">
+              Gửi tin nhắn đầu tiên để tạo hội thoại với cố vấn phụ trách.
+            </p>
           )}
         </div>
 
@@ -71,7 +151,10 @@ export const StudentMessages = () => {
               const isStudent = msg.sender_role === 'STUDENT';
 
               return (
-                <div key={msg.id} className={`flex ${isStudent ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  key={msg.id}
+                  className={`flex ${isStudent ? 'justify-end' : 'justify-start'}`}
+                >
                   <div
                     className={`max-w-[70%] rounded-2xl px-4 py-3 text-sm ${
                       isStudent
@@ -79,12 +162,21 @@ export const StudentMessages = () => {
                         : 'bg-white border border-slate-100 text-slate-700'
                     }`}
                   >
-                    {msg.content}
+                    <p>{msg.content}</p>
+                    <p
+                      className={`text-[10px] mt-1 ${
+                        isStudent ? 'text-blue-100' : 'text-slate-400'
+                      }`}
+                    >
+                      {new Date(msg.created_at).toLocaleString('vi-VN')}
+                    </p>
                   </div>
                 </div>
               );
             })
           )}
+
+          <div ref={bottomRef} />
         </div>
 
         <div className="p-4 border-t flex gap-3">
@@ -94,15 +186,18 @@ export const StudentMessages = () => {
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSend();
             }}
-            className="flex-1 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-100"
+            disabled={sending}
+            className="flex-1 px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:cursor-not-allowed"
             placeholder="Nhập tin nhắn cho cố vấn..."
           />
+
           <button
             onClick={handleSend}
-            className="px-5 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center gap-2"
+            disabled={sending || !content.trim()}
+            className="px-5 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send className="w-4 h-4" />
-            Gửi
+            {sending ? 'Đang gửi...' : 'Gửi'}
           </button>
         </div>
       </section>

@@ -334,6 +334,12 @@ export default function App() {
   const [selectedClassCode, setSelectedClassCode] = useState<string | null>(null);
   const [prevView, setPrevView] = useState('profiles');
   const [selectedContact, setSelectedContact] = useState<SelectedContact | null>(null);
+  const [selectedNoteStudentId, setSelectedNoteStudentId] = useState<string | null>(null);
+
+  const handleNoteStudent = (studentId: string) => {
+    setSelectedNoteStudentId(studentId);
+    setCurrentView('notes');
+  };
 
   const goToStudent = (id: string, from: string = 'profiles') => {
     setPrevView(from);
@@ -354,6 +360,9 @@ export default function App() {
   const handleSetCurrentView = (view: string) => {
     if (view !== 'messages') {
       setSelectedContact(null);
+    }
+    if (view !== 'notes') {
+      setSelectedNoteStudentId(null);
     }
     setCurrentView(view);
   };
@@ -418,10 +427,11 @@ export default function App() {
           
           {/* ──────────────── ADVISOR VIEWS ──────────────── */}
           {isAdvisor && currentView === 'dashboard' && (
-            <Dashboard
-              onNavigate={handleSetCurrentView}
-              onMessageStudent={handleMessageStudent}
-            />
+              <Dashboard
+                  onNavigate={handleSetCurrentView}
+                  onMessageStudent={handleMessageStudent}
+                  onNoteStudent={handleNoteStudent}
+              />
           )}
 
           {isAdvisor && currentView === 'profiles' && (
@@ -454,7 +464,9 @@ export default function App() {
           )}
 
           {isAdvisor && currentView === 'schedule' && <Schedule />}
-          {isAdvisor && currentView === 'notes' && <LogNotes />}
+          {isAdvisor && currentView === 'notes' && (
+              <LogNotes initialStudentId={selectedNoteStudentId} />
+          )}
           {isAdvisor && currentView === 'messages' && (
             <Messages initialContact={selectedContact} />
           )}

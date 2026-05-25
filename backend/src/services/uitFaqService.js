@@ -2,6 +2,25 @@
 // Service xử lý câu hỏi FAQ về UIT — kết hợp knowledge base và Gemini AI
 
 import { UIT_KNOWLEDGE, CATEGORY_KEYWORDS } from '../data/uitKnowledge.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load dữ liệu cào từ web UIT (nếu có)
+let scrapedKnowledge = [];
+try {
+  const _p = path.join(__dirname, '../data/scrapedKnowledge.json');
+  if (fs.existsSync(_p)) {
+    scrapedKnowledge = JSON.parse(fs.readFileSync(_p, 'utf-8'));
+    console.log(`[uitFaqService] Loaded ${scrapedKnowledge.length} scraped articles.`);
+  }
+} catch (e) {
+  console.log('[uitFaqService] scrapedKnowledge load error:', e.message);
+}
+
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -104,6 +123,35 @@ function searchKnowledgeBase(question, category) {
 
   // ── NGÀNH HỌC CỤ THỂ ──
   if (category === 'nganh_hoc') {
+    // Ưu tiên tìm trong scraped data (có nội dung chi tiết thật từ web trường)
+    const NGANH_MAP_SCRAPED = [
+      { keys: ['an toàn thông tin', 'attt'], title: 'an toàn' },
+      { keys: ['khỏa học máy tính', 'khmt'],   title: 'khoa học máy tính' },
+      { keys: ['kỹ thuật phần mềm', 'ktpm'],   title: 'kỹ thuật phần mềm' },
+      { keys: ['kỹ thuật máy tính', 'ktmt'],   title: 'kỹ thuật máy tính' },
+      { keys: ['mạng máy tính', 'mmt'],         title: 'mạng máy tính' },
+      { keys: ['hệ thống thông tin', 'httt'],   title: 'hệ thống thông tin' },
+      { keys: ['khỏa học dữ liệu', 'khdl'],   title: 'khỏa học dữ liệu' },
+      { keys: ['thương mại điện tử'],           title: 'thương mại' },
+      { keys: ['trí tuệ nhân tạo'],              title: 'trí tuệ' },
+      { keys: ['công nghệ thông tin', 'cntt'],  title: 'công nghệ thông tin' },
+      { keys: ['thiết kế vi mạch'],             title: 'vi mạch' },
+      { keys: ['truyền thông đa phương tiện'], title: 'đa phương tiện' },
+    ];
+    const matchedMap = NGANH_MAP_SCRAPED.find(m => m.keys.some(k => q.includes(k)));
+    if (matchedMap) {
+      const scrapedItem = scrapedKnowledge.find(item =>
+        item.title.toLowerCase().includes(matchedMap.title) && !item.title.toLowerCase().includes('liên kết')
+      );
+      if (scrapedItem) {
+        const content = scrapedItem.content.length > 3000
+          ? scrapedItem.content.slice(0, 3000) + '...'
+          : scrapedItem.content;
+        return `🎓 **${scrapedItem.title}** _(Nguồn: tuyensinh.uit.edu.vn)_\n\n${content}`;
+      }
+    }
+
+    // Fallback: tìm trong KB cũ nếu scraped không có
     const { nganh_hoc } = chuong_trinh_dao_tao;
 
     const map = {
@@ -346,25 +394,43 @@ async function askGeminiAboutUIT(question, conversationHistory = []) {
     .map((msg) => `${msg.role === 'user' ? 'Người dùng' : 'Trợ lý'}: ${msg.content}`)
     .join('\n');
 
+  // Bổ sung RAG context từ scrapedKnowledge nếu có liên quan
+  let extraContext = '';
+  const words = question.toLowerCase().normalize('NFC').split(/\s+/).filter(w => w.length > 2);
+  let bestScore = 0;
+  for (const item of scrapedKnowledge) {
+    const text = (item.title + ' ' + item.content).toLowerCase().normalize('NFC');
+    let score = 0;
+    for (const w of words) {
+      if (['các', 'những', 'của', 'với', 'trong', 'cho', 'hay', 'như', 'nào', 'gì'].includes(w)) continue;
+      score += text.split(w).length - 1;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      extraContext = `Tiêu đề: ${item.title}\nNội dung:\n${item.content}`;
+    }
+  }
+
   const prompt = `Bạn là trợ lý AI chính thức của Trường Đại học Công nghệ Thông tin UIT (ĐHQG-HCM).
 
-Nhiệm vụ: Trả lời các câu hỏi về UIT bao gồm học phí, môn học, chương trình đào tạo, quy định học vụ, tuyển sinh, học bổng.
+NHIỆM VỤ: Trả lời chi tiết câu hỏi về UIT: học phí, môn học, chương trình đào tạo, quy định, tuyển sinh, học bổng, ngành học.
 
-Dữ liệu tham khảo:
+${extraContext ? `✨ TÀI LIỆU RAG — WEB UIT (Nguồn chính xác nhất, ưu tiên dùng):\n${extraContext}\n────────────────────────────────\n` : ''}ℹ️ Knowledge Base bổ sung:
 ${JSON.stringify(UIT_KNOWLEDGE, null, 2)}
 
-Quy tắc:
-1. Trả lời bằng tiếng Việt có dấu đầy đủ
-2. Ngắn gọn, rõ ràng, dùng bullet points và emoji khi phù hợp
-3. KHÔNG bịa thông tin không có trong dữ liệu trên
-4. Nếu không chắc, hướng dẫn liên hệ: daotao@uit.edu.vn hoặc portal.uit.edu.vn
-5. Bắt đầu câu trả lời bằng emoji phù hợp
+QUY TẮc BẮt BUỘC:
+1. Nếu có TÀI LIỆU RAG ở trên, bắt buộc dựa vào đó để trả lời.
+2. Trả lời đầy đủ, chi tiết, không rút gọn.
+3. Dùng **bullet points** và emoji phù hợp để dễ đọc.
+4. Đối với ngành học: nêu rõ Mã ngành, Số tín chỉ, Thời gian, Chuẩn đầu ra ngoại ngữ, Môn học đặc trưng, Cơ hội việc làm.
+5. KHÔNG bỊa thông tin ngoài tài liệu. Nếu thiếu, hướng dẫn: daotao@uit.edu.vn.
+6. Kết thúc bằng 1 câu hỏi gợi mở để người dùng khám phá thêm.
 
 ${historyContext ? `Lịch sử hội thoại:\n${historyContext}\n\n` : ''}Câu hỏi hiện tại: ${question}`;
 
   const body = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 1600 },
   });
 
   // Thử lần lượt từng model cho đến khi thành công
@@ -419,8 +485,42 @@ export async function processUitFaq(question, conversationHistory = []) {
   }
 
   const category = classifyQuestion(question);
+  const q = question.toLowerCase().normalize('NFC');
 
-  // 1. Thử tìm trong knowledge base trước (nhanh, chính xác)
+  // 1. Ưu tiên kiểm tra scraped data từ web UIT cho câu hỏi về ngành học cụ thể
+  const NGANH_SCRAPED_MAP = [
+    { keys: ['an toàn thông tin', 'attt', 'ngành an toàn'], title: 'an toàn' },
+    { keys: ['khoa học máy tính', 'khmt', 'ngành khmt'],   title: 'khoa học máy tính' },
+    { keys: ['kỹ thuật phần mềm', 'ktpm', 'ngành ktpm'],   title: 'kỹ thuật phần mềm' },
+    { keys: ['kỹ thuật máy tính', 'ktmt', 'ngành ktmt'],   title: 'kỹ thuật máy tính' },
+    { keys: ['mạng máy tính', 'mmt', 'ngành mmt'],         title: 'mạng máy tính' },
+    { keys: ['hệ thống thông tin', 'httt', 'ngành httt'],  title: 'hệ thống thông tin' },
+    { keys: ['khoa học dữ liệu', 'khdl', 'ngành khdl'],   title: 'dữ liệu' },
+    { keys: ['thương mại điện tử', 'ngành thương mại'],    title: 'thương mại' },
+    { keys: ['trí tuệ nhân tạo', 'ngành trí tuệ'],         title: 'trí tuệ' },
+    { keys: ['công nghệ thông tin', 'cntt'],                title: 'công nghệ thông tin' },
+    { keys: ['thiết kế vi mạch', 'vi mạch'],               title: 'vi mạch' },
+    { keys: ['truyền thông đa phương tiện', 'đa phương tiện'], title: 'đa phương tiện' },
+  ];
+  const matchedNganh = NGANH_SCRAPED_MAP.find(m => m.keys.some(k => q.includes(k)));
+  if (matchedNganh) {
+    const scrapedItem = scrapedKnowledge.find(item =>
+      item.title.toLowerCase().includes(matchedNganh.title) &&
+      !item.title.toLowerCase().includes('liên kết')
+    );
+    if (scrapedItem) {
+      const content = scrapedItem.content.length > 3000
+        ? scrapedItem.content.slice(0, 3000) + '\n\n_(Xem đầy đủ tại: ' + scrapedItem.url + ')_'
+        : scrapedItem.content;
+      return {
+        answer: `🎓 **${scrapedItem.title}**\n_(Nguồn: tuyensinh.uit.edu.vn)_\n\n${content}`,
+        source: 'scraped_web',
+        category,
+      };
+    }
+  }
+
+  // 2. Thử tìm trong knowledge base (nhanh, chính xác)
   const kbAnswer = searchKnowledgeBase(question, category);
   if (kbAnswer) {
     return {
@@ -430,7 +530,7 @@ export async function processUitFaq(question, conversationHistory = []) {
     };
   }
 
-  // 2. Kiểm tra câu hỏi thường gặp
+  // 3. Kiểm tra câu hỏi thường gặp
   const faq = UIT_KNOWLEDGE.cau_hoi_thuong_gap.find((item) =>
     question.toLowerCase().includes(item.hoi.toLowerCase().split(' ').slice(1, 4).join(' '))
   );
@@ -442,7 +542,7 @@ export async function processUitFaq(question, conversationHistory = []) {
     };
   }
 
-  // 3. Gọi Gemini AI cho câu hỏi phức tạp hơn
+  // 4. Gọi Gemini AI cho câu hỏi phức tạp hơn
   const aiAnswer = await askGeminiAboutUIT(question, conversationHistory);
   return {
     answer: aiAnswer,
@@ -450,3 +550,4 @@ export async function processUitFaq(question, conversationHistory = []) {
     category,
   };
 }
+

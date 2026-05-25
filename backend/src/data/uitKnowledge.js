@@ -403,6 +403,11 @@ export const CATEGORY_KEYWORDS = {
     'khoa học máy tính', 'kỹ thuật phần mềm', 'kỹ thuật máy tính', 'mạng máy tính',
     'hệ thống thông tin', 'an toàn thông tin', 'khoa học dữ liệu', 'khmt', 'ktpm',
     'ktmt', 'mmt', 'httt', 'attt', 'khdl', 'ngành nào', 'bao nhiêu ngành',
+    'trí tuệ nhân tạo', 'công nghệ thông tin', 'thương mại điện tử',
+    'thiết kế vi mạch', 'truyền thông đa phương tiện', 'vi mạch', 'đa phương tiện',
+    'ngành attt', 'ngành khmt', 'ngành ktpm', 'ngành httt', 'ngành khdl',
+    'ngành an toàn', 'ngành kỹ thuật', 'ngành mạng', 'ngành hệ thống',
+    'ngành trí tuệ', 'ngành dữ liệu', 'ngành thương mại',
   ],
   mon_hoc: [
     'môn', 'học phần', 'môn học', 'tín chỉ môn', 'tiên quyết', 'it001', 'it002',

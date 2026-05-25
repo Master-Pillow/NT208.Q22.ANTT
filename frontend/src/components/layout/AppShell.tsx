@@ -2,6 +2,8 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../Sidebar';
 import { Toolbar } from '../Toolbar';
 import { useAuth } from '../../auth/AuthContext';
+import { AISupportWidget } from '../AISupportWidget';
+import { UITFaqWidget } from '../UITFaqWidget';
 
 const legacyViewRoutes: Record<string, string> = {
   adminDashboard: '/admin/dashboard',
@@ -71,6 +73,12 @@ export const AppShell = () => {
         <div className="flex-1 overflow-y-auto w-full pt-32 px-4 sm:px-8 lg:px-10 pb-12">
           <Outlet />
         </div>
+        
+        {/* Global AI Support Widget — chỉ Admin/Advisor */}
+        <AISupportWidget />
+
+        {/* UIT FAQ Widget — tất cả mọi người */}
+        <UITFaqWidget />
       </main>
     </div>
   );

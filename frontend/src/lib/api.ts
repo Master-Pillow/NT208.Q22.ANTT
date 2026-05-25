@@ -59,3 +59,14 @@ export const getAnomalyPatterns = () => apiClient.get('/ai/anomaly-patterns');
 
 export const generateAiBrief = (classCode: string) =>
   apiClient.post('/ai/briefs/generate', { classCode });
+
+// UIT FAQ — public endpoint (no auth needed)
+export const askUitFaq = (question: string, sessionId?: string) =>
+  fetch('http://localhost:4000/uit-faq/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, sessionId }),
+  }).then((r) => r.json());
+
+export const getUitFaqSuggestions = () =>
+  fetch('http://localhost:4000/uit-faq/suggestions').then((r) => r.json());

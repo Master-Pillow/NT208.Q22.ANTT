@@ -96,7 +96,7 @@ export const AISupportWidget = () => {
       <button
         onClick={() => setIsOpen(true)}
         className={cn(
-          "fixed bottom-8 right-8 z-50 flex items-center gap-2 bg-gradient-to-r from-primary to-primary-container text-white px-5 py-3.5 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 active:scale-95 transition-all outline-none font-bold text-sm",
+          "fixed bottom-[88px] right-8 z-40 flex items-center gap-2 bg-gradient-to-r from-primary to-primary-container text-white px-5 py-3.5 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 active:scale-95 transition-all outline-none font-bold text-sm",
           isOpen ? "opacity-0 pointer-events-none scale-75" : "opacity-100 scale-100"
         )}
       >
@@ -107,7 +107,7 @@ export const AISupportWidget = () => {
       {/* Chat Window */}
       <div 
         className={cn(
-          "fixed bottom-8 right-8 z-50 w-[360px] h-[540px] bg-white rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right",
+          "fixed bottom-[88px] right-8 z-40 w-[360px] h-[540px] bg-white rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right",
           isOpen ? "scale-100 opacity-100" : "scale-75 opacity-0 pointer-events-none"
         )}
       >

@@ -68,7 +68,7 @@ const getInitials = (name: string) => {
       .toUpperCase();
 };
 
-export const LogNotes = () => {
+export const LogNotes = ({ initialStudentId }: { initialStudentId?: string | null }) => {
   const [notes, setNotes] = useState<LogNote[]>([]);
   const [students, setStudents] = useState<AdvisorStudent[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -102,6 +102,18 @@ export const LogNotes = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (initialStudentId && students.length > 0) {
+      // Đặt sẵn giá trị sinh viên vào Form
+      setForm((prev) => ({ ...prev, student_id: initialStudentId }));
+      // Chọn sẵn ở bộ lọc ngoài màn hình chính
+      setSelectedStudent(initialStudentId);
+      setEditingId(null);
+      // Mở Popup Ghi chú
+      setShowForm(true);
+    }
+  }, [initialStudentId, students]);
 
   const filteredNotes = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();

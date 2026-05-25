@@ -83,7 +83,6 @@ const MessageBubble = ({ msg }: { msg: Message }) => {
           <>
             <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-5 py-4 shadow-sm text-[15px] text-slate-700">{renderMarkdown(msg.content)}</div>
             <div className="flex items-center gap-3 mt-2">
-              {msg.source && <span className="text-xs font-medium text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full flex items-center gap-1.5">{SOURCE_LABELS[msg.source] || msg.source}</span>}
               <span className="text-xs font-medium text-slate-400">{msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
               <button onClick={handleCopy} className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100" title="Sao chép">{copied ? <CheckCheck size={14} className="text-emerald-500" /> : <Copy size={14} />}</button>
             </div>

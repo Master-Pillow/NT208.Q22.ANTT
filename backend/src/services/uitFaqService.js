@@ -121,24 +121,102 @@ function searchKnowledgeBase(question, category) {
     return answer;
   }
 
-  // ── NGÀNH HỌC, QUY ĐỊNH, TUYỂN SINH được chuyển qua AI xử lý với data cào ──
+  // ── NGÀNH HỌC & CHƯƠNG TRÌNH ĐÀO TẠO ──
+  // Ưu tiên kiểm tra xem có nhắc đến ngành học cụ thể nào không, bất kể category là gì
+  if (category === 'nganh_hoc' || category === 'chuong_trinh') {
+    const { nganh_hoc, dai_cuong } = chuong_trinh_dao_tao;
+    const foundNganh = nganh_hoc.filter(n => 
+      q.includes(n.ten.toLowerCase().normalize('NFC')) || 
+      q.includes(n.viet_tat.toLowerCase().normalize('NFC')) ||
+      (n.viet_tat === 'ATTT' && q.includes('an toàn thông tin')) ||
+      (n.viet_tat === 'HTTT' && q.includes('hệ thống thông tin')) ||
+      (n.viet_tat === 'KHMT' && q.includes('khoa học máy tính')) ||
+      (n.viet_tat === 'KTPM' && q.includes('kỹ thuật phần mềm')) ||
+      (n.viet_tat === 'KTMT' && q.includes('kỹ thuật máy tính')) ||
+      (n.viet_tat === 'MMT' && (q.includes('mạng máy tính') || q.includes('truyền thông dữ liệu'))) ||
+      (n.viet_tat === 'KHDL' && q.includes('khoa học dữ liệu'))
+    );
 
-  // ── CHƯƠNG TRÌNH ĐÀO TẠO ──
-  if (category === 'chuong_trinh') {
-    const { dai_cuong, nganh_hoc } = chuong_trinh_dao_tao;
-    let answer = `📚 **Chương trình đào tạo UIT**\n\n`;
-    answer += `- Hệ đào tạo: ${UIT_KNOWLEDGE.chuong_trinh_dao_tao.he_dao_tao}\n`;
-    answer += `- Thời gian chuẩn: ${UIT_KNOWLEDGE.chuong_trinh_dao_tao.thoi_gian_chuan}\n`;
-    answer += `- Tổng tín chỉ: **${UIT_KNOWLEDGE.chuong_trinh_dao_tao.tong_tin_chi}**\n\n`;
+    // Nếu tìm thấy ngành cụ thể, xuất thông tin ngành đó
+    if (foundNganh.length > 0) {
+      let answer = `🎓 **Thông tin ngành học bạn quan tâm:**\n\n`;
+      foundNganh.forEach(n => {
+        answer += formatNganh(n) + '\n';
+      });
+      return answer.trim();
+    }
 
-    answer += `**📖 Các môn đại cương chính (năm 1–2):**\n`;
-    dai_cuong.cac_mon_chinh.slice(0, 8).forEach((mon) => {
-      answer += `- ${mon}\n`;
-    });
-    answer += `- _(và nhiều môn khác...)_\n\n`;
+    // Nếu không tìm thấy ngành cụ thể mà category là chuong_trinh, xuất thông tin chung
+    if (category === 'chuong_trinh') {
+      let answer = `📚 **Chương trình đào tạo UIT**\n\n`;
+      answer += `- Hệ đào tạo: ${chuong_trinh_dao_tao.he_dao_tao}\n`;
+      answer += `- Thời gian chuẩn: ${chuong_trinh_dao_tao.thoi_gian_chuan}\n`;
+      answer += `- Tổng tín chỉ: **${chuong_trinh_dao_tao.tong_tin_chi}**\n\n`;
 
-    answer += `**🎓 Các ngành đào tạo:** ${nganh_hoc.map((n) => n.ten).join(', ')}`;
+      answer += `**📖 Các môn đại cương chính (năm 1–2):**\n`;
+      dai_cuong.cac_mon_chinh.slice(0, 8).forEach((mon) => {
+        answer += `- ${mon}\n`;
+      });
+      answer += `- _(và nhiều môn khác...)_\n\n`;
+
+      answer += `**🎓 Các ngành đào tạo:** ${nganh_hoc.map((n) => n.ten).join(', ')}`;
+      return answer;
+    }
+  }
+
+  // ── QUY ĐỊNH HỌC VỤ ──
+  if (category === 'quy_dinh') {
+    const qv = quy_dinh_hoc_vu;
+    let answer = '';
+    if (q.includes('cảnh báo') || q.includes('đình chỉ') || q.includes('thôi học')) {
+      answer = `⚠️ **Quy định về Cảnh báo học vụ:**\n\n` +
+             `- **Điều kiện:** ${qv.canh_bao_hoc_vu.dieu_kien}\n` +
+             `- ${qv.canh_bao_hoc_vu.muc_1}\n` +
+             `- ${qv.canh_bao_hoc_vu.muc_2}\n` +
+             `- ${qv.canh_bao_hoc_vu.muc_3}\n\n` +
+             `*Vui lòng liên hệ Cố vấn học vụ hoặc Phòng Đào tạo để được tư vấn thêm.*`;
+    }
+    else if (q.includes('tốt nghiệp')) {
+      answer = `🎓 **Điều kiện tốt nghiệp:**\n\n` +
+             qv.dieu_kien_tot_nghiep.map(d => `- ${d}`).join('\n') + `\n\n` +
+             `🏆 **Xếp loại tốt nghiệp:**\n` +
+             Object.entries(qv.xep_loai_tot_nghiep).map(([k, v]) => `- **${k}:** ${v}`).join('\n');
+    }
+    else if (q.includes('học lại') || q.includes('điểm f')) {
+      answer = `🔄 **Quy định Học lại:**\n\n` +
+             `- ${qv.hoc_lai.quy_dinh}\n` +
+             `- ${qv.hoc_lai.diem}\n` +
+             `- ${qv.hoc_lai.phi}`;
+    }
+    else if (q.includes('bảo lưu')) {
+      answer = `⏸️ **Quy định Bảo lưu:**\n\n` +
+             `- **Tối đa:** ${qv.bao_luu.toi_da}\n` +
+             `- **Thủ tục:** ${qv.bao_luu.thu_tuc}\n` +
+             `- **Lý do hợp lệ:** ${qv.bao_luu.ly_do}`;
+    }
+    else {
+      answer = `📜 **Một số quy định học vụ cơ bản:**\n\n` +
+               `- **Tính điểm GPA:** ${qv.cach_tinh_gpa}\n` +
+               `- **Số TC tối thiểu/kỳ:** ${qv.so_tin_chi_toi_thieu}\n` +
+               `- **Số TC tối đa/kỳ:** ${qv.so_tin_chi_toi_da}\n\n` +
+               `Vui lòng hỏi cụ thể hơn (ví dụ: "điều kiện tốt nghiệp", "cảnh báo học vụ", "quy định bảo lưu"...).`;
+    }
     return answer;
+  }
+
+  // ── MÔN HỌC ──
+  if (category === 'mon_hoc') {
+    const foundMon = UIT_KNOWLEDGE.mon_hoc_pho_bien.filter(m => 
+      q.includes(m.ma.toLowerCase()) || 
+      q.includes(m.ten.toLowerCase().normalize('NFC'))
+    );
+    if (foundMon.length > 0) {
+      let answer = `📘 **Thông tin môn học:**\n\n`;
+      foundMon.forEach(m => {
+        answer += `- **${m.ten} (${m.ma})**: ${m.tc} tín chỉ. ${m.mo_ta}\n`;
+      });
+      return answer.trim();
+    }
   }
 
   // (Quy định học vụ do AI RAG xử lý để lấy từ file quy chế mới nhất)
@@ -285,7 +363,7 @@ async function askGeminiAboutUIT(question, conversationHistory = []) {
 NHIỆM VỤ: Trả lời ĐÚNG TRỌNG TÂM, NGẮN GỌN, VÀ TRỰC TIẾP vào câu hỏi của người dùng.
 
 ${extraContext ? `✨ TÀI LIỆU THAM KHẢO TỪ WEB UIT (Căn cứ chính xác nhất):\n${extraContext}\n────────────────────────────────\n` : ''}ℹ️ Knowledge Base cơ bản:
-${JSON.stringify({ truong: UIT_KNOWLEDGE.truong, lien_he: UIT_KNOWLEDGE.lien_he })}
+${JSON.stringify({ ...UIT_KNOWLEDGE, cau_hoi_thuong_gap: undefined })}
 
 QUY TẮC BẮT BUỘC:
 1. CHỈ trả lời những gì người dùng hỏi. KHÔNG lan man, KHÔNG kể lể thêm thông tin thừa.
@@ -294,6 +372,7 @@ QUY TẮC BẮT BUỘC:
 4. Nếu thông tin không có trong tài liệu, hướng dẫn liên hệ: daotao@uit.edu.vn.
 5. Nếu câu hỏi yêu cầu so sánh hoặc liệt kê, hãy dùng định dạng danh sách.
 6. Luôn giữ thái độ thân thiện, chuyên nghiệp.
+7. TỪ CHỐI LỊCH SỰ các câu hỏi ngoài luồng, không liên quan đến học tập, đào tạo, tuyển sinh hoặc UIT (ví dụ: tán gẫu, hỏi về nhan sắc, thời sự, v.v.) bằng cách nói rằng bạn chỉ hỗ trợ thông tin học vụ của Trường Đại học Công nghệ Thông tin (UIT).
 
 ${historyContext ? `Lịch sử hội thoại:\n${historyContext}\n\n` : ''}Câu hỏi hiện tại: ${question}`;
 
@@ -322,14 +401,29 @@ ${historyContext ? `Lịch sử hội thoại:\n${historyContext}\n\n` : ''}Câu
         let errDetails = '';
         try { errDetails = JSON.parse(errText)?.error?.message || errText; } catch { errDetails = errText; }
         console.warn(`[uitFaqService] Model ${model} failed ${response.status}: ${errDetails.slice(0, 300)}`);
+        
+        // Nếu lỗi do hết Quota (429) hoặc Rate Limit, lưu lại lý do
+        if (response.status === 429) {
+           return 'Hiện tại hệ thống AI đang quá tải do lượng truy cập lớn. Bạn vui lòng thử lại sau ít phút hoặc liên hệ daotao@uit.edu.vn nếu cần hỗ trợ khẩn cấp nhé!';
+        }
+        
         continue;
       }
 
       const data = await response.json();
+
+      // Kiểm tra block do an toàn
+      const finishReason = data?.candidates?.[0]?.finishReason;
+      if (finishReason === 'SAFETY' || data?.promptFeedback?.blockReason) {
+        return 'Xin lỗi, tôi là AI Hỗ trợ Học vụ của Trường Đại học Công nghệ Thông tin (UIT). Tôi không thể trả lời câu hỏi này. Bạn vui lòng đặt các câu hỏi liên quan đến học tập, tuyển sinh hoặc quy định của trường nhé!';
+      }
+
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
       if (text) {
         console.log(`[uitFaqService] Success with model: ${model}`);
         return text;
+      } else {
+        console.warn(`[uitFaqService] No text returned for model ${model}. Data:`, JSON.stringify(data));
       }
     } catch (err) {
       console.warn(`[uitFaqService] Model ${model} error:`, err.message);
@@ -357,6 +451,15 @@ export async function processUitFaq(question, conversationHistory = []) {
 
   const category = classifyQuestion(question);
   const q = question.toLowerCase().normalize('NFC');
+
+  // Xử lý riêng các câu chitchat, ngoài luồng
+  if (category === 'chitchat') {
+    return {
+      answer: '🤖 Xin lỗi, tôi là AI Hỗ trợ Học vụ của Trường Đại học Công nghệ Thông tin (UIT). Tôi chỉ có thể trả lời các câu hỏi liên quan đến học tập, tuyển sinh, quy định học vụ hoặc thông tin của trường. Bạn vui lòng đặt câu hỏi phù hợp nhé!',
+      source: 'rule_based',
+      category
+    };
+  }
 
   // Bước 1: Knowledge base tĩnh (học phí, liên hệ, lịch học, học bổng, KTX...)
   const kbAnswer = searchKnowledgeBase(question, category);

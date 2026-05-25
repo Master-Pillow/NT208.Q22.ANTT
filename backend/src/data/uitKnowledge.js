@@ -441,5 +441,10 @@ export const CATEGORY_KEYWORDS = {
     'câu lạc bộ', 'clb', 'hoạt động', 'ngoại khóa', 'hackathon', 'sự kiện', 'trao đổi',
     'du học', 'thi đấu', 'it fair', 'itsc', 'ai club', 'startup',
   ],
+  chitchat: [
+    'gái đẹp', 'trai đẹp', 'xinh', 'yêu', 'tán gái', 'có bồ', 'người yêu',
+    'thời tiết', 'chào', 'hello', 'hi', 'tán gẫu', 'giỡn', 'đùa', 'nhan sắc',
+    'có gái', 'có trai', 'đi chơi',
+  ],
 };
 

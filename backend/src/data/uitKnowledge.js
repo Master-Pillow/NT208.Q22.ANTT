@@ -384,6 +384,12 @@ export const UIT_KNOWLEDGE = {
 
 // Từ khóa để phân loại câu hỏi
 export const CATEGORY_KEYWORDS = {
+  thong_tin_truong: [
+    'nằm ở đâu', 'ở đâu', 'địa điểm', 'tọa lạc', 'vị trí', 'trường ở', 'đường nào',
+    'quận nào', 'thủ đức', 'linh trung', 'uit là gì', 'uit là trường', 'giới thiệu',
+    'thành lập', 'năm thành lập', 'trường nào', 'website', 'portal',
+    'giờ làm việc', 'giờ mở cửa', 'trường cntt', 'đhqg', 'đại học quốc gia',
+  ],
   hoc_phi: [
     'học phí', 'tiền học', 'đóng tiền', 'chi phí', 'học phí mỗi tín', 'mức thu',
     'miễn giảm', 'học bổng tài chính', 'tín chỉ bao nhiêu', 'mấy tiền', 'bao nhiêu tiền',
@@ -426,4 +432,9 @@ export const CATEGORY_KEYWORDS = {
     'ký túc xá', 'ktx', 'thư viện', 'phòng lab', 'phòng máy', 'cơ sở', 'khuôn viên',
     'phòng thí nghiệm',
   ],
+  hoat_dong: [
+    'câu lạc bộ', 'clb', 'hoạt động', 'ngoại khóa', 'hackathon', 'sự kiện', 'trao đổi',
+    'du học', 'thi đấu', 'it fair', 'itsc', 'ai club', 'startup',
+  ],
 };
+

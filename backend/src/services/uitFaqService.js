@@ -3,7 +3,15 @@
 
 import { UIT_KNOWLEDGE, CATEGORY_KEYWORDS } from '../data/uitKnowledge.js';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+// Danh sách model thử theo thứ tự ưu tiên (nếu model đầu fail thì thử tiếp)
+const GEMINI_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+];
 
 // ─── Phân loại câu hỏi ───────────────────────────────────────────────────────
 function classifyQuestion(question) {
@@ -36,7 +44,35 @@ function formatNganh(nganh) {
 // ─── Tìm trong Knowledge Base ─────────────────────────────────────────────────
 function searchKnowledgeBase(question, category) {
   const q = question.toLowerCase().normalize('NFC');
-  const { hoc_phi, chuong_trinh_dao_tao, quy_dinh_hoc_vu, lien_he, lich_hoc, hoc_bong, tuyen_sinh } = UIT_KNOWLEDGE;
+  const { hoc_phi, chuong_trinh_dao_tao, quy_dinh_hoc_vu, lien_he, lich_hoc, hoc_bong, tuyen_sinh, truong, hoat_dong_sinh_vien } = UIT_KNOWLEDGE;
+
+  // ── THÔNG TIN TRƯỜNG / VỊ TRÍ ──
+  if (category === 'thong_tin_truong') {
+    return (
+      `🏫 **Trường Đại học Công nghệ Thông tin (UIT)**\n\n` +
+      `- 📍 **Địa chỉ:** ${truong.dia_chi}\n` +
+      `- 📅 **Thành lập:** Năm ${truong.thanh_lap}\n` +
+      `- 🌐 **Website:** ${truong.website}\n` +
+      `- 🎓 **Portal SV:** ${truong.portal_sv}\n` +
+      `- 📞 **Điện thoại:** ${truong.dien_thoai}\n` +
+      `- 📧 **Email:** ${truong.email}\n` +
+      `- 🕐 **Giờ làm việc:** ${truong.gio_lam_viec}\n\n` +
+      `💡 ${truong.mo_ta}`
+    );
+  }
+
+  // ── HOẠT ĐỘNG SINH VIÊN ──
+  if (category === 'hoat_dong') {
+    const hd = hoat_dong_sinh_vien;
+    return (
+      `🎉 **Hoạt động sinh viên UIT:**\n\n` +
+      `**Câu lạc bộ:**\n` +
+      hd.clb.map((c) => `- ${c}`).join('\n') +
+      `\n\n**Sự kiện nổi bật:**\n` +
+      hd.su_kien.map((s) => `- ${s}`).join('\n') +
+      `\n\n🌏 ${hd.chuong_trinh_trao_doi}`
+    );
+  }
 
   // ── HỌC PHÍ ──
   if (category === 'hoc_phi') {
@@ -297,9 +333,9 @@ function searchKnowledgeBase(question, category) {
   return null;
 }
 
-// ─── Gọi Gemini AI ─────────────────────────────────────────────────────────────
+// ─── Gọi Gemini AI (tự thử lần lượt các model) ────────────────────────────────
 async function askGeminiAboutUIT(question, conversationHistory = []) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     return 'Xin lỗi, tôi chưa được cấu hình AI. Vui lòng liên hệ phòng đào tạo tại daotao@uit.edu.vn để được hỗ trợ.';
   }
@@ -326,37 +362,54 @@ Quy tắc:
 
 ${historyContext ? `Lịch sử hội thoại:\n${historyContext}\n\n` : ''}Câu hỏi hiện tại: ${question}`;
 
-  try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 800,
-        },
-      }),
-    });
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+  });
 
-    if (!response.ok) {
-      console.warn('[uitFaqService] Gemini API failed:', response.status);
-      throw new Error(`Gemini API error: ${response.status}`);
+  // Thử lần lượt từng model cho đến khi thành công
+  for (const model of GEMINI_MODELS) {
+    const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+
+      if (response.status === 404) {
+        console.warn(`[uitFaqService] Model ${model} not found, trying next...`);
+        continue; // Thử model tiếp theo
+      }
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.warn(`[uitFaqService] Model ${model} failed ${response.status}:`, errText.slice(0, 200));
+        continue;
+      }
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (text) {
+        console.log(`[uitFaqService] Success with model: ${model}`);
+        return text;
+      }
+    } catch (err) {
+      console.warn(`[uitFaqService] Model ${model} error:`, err.message);
     }
-
-    const data = await response.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
-  } catch (err) {
-    console.error('[uitFaqService] Gemini error:', err.message);
-    return (
-      'Xin lỗi, tôi đang gặp sự cố kết nối AI. Bạn có thể:\n\n' +
-      '- 🌐 Truy cập: https://www.uit.edu.vn\n' +
-      '- 📧 Email: daotao@uit.edu.vn\n' +
-      '- 📱 Điện thoại: (028) 37251997\n' +
-      '- 🎓 Portal SV: https://portal.uit.edu.vn'
-    );
   }
+
+  // Tất cả models đều fail → fallback thân thiện
+  console.error('[uitFaqService] All Gemini models failed.');
+  return (
+    'Xin lỗi, tôi đang gặp sự cố kết nối AI. Bạn có thể:\n\n' +
+    '- 🌐 Truy cập: https://www.uit.edu.vn\n' +
+    '- 📧 Email: daotao@uit.edu.vn\n' +
+    '- 📱 Điện thoại: (028) 37251997\n' +
+    '- 🎓 Portal SV: https://portal.uit.edu.vn'
+  );
 }
+
 
 
 // ─── Hàm chính ────────────────────────────────────────────────────────────────

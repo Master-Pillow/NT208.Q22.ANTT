@@ -272,10 +272,12 @@ async function askGeminiAboutUIT(question, conversationHistory = []) {
     return { ...item, score };
   });
 
-  // Lấy Top 3 tài liệu có liên quan nhất (điểm > 0)
-  const topDocs = scoredDocs.filter(d => d.score > 0).sort((a, b) => b.score - a.score).slice(0, 3);
+  // Lấy Top 2 tài liệu có liên quan nhất (điểm > 0)
+  // Khôi phục mức giới hạn quét tài liệu lên 1.000.000 ký tự theo yêu cầu
+  const MAX_CHARS_PER_DOC = 1000000;
+  const topDocs = scoredDocs.filter(d => d.score > 0).sort((a, b) => b.score - a.score).slice(0, 2);
   if (topDocs.length > 0) {
-    extraContext = topDocs.map((d, i) => `[Tài liệu ${i + 1}] Tiêu đề: ${d.title}\nTrích xuất: ${d.content.slice(0, 200000)}...`).join('\n\n');
+    extraContext = topDocs.map((d, i) => `[Tài liệu ${i + 1}] Tiêu đề: ${d.title}\nTrích xuất: ${d.content.slice(0, MAX_CHARS_PER_DOC)}${d.content.length > MAX_CHARS_PER_DOC ? '...(còn nữa)' : ''}`).join('\n\n');
   }
 
   const prompt = `Bạn là trợ lý AI chính thức của Trường Đại học Công nghệ Thông tin UIT (ĐHQG-HCM).
@@ -317,7 +319,9 @@ ${historyContext ? `Lịch sử hội thoại:\n${historyContext}\n\n` : ''}Câu
 
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
-        console.warn(`[uitFaqService] Model ${model} failed ${response.status}:`, errText.slice(0, 200));
+        let errDetails = '';
+        try { errDetails = JSON.parse(errText)?.error?.message || errText; } catch { errDetails = errText; }
+        console.warn(`[uitFaqService] Model ${model} failed ${response.status}: ${errDetails.slice(0, 300)}`);
         continue;
       }
 
@@ -354,32 +358,58 @@ export async function processUitFaq(question, conversationHistory = []) {
   const category = classifyQuestion(question);
   const q = question.toLowerCase().normalize('NFC');
 
-  // Bỏ qua bước trả dữ liệu thô (raw data) ra cho người dùng.
-  // Nhờ AI đọc và tự tóm tắt lại cho gọn.
-
-  // 2. Thử tìm trong knowledge base (nhanh, chính xác)
+  // Bước 1: Knowledge base tĩnh (học phí, liên hệ, lịch học, học bổng, KTX...)
   const kbAnswer = searchKnowledgeBase(question, category);
   if (kbAnswer) {
-    return {
-      answer: kbAnswer,
-      source: 'knowledge_base',
-      category,
-    };
+    return { answer: kbAnswer, source: 'knowledge_base', category };
   }
 
-  // 3. Kiểm tra câu hỏi thường gặp
+  // Bước 2: Câu hỏi thường gặp (FAQ)
   const faq = UIT_KNOWLEDGE.cau_hoi_thuong_gap.find((item) =>
     question.toLowerCase().includes(item.hoi.toLowerCase().split(' ').slice(1, 4).join(' '))
   );
   if (faq) {
+    return { answer: `💡 ${faq.tra_loi}`, source: 'faq', category };
+  }
+
+  // Bước 3: DIRECT RETRIEVAL từ scrapedKnowledge — TIẾT KIỆM QUOTA GEMINI
+  // Tìm tài liệu khớp nhất, nếu điểm đủ cao → trả lời thẳng không cần AI
+  const stopWords = ['các', 'những', 'của', 'với', 'trong', 'cho', 'hay', 'như', 'nào', 'gì', 'làm', 'sao', 'để', 'có', 'không', 'ở', 'và', 'là'];
+  const words = q.split(/\s+/).filter(w => w.length > 2 && !stopWords.includes(w));
+
+  const DIRECT_RETRIEVAL_THRESHOLD = 3; // Ngưỡng điểm tối thiểu để trả lời trực tiếp
+  let bestDoc = null;
+  let bestScore = 0;
+
+  for (const item of scrapedKnowledge) {
+    let score = 0;
+    const text = (item.title + ' ' + item.content).toLowerCase().normalize('NFC');
+    // Thưởng điểm cao nếu câu hỏi chứa nguyên cụm tiêu đề
+    if (q.includes(item.title.toLowerCase().normalize('NFC'))) score += 50;
+    // Thưởng điểm khớp cụm từ liền kề
+    if (words.length >= 2 && text.includes(words.join(' '))) score += 10;
+    // Đếm tần suất từ khóa
+    for (const w of words) {
+      if (text.includes(w)) score += 1;
+    }
+    if (score > bestScore) { bestScore = score; bestDoc = item; }
+  }
+
+  if (bestDoc && bestScore >= DIRECT_RETRIEVAL_THRESHOLD) {
+    console.log(`[uitFaqService] Direct retrieval: "${bestDoc.title}" (score=${bestScore}) — Không gọi Gemini.`);
+    // Cho phép trả lời dài tối đa 1000000 ký tự theo data cào được
+    const previewContent = bestDoc.content.length > 1000000
+      ? bestDoc.content.slice(0, 1000000) + `\n\n_(📎 Xem đầy đủ tại: ${bestDoc.url})_`
+      : bestDoc.content;
     return {
-      answer: `💡 ${faq.tra_loi}`,
-      source: 'faq',
+      answer: `📚 **${bestDoc.title}**\n\n${previewContent}`,
+      source: 'scraped_direct',
       category,
     };
   }
 
-  // 4. Gọi Gemini AI cho câu hỏi phức tạp hơn
+  // Bước 4: Chỉ gọi Gemini khi không tìm được tài liệu phù hợp nào
+  console.log(`[uitFaqService] No direct match (bestScore=${bestScore}), calling Gemini AI...`);
   const aiAnswer = await askGeminiAboutUIT(question, conversationHistory);
   return {
     answer: aiAnswer,
@@ -387,4 +417,3 @@ export async function processUitFaq(question, conversationHistory = []) {
     category,
   };
 }
-

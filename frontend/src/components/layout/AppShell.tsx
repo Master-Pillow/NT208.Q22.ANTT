@@ -73,7 +73,7 @@ export const AppShell = () => {
           <Outlet />
         </div>
         
-        {/* UIT FAQ Widget — tất cả mọi người */}
+        {/* Widget Chat nổi đồng bộ dữ liệu với Trang Chat lớn */}
         <UITFaqWidget />
       </main>
     </div>

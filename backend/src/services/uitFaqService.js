@@ -257,18 +257,18 @@ async function askGeminiAboutUIT(question, conversationHistory = []) {
   const scoredDocs = scrapedKnowledge.map(item => {
     let score = 0;
     const text = (item.title + ' ' + item.content).toLowerCase().normalize('NFC');
-    
+
     // Thưởng điểm cao nếu câu hỏi chứa nguyên cụm tiêu đề (ví dụ: "an toàn thông tin", "quy chế đào tạo")
     if (qLower.includes(item.title.toLowerCase().normalize('NFC'))) score += 50;
-    
+
     // Thưởng điểm nếu chứa cụm từ ghép liền kề
     if (words.length >= 2 && text.includes(words.join(' '))) score += 10;
-    
+
     // Tính điểm đếm tần suất từ khóa
     for (const w of words) {
       if (text.includes(w)) score += 1;
     }
-    
+
     return { ...item, score };
   });
 
@@ -397,13 +397,46 @@ export async function processUitFaq(question, conversationHistory = []) {
 
   if (bestDoc && bestScore >= DIRECT_RETRIEVAL_THRESHOLD) {
     console.log(`[uitFaqService] Direct retrieval: "${bestDoc.title}" (score=${bestScore}) — Không gọi Gemini.`);
-    // Cho phép trả lời dài tối đa 1000000 ký tự theo data cào được
-    const previewContent = bestDoc.content.length > 1000000
-      ? bestDoc.content.slice(0, 1000000) + `\n\n_(📎 Xem đầy đủ tại: ${bestDoc.url})_`
-      : bestDoc.content;
+    
+    // THUẬT TOÁN EXTRACTIVE SUMMARIZATION (Tóm tắt trích xuất không dùng AI)
+    // Tách bài viết thành các đoạn văn (hỗ trợ đọc dễ hơn)
+    const paragraphs = bestDoc.content.split(/\n+/).map(p => p.trim()).filter(p => p.length > 30);
+    
+    // Chấm điểm từng đoạn văn để tìm ra nơi chứa câu trả lời trọng tâm nhất
+    const scoredParagraphs = paragraphs.map(p => {
+      let pScore = 0;
+      const pLower = p.toLowerCase().normalize('NFC');
+      // Thưởng điểm mạnh nếu đoạn chứa cụm từ liền kề của câu hỏi
+      if (words.length >= 2 && pLower.includes(words.join(' '))) pScore += 10;
+      // Đếm từ khóa rải rác
+      for (const w of words) {
+        if (pLower.includes(w)) pScore += 1;
+      }
+      return { text: p, score: pScore };
+    });
+
+    // Lấy tối đa 3 đoạn văn có điểm cao nhất (có chứa từ khóa), giữ nguyên thứ tự gốc
+    const topParagraphs = scoredParagraphs
+      .map((p, index) => ({ ...p, index }))
+      .filter(p => p.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3)
+      .sort((a, b) => a.index - b.index);
+
+    // Xây dựng câu trả lời dạng gạch đầu dòng ngắn gọn (trọng tâm)
+    let summaryText = '';
+    if (topParagraphs.length === 0) {
+      // Nếu không có đoạn nào nổi bật, lấy 2 đoạn đầu tiên làm giới thiệu
+      summaryText = paragraphs.slice(0, 2).map(p => `🔹 ${p}`).join('\n\n');
+    } else {
+      summaryText = topParagraphs.map(p => `🔹 ${p.text}`).join('\n\n');
+    }
+
+    const previewContent = `${summaryText}\n\n_(📎 Nguồn: ${bestDoc.url})_`;
+
     return {
       answer: `📚 **${bestDoc.title}**\n\n${previewContent}`,
-      source: 'scraped_direct',
+      source: 'scraped_direct_summary',
       category,
     };
   }

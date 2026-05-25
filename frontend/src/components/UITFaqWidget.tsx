@@ -309,30 +309,13 @@ export const UITFaqWidget: React.FC = () => {
       <button
         id="uit-faq-open-btn"
         onClick={() => { setIsOpen(true); setUnreadCount(0); }}
-        className={[
-          'fixed bottom-8 right-8 z-50',
-          'flex items-center gap-2.5',
-          'bg-gradient-to-r from-[#003F87] via-[#004DAA] to-[#0066CC]',
-          'text-white pl-4 pr-5 py-3 rounded-2xl',
-          'shadow-[0_8px_32px_rgba(0,77,170,0.45)]',
-          'hover:shadow-[0_12px_40px_rgba(0,77,170,0.6)]',
-          'hover:-translate-y-0.5 active:scale-95',
-          'transition-all duration-200 font-semibold text-sm',
-          'border border-white/10',
-          isOpen ? 'opacity-0 pointer-events-none scale-90' : 'opacity-100 scale-100',
-        ].join(' ')}
+        className={`fixed bottom-8 right-8 z-40 flex items-center gap-2 bg-gradient-to-r from-primary to-primary-container text-white px-5 py-3.5 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 active:scale-95 transition-all outline-none font-bold text-sm ${
+          isOpen ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 scale-100'
+        }`}
         aria-label="Hỏi đáp về UIT"
       >
-        <div className="relative">
-          <GraduationCap size={20} />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold flex items-center justify-center ring-2 ring-white/60">
-              {unreadCount}
-            </span>
-          )}
-        </div>
-        <span>Hỏi về UIT</span>
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+        <Sparkles className="w-5 h-5" />
+        Hỏi về UIT
       </button>
 
       {/* ── Chat Window ── */}

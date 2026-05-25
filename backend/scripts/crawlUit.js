@@ -9,13 +9,11 @@ import Tesseract from 'tesseract.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ─── Ngưỡng để phán đoán file PDF là ảnh scan (dưới 100 ký tự thì dùng OCR) ───
+// ─── CẤU HÌNH TỐI ƯU ──────────────────────────────────────────────────────────
 const OCR_FALLBACK_THRESHOLD = 100;
+const MAX_CONTENT_LENGTH = 1000000; // 1 triệu ký tự (gần như không giới hạn để lấy trọn vẹn PDF)
+const CONCURRENCY_LIMIT = 3; // Số lượng URL cào đồng thời cùng lúc (tối ưu tốc độ & RAM)
 
-// ─── Giới hạn ký tự mỗi bài để tránh tràn JSON ─────────────────────────────
-const MAX_CONTENT_LENGTH = 1000000; // 1 triệu ký tự, gần như không giới hạn để lấy trọn vẹn PDF
-
-// ─── Danh sách URL cần cào (HTML + PDF) ────────────────────────────────────
 const URLS_TO_CRAWL = [
   'https://tuyensinh.uit.edu.vn/phuong-thuc-tuyen-sinh',
   'https://tuyensinh.uit.edu.vn/de-an-tuyen-sinh',
@@ -35,19 +33,31 @@ const URLS_TO_CRAWL = [
   'https://tuyensinh.uit.edu.vn/diem-chuan-cua-truong-dh-cong-nghe-thong-tin-qua-cac-nam',
   'https://tuyensinh.uit.edu.vn/truong-dai-hoc-cong-nghe-thong-tin-dhqg-hcm',
   'https://daa.uit.edu.vn/content/cac-nganh-dao-tao',
-  // ─── PDF: Quy chế đào tạo (văn bản text-based) ───────────────────────────
+  // ─── PDF
   'https://daa.uit.edu.vn/sites/daa/files/202309/790-qd-dhcntt_28-9-22_quy_che_dao_tao.pdf',
-  // ─── PDF: Cập nhật quy chế (file scan ảnh, sẽ kích hoạt OCR tự động) ─────
   'https://daa.uit.edu.vn/sites/daa/files/202401/1393-qd-dhcntt_29-12-2023_cap_nhat_quy_che_dao_tao_theo_hoc_che_tin_chi_cho_he_dai_hoc_chinh_quy.pdf',
+  'https://daa.uit.edu.vn/thongbao/02-quyet-dinh-ve-viec-ban-hanh-qui-dinh-ve-cong-tac-giao-trinh',
+  'https://daa.uit.edu.vn/sites/daa/files/202309/172-qd-dhcntt_08-3-2023_quy_che_van_bang_chung_chi.pdf',
 ];
 
-// ─── Trích xuất nội dung từ trang HTML ──────────────────────────────────────
+// ─── QUẢN LÝ TESSERACT WORKER GLOBAL (Khởi tạo 1 lần duy nhất) ──────────────
+let globalWorker = null;
+
+async function getTesseractWorker() {
+  if (!globalWorker) {
+    console.log('    🤖 Đang khởi tạo Global OCR Worker (vie+eng)...');
+    globalWorker = await Tesseract.createWorker('vie+eng');
+  }
+  return globalWorker;
+}
+
+// ─── TRÍCH XUẤT HTML ────────────────────────────────────────────────────────
 async function crawlHtml(url) {
   const { data } = await axios.get(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     },
-    timeout: 10000,
+    timeout: 15000,
   });
   const $ = cheerio.load(data);
 
@@ -65,100 +75,103 @@ async function crawlHtml(url) {
   return { title, content: contentBlocks.join('\n').slice(0, MAX_CONTENT_LENGTH) };
 }
 
-// ─── Trích xuất text từ ảnh dùng OCR (Tesseract.js) ─────────────────────────
+// ─── TRÍCH XUẤT OCR BẰNG GLOBAL WORKER ──────────────────────────────────────
 async function ocrPages(parser) {
   console.log('    🔍 Đang render PDF thành ảnh...');
-  // scale: 2.0 = độ phân giải cao, OCR chính xác hơn
   const screenshots = await parser.getScreenshot({ scale: 2.0 });
-
-  // Khởi tạo Tesseract worker 1 lần, dùng cho tất cả trang
-  const worker = await Tesseract.createWorker('vie+eng');
+  const worker = await getTesseractWorker();
 
   let fullText = '';
   for (let i = 0; i < screenshots.pages.length; i++) {
     console.log(`    📖 OCR trang ${i + 1}/${screenshots.pages.length}...`);
     const { data: { text } } = await worker.recognize(Buffer.from(screenshots.pages[i].data));
     fullText += text + '\n';
-
-    // Dừng sớm nếu đã đủ 5000 ký tự (không cần quét hết tất cả trang)
-    if (fullText.length >= MAX_CONTENT_LENGTH * 2) break;
+    if (fullText.length >= MAX_CONTENT_LENGTH) break;
   }
-
-  await worker.terminate(); // Giải phóng bộ nhớ worker
+  
+  // KHÔNG gọi terminate ở đây để tái sử dụng worker cho PDF sau
   return fullText;
 }
 
-// ─── Trích xuất nội dung từ file PDF (text hoặc ảnh scan) ───────────────────
+// ─── TRÍCH XUẤT PDF ─────────────────────────────────────────────────────────
 async function crawlPdf(url) {
   const title = decodeURIComponent(url.split('/').pop() || 'Tài liệu PDF');
   const parser = new PDFParse({ url });
 
   let content = '';
-
   try {
-    // Bước 1: Thử đọc text bình thường trước (nhanh, không tốn CPU)
     const result = await parser.getText();
     content = result.text.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
 
-    // Bước 2: Nếu text quá ít → file dạng ảnh scan → kích hoạt OCR
     if (content.length < OCR_FALLBACK_THRESHOLD) {
-      console.log(`  ⚠️  Phát hiện file scan (${content.length} ký tự), chuyển sang OCR tiếng Việt...`);
+      console.log(`  ⚠️  Phát hiện PDF scan: [${title}] (${content.length} ký tự), đang kích hoạt OCR...`);
       const ocrText = await ocrPages(parser);
       content = ocrText.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
     }
   } finally {
-    // Luôn giải phóng bộ nhớ dù thành công hay thất bại
     await parser.destroy();
   }
 
   return { title, content: content.slice(0, MAX_CONTENT_LENGTH) };
 }
 
-// ─── Điều phối: chọn hàm phù hợp theo loại URL ──────────────────────────────
+// ─── ĐIỀU PHỐI TỪNG URL ─────────────────────────────────────────────────────
 async function crawlPage(url) {
   try {
     const result = url.toLowerCase().endsWith('.pdf')
       ? await crawlPdf(url)
       : await crawlHtml(url);
 
-    console.log(`✅ Đã cào thành công: ${result.title} (${result.content.length} ký tự)`);
+    console.log(`✅ Đã cào: ${result.title.substring(0, 70)}... (${result.content.length} ký tự)`);
     return { url, title: result.title, content: result.content };
   } catch (error) {
-    console.log(`❌ Lỗi cào ${url}:`, error.message);
+    console.log(`❌ Lỗi cào [${url}]:`, error.message);
     return null;
   }
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
-async function main() {
-  console.log('🚀 Bắt đầu cào dữ liệu từ UIT...\n');
-  const scrapedData = [];
-
-  for (const url of URLS_TO_CRAWL) {
-    const data = await crawlPage(url);
-    if (data && data.content.length > 100) {
-      scrapedData.push(data);
-    }
+// ─── HÀM CHIA LÔ (CHUNKING) CHO CONCURRENCY ─────────────────────────────────
+async function processInBatches(urls, batchSize) {
+  const results = [];
+  for (let i = 0; i < urls.length; i += batchSize) {
+    const batch = urls.slice(i, i + batchSize);
+    console.log(`\n⏳ Đang xử lý lô ${Math.floor(i / batchSize) + 1}/${Math.ceil(urls.length/batchSize)} (${batch.length} URL)...`);
+    const batchResults = await Promise.all(batch.map(url => crawlPage(url)));
+    results.push(...batchResults.filter(r => r && r.content.length > 100));
   }
+  return results;
+}
 
-  // Fallback nếu cào thất bại toàn bộ (web down, chống DDoS...)
+// ─── MAIN SCRIPT ────────────────────────────────────────────────────────────
+async function main() {
+  console.log('🚀 BẮT ĐẦU CÀO DỮ LIỆU TỪ UIT (ĐA LUỒNG TỐI ƯU)...\n');
+  
+  const startTime = Date.now();
+  const scrapedData = await processInBatches(URLS_TO_CRAWL, CONCURRENCY_LIMIT);
+
+  // Fallback nếu cào thất bại hoàn toàn
   if (scrapedData.length === 0) {
     console.log('\n⚠️  Không cào được dữ liệu. Tạo dữ liệu fallback mẫu...');
     scrapedData.push({
       url: 'https://tuyensinh.uit.edu.vn/nganh-tri-tue-nhan-tao',
       title: 'Ngành Trí tuệ nhân tạo (Artificial Intelligence)',
-      content: 'Chương trình đào tạo Trí tuệ nhân tạo (AI) trang bị cho sinh viên kiến thức chuyên sâu về Machine Learning, Deep Learning, Xử lý ngôn ngữ tự nhiên, Thị giác máy tính. Sinh viên tốt nghiệp có thể làm AI Engineer, Data Scientist với mức lương khủng.',
-    });
-    scrapedData.push({
-      url: 'https://tuyensinh.uit.edu.vn/phuong-thuc-tuyen-sinh',
-      title: 'Các phương thức tuyển sinh UIT',
-      content: 'Trường Đại học Công nghệ Thông tin xét tuyển theo 3 phương thức: Tuyển thẳng, Ưu tiên xét tuyển theo quy định ĐHQG-HCM, Xét tuyển dựa vào điểm thi ĐGNL, Xét tuyển dựa vào điểm thi THPT Quốc gia.',
+      content: 'Chương trình đào tạo Trí tuệ nhân tạo (AI)...',
     });
   }
 
+  // Ghi kết quả
   const outputPath = path.join(__dirname, '../src/data/scrapedKnowledge.json');
   fs.writeFileSync(outputPath, JSON.stringify(scrapedData, null, 2), 'utf-8');
-  console.log(`\n🎉 Hoàn tất! Đã lưu ${scrapedData.length} bài viết vào: ${outputPath}`);
+  
+  // Dọn dẹp tài nguyên
+  if (globalWorker) {
+    await globalWorker.terminate();
+    console.log('\n🧹 Đã giải phóng OCR Worker.');
+  }
+
+  const timeTaken = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`🎉 HOÀN TẤT! Đã lưu ${scrapedData.length} bài viết vào: ${outputPath}`);
+  console.log(`⏱️ Thời gian chạy: ${timeTaken} giây.`);
 }
 
 main();

@@ -30,6 +30,8 @@ interface CurrentUser {
   full_name?: string;
   role?: string;
   student_id?: number | null;
+  avatar_url?: string;
+  bio?: string;
 }
 
 interface AppointmentRequest {
@@ -445,7 +447,7 @@ export const Toolbar = ({
           </div>
 
           <img
-            src={`https://api.dicebear.com/7.x/initials/svg?seed=${avatarSeed}`}
+            src={currentUser?.avatar_url ? `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${currentUser.avatar_url}` : `https://api.dicebear.com/7.x/initials/svg?seed=${avatarSeed}`}
             alt={displayName}
             onClick={() => setShowSettings(!showSettings)}
             className="w-10 h-10 rounded-full object-cover ring-2 ring-primary-fixed shrink-0 cursor-pointer"

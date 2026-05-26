@@ -6,6 +6,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import multer from "multer";
 
 import { pool } from "./db.js";
 import { verifyToken } from "./middleware/auth.js";
@@ -23,8 +26,42 @@ const JWT_SECRET = process.env.JWT_SECRET || "uit_advisorhub_secret_2026";
 
 const normalizeRole = (role) => String(role || "").trim().toUpperCase();
 
-app.use(cors());
+// CORS: cho phép mọi origin (local dev + production)
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Cho phép curl / Postman (không có origin) và các origin trong danh sách
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} không được phép`));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static uploads
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "../uploads/"));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+const upload = multer({ storage: storage });
 
 // ==========================================
 // SOCKET.IO
@@ -33,8 +70,9 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 app.set("io", io);
@@ -117,7 +155,9 @@ app.post("/auth/login", async (req, res) => {
         password_hash,
         full_name,
         role,
-        student_id
+        student_id,
+        avatar_url,
+        bio
       FROM users
       WHERE email = $1
       `,
@@ -166,10 +206,60 @@ app.post("/auth/login", async (req, res) => {
         full_name: user.full_name,
         role: normalizedUserRole,
         student_id: user.student_id,
+        avatar_url: user.avatar_url,
+        bio: user.bio,
       },
     });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+});
+
+// ==========================================
+// UPDATE PROFILE
+// ==========================================
+app.put("/auth/profile", verifyToken, upload.single("avatar"), async (req, res) => {
+  try {
+    const { bio } = req.body;
+    let avatarUrl = undefined;
+
+    if (req.file) {
+      avatarUrl = "/uploads/" + req.file.filename;
+    }
+
+    if (avatarUrl !== undefined && bio !== undefined) {
+      await pool.query("UPDATE users SET bio = $1, avatar_url = $2 WHERE id = $3", [bio, avatarUrl, req.user.id]);
+    } else if (avatarUrl !== undefined) {
+      await pool.query("UPDATE users SET avatar_url = $1 WHERE id = $2", [avatarUrl, req.user.id]);
+    } else if (bio !== undefined) {
+      await pool.query("UPDATE users SET bio = $1 WHERE id = $2", [bio, req.user.id]);
+    }
+
+    const result = await pool.query(
+      "SELECT id, email, full_name, role, student_id, bio, avatar_url FROM users WHERE id = $1",
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
+    }
+
+    const user = result.rows[0];
+    return res.json({
+      message: "Cập nhật hồ sơ thành công",
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: normalizeRole(user.role),
+        student_id: user.student_id,
+        bio: user.bio,
+        avatar_url: user.avatar_url,
+      },
+    });
+  } catch (err) {
+    console.error("UPDATE PROFILE ERROR:", err);
     return res.status(500).json({ message: "Lỗi server" });
   }
 });
@@ -652,6 +742,8 @@ app.post("/conversations", verifyToken, async (req, res) => {
 // ==========================================
 // START SERVER
 // ==========================================
-httpServer.listen(4000, () => {
-  console.log("Backend & Socket.io running on http://localhost:4000");
+import { config } from './config.js';
+const PORT = config.port || Number(process.env.PORT) || 4000;
+httpServer.listen(PORT, () => {
+  console.log(`Backend & Socket.io running on port ${PORT}`);
 });

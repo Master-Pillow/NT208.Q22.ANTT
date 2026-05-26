@@ -41,6 +41,17 @@
   --font-body: "Inter", sans-serif;
   --font-label: "Inter", sans-serif;
   --font-elephant: "Noto Serif", serif;
+
+  --animate-gradient-x: gradient-x 15s ease infinite;
+  
+  @keyframes gradient-x {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+  }
 }
 
 @layer utilities {

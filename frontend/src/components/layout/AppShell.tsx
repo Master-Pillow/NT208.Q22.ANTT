@@ -33,13 +33,23 @@ export const AppShell = () => {
   const navigate = useNavigate();
 
   const navigateLegacyView = (view: string) => {
-    if (view === 'profile') {
-      navigate(routeForRole(String(currentUser?.role || '').toUpperCase()));
-      return;
-    }
+  const role = String(currentUser?.role || '').toUpperCase();
 
-    navigate(legacyViewRoutes[view] || routeForRole(String(currentUser?.role || '').toUpperCase()));
-  };
+  if (view === 'profile') {
+    if (role === 'STUDENT') {
+      navigate('/student/profile');
+    } else if (role === 'ADVISOR') {
+      navigate('/advisor/profile');
+    } else if (role === 'ADMIN') {
+      navigate('/admin/profile');
+    } else {
+      navigate('/');
+    }
+    return;
+  }
+
+  navigate(legacyViewRoutes[view] || routeForRole(role));
+};
 
   const handleSearchSelect = (item: { type: string; id: number | null; code: string }) => {
     if (item.type === 'student' && item.id) {

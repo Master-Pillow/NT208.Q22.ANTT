@@ -472,15 +472,7 @@ export const Toolbar = ({
                   Xem hồ sơ
                 </button>
 
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer">
-                  <UserCog className="w-4 h-4 ml-1" />
-                  Edit Account Info
-                </button>
-
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer">
-                  <Shield className="w-4 h-4 ml-1" />
-                  Quyền riêng tư & bảo mật
-                </button>
+                
               </div>
 
               <div className="p-2 border-t border-slate-100 bg-slate-50/50">

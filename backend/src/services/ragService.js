@@ -122,7 +122,7 @@ function retrieveRelevantChunks(queryEmbedding, topK = 5) {
   }
   return vectorDB
     .map(chunk => ({ ...chunk, similarity: cosineSimilarity(queryEmbedding, chunk.embedding) }))
-    .filter(c => c.similarity > 0.45)
+    .filter(c => c.similarity > 0.3)
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, topK);
 }
@@ -132,26 +132,21 @@ async function generateAnswerWithContext(question, relevantChunks, conversationH
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return { text: 'GEMINI_API_KEY chưa được cấu hình. Liên hệ daotao@uit.edu.vn.', model: 'no_key' };
 
-  let contextSection = '';
-  if (relevantChunks.length > 0) {
-    contextSection = '📚 THÔNG TIN TÌM ĐƯỢC:\n';
-    contextSection += relevantChunks
-      .map((c, i) => `[${i + 1}] (${Math.round(c.similarity * 100)}% liên quan) ${c.content}`)
-      .join('\n\n');
-  }
-
   const historyText = conversationHistory.slice(-6)
     .map(m => `${m.role === 'user' ? 'Người dùng' : 'Trợ lý'}: ${m.content}`)
     .join('\n');
 
-  const prompt = `Bạn là trợ lý AI học vụ chính thức của Trường Đại học Công nghệ Thông tin (UIT - ĐHQG-HCM).
-${contextSection ? '\n' + contextSection + '\n' : ''}
-QUY TẮC TRẢ LỜI:
-1. Trả lời NGẮN GỌN, TRỰC TIẾP, đúng trọng tâm câu hỏi
-2. Dùng bullet points và emoji vừa phải để dễ đọc  
-3. Nếu có thông tin trong phần TÌM ĐƯỢC → ưu tiên dùng đó
-4. Nếu KHÔNG có thông tin → hướng dẫn liên hệ daotao@uit.edu.vn hoặc portal.uit.edu.vn
-5. KHÔNG bịa đặt thông tin, luôn thân thiện bằng tiếng Việt
+  const contextText = relevantChunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n');
+
+  const prompt = `Bạn là trợ lý AI học vụ của Trường Đại học Công nghệ Thông tin (UIT).
+Dựa vào các THÔNG TIN TRÍCH XUẤT dưới đây, hãy trả lời câu hỏi của người dùng.
+Lưu ý: "Công nghệ phần mềm" và "Kỹ thuật phần mềm" là một.
+Nội dung của bạn phải:
+1. Chính xác, ngắn gọn, thân thiện (có emoji).
+2. Nếu thông tin trích xuất không đủ chi tiết nhưng bạn có thể suy luận được từ ngữ cảnh (ví dụ tóm tắt những gì sẽ được học), hãy cố gắng trả lời một cách khái quát.
+3. CHỈ khi nào hoàn toàn không có bất kỳ thông tin nào liên quan, bạn mới dùng câu trả lời: "Để biết chi tiết về nội dung này, bạn vui lòng truy cập portal.uit.edu.vn hoặc liên hệ daotao@uit.edu.vn để được hỗ trợ nhé."
+
+${relevantChunks.length > 0 ? `THÔNG TIN TRÍCH XUẤT:\n${contextText}\n` : ''}
 ${historyText ? `\nLỊCH SỬ HỘI THOẠI:\n${historyText}` : ''}
 CÂU HỎI HIỆN TẠI: ${question}`;
 
@@ -184,7 +179,7 @@ CÂU HỎI HIỆN TẠI: ${question}`;
     }
   }
 
-  return { text: 'Xin lỗi, Google Gemini AI đang bị quá tải hoặc hết hạn mức (quota) miễn phí. Vui lòng thử lại sau 1 phút, hoặc sử dụng API key có tính phí.', model: 'fallback' };
+  return { text: 'Xin lỗi, hệ thống AI đang quá tải. Xin bạn vui lòng thử lại sau 1 phút.', model: 'fallback' };
 }
 
 // ─── Hàm chính: RAG Pipeline (không bao giờ throw) ───────────────────────────

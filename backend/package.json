@@ -5,7 +5,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/index.js",
+    "dev": "npx kill-port 4000 && nodemon src/index.js",
     "start": "node src/index.js",
     "crawl": "node scripts/crawlUit.js"
   },

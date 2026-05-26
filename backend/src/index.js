@@ -764,6 +764,33 @@ app.post("/conversations", verifyToken, async (req, res) => {
 });
 
 // ==========================================
+// GRACEFUL SHUTDOWN (Giải quyết triệt để EADDRINUSE trên Windows)
+// ==========================================
+const closeServer = (signal) => {
+  console.log(`\n[Server] Nhận được tín hiệu ${signal}. Đang giải phóng port...`);
+  httpServer.close(() => {
+    console.log('[Server] Đã giải phóng port thành công.');
+    process.exit(0);
+  });
+};
+
+// Xử lý riêng cho nodemon restart
+process.once('SIGUSR2', () => {
+  httpServer.close(() => {
+    process.kill(process.pid, 'SIGUSR2');
+  });
+});
+
+process.on('SIGINT', () => closeServer('SIGINT')); // Ctrl+C
+process.on('SIGTERM', () => closeServer('SIGTERM'));
+
+// Bắt lỗi không xác định để tránh treo process
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught Exception:', err);
+  closeServer('uncaughtException');
+});
+
+// ==========================================
 // START SERVER
 // ==========================================
 import { config } from './config.js';

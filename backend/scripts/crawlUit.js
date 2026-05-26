@@ -33,11 +33,30 @@ const URLS_TO_CRAWL = [
   'https://tuyensinh.uit.edu.vn/diem-chuan-cua-truong-dh-cong-nghe-thong-tin-qua-cac-nam',
   'https://tuyensinh.uit.edu.vn/truong-dai-hoc-cong-nghe-thong-tin-dhqg-hcm',
   'https://daa.uit.edu.vn/content/cac-nganh-dao-tao',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-toan-thong-tin-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-cong-nghe-thong-tin-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-he-thong-thong-tin-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/chuong-trinh-tien-tien-nganh-he-thong-thong-tin-ap-dung-tu-khoa-18-2023',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-khoa-hoc-may-tinh-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-tri-tue-nhan-tao-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-ky-thuat-phan-mem-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-ky-thuat-may-tinh-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-thiet-ke-vi-mach-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-mang-may-tinh-va-truyen-thong-du-lieu-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-thuong-mai-dien-tu-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-khoa-hoc-nganh-khoa-hoc-du-lieu-ap-dung-tu-khoa-19-2024',
+  'https://student.uit.edu.vn/content/cu-nhan-nganh-thuong-mai-dien-tu-ap-dung-tu-khoa-19-2024',
   // ─── PDF
   'https://daa.uit.edu.vn/sites/daa/files/202309/790-qd-dhcntt_28-9-22_quy_che_dao_tao.pdf',
   'https://daa.uit.edu.vn/sites/daa/files/202401/1393-qd-dhcntt_29-12-2023_cap_nhat_quy_che_dao_tao_theo_hoc_che_tin_chi_cho_he_dai_hoc_chinh_quy.pdf',
   'https://daa.uit.edu.vn/thongbao/02-quyet-dinh-ve-viec-ban-hanh-qui-dinh-ve-cong-tac-giao-trinh',
   'https://daa.uit.edu.vn/sites/daa/files/202309/172-qd-dhcntt_08-3-2023_quy_che_van_bang_chung_chi.pdf',
+  'https://student.uit.edu.vn/sites/daa/files/202502/133-qd-dhcntt_17-02-2025_cap_nhat_bo_sung_mau_plvb_tot_nghiep_dh_ths.pdf',
+  'https://student.uit.edu.vn/sites/daa/files/202512/131_qd-dhcntt_08-03-2022_quy_dinh_dao_tao_chuong_trinh_tai_nang.pdf',
+  'https://student.uit.edu.vn/sites/daa/files/202512/1032-qd-dhcntt_3-9-2025_quy_dinh_dao_tao_chuong_trinh_tai_nang.pdf',
+  'https://student.uit.edu.vn/sites/daa/files/202309/1139_qd-dhcntt_20-12-2022_to_chuc_thi_cac_mon_hoc_he_dai_hoc_chinh_quy.pdf',
+  'https://student.uit.edu.vn/sites/daa/files/202312/1376_qd-dhcntt_28-12-2023_cap_nhat_quy_dinh_to_chuc_thi.pdf',
+
 ];
 
 // ─── QUẢN LÝ TESSERACT WORKER GLOBAL (Khởi tạo 1 lần duy nhất) ──────────────
@@ -88,7 +107,7 @@ async function ocrPages(parser) {
     fullText += text + '\n';
     if (fullText.length >= MAX_CONTENT_LENGTH) break;
   }
-  
+
   // KHÔNG gọi terminate ở đây để tái sử dụng worker cho PDF sau
   return fullText;
 }
@@ -135,7 +154,7 @@ async function processInBatches(urls, batchSize) {
   const results = [];
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
-    console.log(`\n⏳ Đang xử lý lô ${Math.floor(i / batchSize) + 1}/${Math.ceil(urls.length/batchSize)} (${batch.length} URL)...`);
+    console.log(`\n⏳ Đang xử lý lô ${Math.floor(i / batchSize) + 1}/${Math.ceil(urls.length / batchSize)} (${batch.length} URL)...`);
     const batchResults = await Promise.all(batch.map(url => crawlPage(url)));
     results.push(...batchResults.filter(r => r && r.content.length > 100));
   }
@@ -145,7 +164,7 @@ async function processInBatches(urls, batchSize) {
 // ─── MAIN SCRIPT ────────────────────────────────────────────────────────────
 async function main() {
   console.log('🚀 BẮT ĐẦU CÀO DỮ LIỆU TỪ UIT (ĐA LUỒNG TỐI ƯU)...\n');
-  
+
   const startTime = Date.now();
   const scrapedData = await processInBatches(URLS_TO_CRAWL, CONCURRENCY_LIMIT);
 
@@ -162,7 +181,7 @@ async function main() {
   // Ghi kết quả
   const outputPath = path.join(__dirname, '../src/data/scrapedKnowledge.json');
   fs.writeFileSync(outputPath, JSON.stringify(scrapedData, null, 2), 'utf-8');
-  
+
   // Dọn dẹp tài nguyên
   if (globalWorker) {
     await globalWorker.terminate();

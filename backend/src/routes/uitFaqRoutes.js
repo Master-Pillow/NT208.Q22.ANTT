@@ -3,6 +3,7 @@
 
 import { Router } from 'express';
 import { processUitFaq } from '../services/uitFaqService.js';
+import { ragChat, isRagReady } from '../services/ragService.js';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// POST /uit-faq/ask — Đặt câu hỏi
+// POST /uit-faq/ask — Đặt câu hỏi (tự động chọn RAG hoặc keyword matching)
 router.post('/ask', async (req, res) => {
   try {
     const { question, sessionId } = req.body;
@@ -41,9 +42,31 @@ router.post('/ask', async (req, res) => {
     }
     session.lastAccess = Date.now();
 
-    const result = await processUitFaq(question.trim(), session.history);
+    let result;
 
-    // Cập nhật history (giữ tối đa 10 lượt)
+    // Kiểm tra RAG DB có sẵn sàng không
+    const ragReady = await isRagReady();
+
+    if (ragReady) {
+      // ✅ Dùng RAG thông minh
+      try {
+        const ragResult = await ragChat(question.trim(), session.history);
+        result = {
+          answer: ragResult.answer,
+          source: ragResult.fromCache ? 'rag_cache' : 'rag_vector',
+          category: 'rag',
+        };
+      } catch (ragErr) {
+        console.warn('[uit-faq/ask] RAG failed, falling back to keyword:', ragErr.message);
+        // Fallback về hệ thống cũ nếu RAG lỗi
+        result = await processUitFaq(question.trim(), session.history);
+      }
+    } else {
+      // ⚡ Dùng keyword matching cũ (khi chưa setup pgvector)
+      result = await processUitFaq(question.trim(), session.history);
+    }
+
+    // Cập nhật history
     session.history.push({ role: 'user', content: question.trim() });
     session.history.push({ role: 'model', content: result.answer });
     if (session.history.length > 20) {
@@ -62,6 +85,21 @@ router.post('/ask', async (req, res) => {
     });
   }
 });
+
+// GET /uit-faq/status — Kiểm tra trạng thái RAG
+router.get('/status', async (req, res) => {
+  try {
+    const ragReady = await isRagReady();
+    res.json({
+      rag_ready: ragReady,
+      mode: ragReady ? 'RAG (Vector Search)' : 'Keyword Matching (Legacy)',
+    });
+  } catch {
+    res.json({ rag_ready: false, mode: 'Keyword Matching (Legacy)' });
+  }
+});
+
+
 
 // GET /uit-faq/suggestions — Lấy câu hỏi gợi ý
 router.get('/suggestions', (req, res) => {

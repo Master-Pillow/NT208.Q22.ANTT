@@ -63,17 +63,17 @@ export const Sidebar: React.FC = () => {
   const subtitle = role === 'ADMIN' ? 'Quản trị viên' : role === 'STUDENT' ? 'Sinh viên' : 'Cố vấn học vụ';
 
   const aside = (
-    <aside className="h-full w-64 bg-slate-50/95 dark:bg-slate-800/95 backdrop-blur-lg flex flex-col p-6 space-y-8 border border-slate-200 lg:rounded-3xl">
+    <aside className="h-full w-64 bg-gradient-to-b from-[#004ac6]/95 via-[#2563eb]/95 to-[#0058be]/95 backdrop-blur-lg flex flex-col p-6 space-y-8 border border-blue-500/30 lg:rounded-3xl shadow-xl shadow-blue-900/10">
       <div className="flex flex-col items-center gap-2 mb-4">
-        <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-sm">
-          <GraduationCap className="w-8 h-8 text-blue-800 dark:text-blue-400" />
+        <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center shadow-sm backdrop-blur-md">
+          <GraduationCap className="w-8 h-8 text-white" />
         </div>
 
         <div className="text-center">
-          <h1 className="font-sans text-xl font-bold text-blue-800 dark:text-blue-400">
+          <h1 className="font-sans text-xl font-bold text-white">
             COURSE2
           </h1>
-          <p className="text-xs opacity-60 uppercase tracking-normal font-semibold">
+          <p className="text-xs text-blue-100 uppercase tracking-wider font-semibold">
             {subtitle}
           </p>
         </div>
@@ -93,10 +93,10 @@ export const Sidebar: React.FC = () => {
               to={item.to}
               onClick={() => setOpen(false)}
               className={cn(
-                'flex items-center gap-3 px-4 py-3 rounded-xl hover:translate-x-1 transition-transform duration-200 text-left',
+                'flex items-center gap-3 px-4 py-3 rounded-xl hover:translate-x-1 transition-all duration-200 text-left',
                 isActive
-                  ? 'bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 font-bold shadow-sm border border-slate-100'
-                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 font-medium'
+                  ? 'bg-white text-blue-700 font-bold shadow-sm'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white font-medium'
               )}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
@@ -107,11 +107,11 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       <div className="mt-auto flex flex-col gap-4">
-        <button className="bg-gradient-to-br from-primary to-primary-container text-white py-3 px-4 rounded-full font-semibold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-transform">
+        <button className="bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-full font-bold text-sm shadow-sm backdrop-blur-md transition-colors border border-white/20 cursor-pointer">
           {role === 'STUDENT' ? 'Đặt lịch tư vấn' : role === 'ADMIN' ? 'Báo cáo hệ thống' : 'Tạo kế hoạch học tập'}
         </button>
 
-        <button className="flex items-center gap-3 px-4 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 rounded-xl text-sm transition-colors">
+        <button className="flex items-center gap-3 px-4 py-2 text-blue-100 hover:bg-white/10 hover:text-white rounded-xl text-sm transition-colors cursor-pointer">
           <HelpCircle className="w-5 h-5" />
           <span>Trung tâm trợ giúp</span>
         </button>

@@ -157,6 +157,7 @@ app.post("/auth/login", async (req, res) => {
         role,
         student_id,
         avatar_url,
+        cover_url,
         bio
       FROM users
       WHERE email = $1
@@ -207,6 +208,7 @@ app.post("/auth/login", async (req, res) => {
         role: normalizedUserRole,
         student_id: user.student_id,
         avatar_url: user.avatar_url,
+        cover_url: user.cover_url,
         bio: user.bio,
       },
     });
@@ -219,25 +221,46 @@ app.post("/auth/login", async (req, res) => {
 // ==========================================
 // UPDATE PROFILE
 // ==========================================
-app.put("/auth/profile", verifyToken, upload.single("avatar"), async (req, res) => {
+app.put("/auth/profile", verifyToken, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), async (req, res) => {
   try {
     const { bio } = req.body;
     let avatarUrl = undefined;
+    let coverUrl = undefined;
 
-    if (req.file) {
-      avatarUrl = "/uploads/" + req.file.filename;
+    if (req.files) {
+      if (req.files.avatar && req.files.avatar[0]) {
+        avatarUrl = "/uploads/" + req.files.avatar[0].filename;
+      }
+      if (req.files.cover && req.files.cover[0]) {
+        coverUrl = "/uploads/" + req.files.cover[0].filename;
+      }
     }
 
-    if (avatarUrl !== undefined && bio !== undefined) {
-      await pool.query("UPDATE users SET bio = $1, avatar_url = $2 WHERE id = $3", [bio, avatarUrl, req.user.id]);
-    } else if (avatarUrl !== undefined) {
-      await pool.query("UPDATE users SET avatar_url = $1 WHERE id = $2", [avatarUrl, req.user.id]);
-    } else if (bio !== undefined) {
-      await pool.query("UPDATE users SET bio = $1 WHERE id = $2", [bio, req.user.id]);
+    // Dynamic update query
+    let updateFields = [];
+    let queryParams = [];
+    let paramIndex = 1;
+
+    if (bio !== undefined) {
+      updateFields.push(`bio = $${paramIndex++}`);
+      queryParams.push(bio);
+    }
+    if (avatarUrl !== undefined) {
+      updateFields.push(`avatar_url = $${paramIndex++}`);
+      queryParams.push(avatarUrl);
+    }
+    if (coverUrl !== undefined) {
+      updateFields.push(`cover_url = $${paramIndex++}`);
+      queryParams.push(coverUrl);
+    }
+
+    if (updateFields.length > 0) {
+      queryParams.push(req.user.id);
+      await pool.query(`UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`, queryParams);
     }
 
     const result = await pool.query(
-      "SELECT id, email, full_name, role, student_id, bio, avatar_url FROM users WHERE id = $1",
+      "SELECT id, email, full_name, role, student_id, bio, avatar_url, cover_url FROM users WHERE id = $1",
       [req.user.id]
     );
 
@@ -252,10 +275,11 @@ app.put("/auth/profile", verifyToken, upload.single("avatar"), async (req, res) 
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        role: normalizeRole(user.role),
+        role: user.role,
         student_id: user.student_id,
-        bio: user.bio,
         avatar_url: user.avatar_url,
+        cover_url: user.cover_url,
+        bio: user.bio,
       },
     });
   } catch (err) {

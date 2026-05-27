@@ -1,6 +1,5 @@
 // backend/src/services/ragService.js
-// RAG Service — In-Memory Vector Search
-// Dùng HuggingFace Inference API để embed query (miễn phí, cùng model với Colab)
+// RAG Service — Keyword Search + Gemini Generation
 
 import fs from 'fs';
 import path from 'path';
@@ -11,41 +10,27 @@ const __dirname = path.dirname(__filename);
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// ─── Model phải khớp với Colab ────────────────────────────────────────────────
-const HF_MODEL = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2';
-const HF_API_URL = `https://api-inference.huggingface.co/pipeline/feature-extraction/${HF_MODEL}`;
-
-// ─── Tải dữ liệu vector vào bộ nhớ (RAM) ──────────────────────────────────────
-let vectorDB = [];
+// ─── Tải dữ liệu raw vào RAM khi khởi động ────────────────────────────────────
+let rawDB = [];
 try {
-  const filePath = path.join(__dirname, '../../scripts/chunks_with_embeddings.json');
+  const filePath = path.join(__dirname, '../../scripts/chunks.json');
   if (fs.existsSync(filePath)) {
-    vectorDB = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    console.log(`[ragService] ✅ Đã tải ${vectorDB.length} chunks vào bộ nhớ (dim=${vectorDB[0]?.embedding?.length})`);
+    rawDB = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    console.log(`[ragService] ✅ Đã tải ${rawDB.length} chunks vào RAM`);
+  } else {
+    console.warn('[ragService] ⚠️  Không tìm thấy chunks.json');
   }
 } catch (e) {
-  console.log('[ragService] Chưa có chunks_with_embeddings.json, RAG chưa sẵn sàng.');
+  console.error('[ragService] Lỗi khi tải chunks.json:', e.message);
 }
 
 export async function isRagReady() {
-  return vectorDB.length > 0;
+  return rawDB.length > 0;
 }
 
-// ─── Thuật toán Cosine Similarity ─────────────────────────────────────────────
-function cosineSimilarity(vecA, vecB) {
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dot += vecA[i] * vecB[i];
-    normA += vecA[i] * vecA[i];
-    normB += vecB[i] * vecB[i];
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-// ─── Cache đơn giản trong memory ─────────────────────────────────────────────
+// ─── Cache query ───────────────────────────────────────────────────────────────
 const memoryCache = new Map();
-const CACHE_TTL = 24 * 60 * 60 * 1000;
+const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 giờ
 
 function simpleHash(str) {
   let hash = 0;
@@ -56,101 +41,134 @@ function simpleHash(str) {
   return Math.abs(hash).toString(36);
 }
 
-// ─── Bước 1: Embed query bằng HuggingFace (cùng model với Colab) ──────────────
-// Trả về null nếu thất bại (không throw) — hệ thống tự dùng Gemini thuần
-async function embedQuery(question) {
-  // HuggingFace Inference API — timeout 8s để tránh treo chatbox
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+// ─── Chuẩn hóa text tiếng Việt cho tìm kiếm ──────────────────────────────────
+function normalize(str) {
+  return str
+    .toLowerCase()
+    // bỏ dấu cơ bản nhất định
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .replace(/[^\w\s]/g, ' ')
+    .trim();
+}
 
-    const response = await fetch(HF_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inputs: question, options: { wait_for_model: false } }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
+// ─── Bảng alias viết tắt phổ biến UIT ────────────────────────────────────────
+const ALIASES = {
+  attt: ['an toan thong tin', 'an toàn thông tin', 'information security', 'nt101', 'nt140', 'nganh attt', 'khoa attt'],
+  cnpm: ['cong nghe phan mem', 'công nghệ phần mềm', 'software engineering', 'ky thuat phan mem', 'kỹ thuật phần mềm', 'ktpm', 'se104'],
+  httt: ['he thong thong tin', 'hệ thống thông tin', 'information systems', 'is207'],
+  khmt: ['khoa hoc may tinh', 'khoa học máy tính', 'computer science'],
+  ktmt: ['ky thuat may tinh', 'kỹ thuật máy tính', 'computer engineering'],
+  mmvttd: ['mang may tinh va truyen thong du lieu', 'mạng máy tính'],
+  khdt: ['khoa hoc du lieu', 'khoa học dữ liệu', 'data science'],
+  cq: ['chinh quy', 'chính quy'],
+  vlvh: ['vua lam vua hoc', 'vừa làm vừa học'],
+  // Mở rộng câu hỏi về môn học/chương trình đào tạo ATTT
+  'mon hoc': ['hoc phan', 'mon thi', 'nt101', 'nt140', 'is101', 'noi dung hoc'],
+  'chuong trinh': ['khung chuong trinh', 'ke hoach dao tao', 'tin chi', 'hoc ky'],
+};
 
-    if (response.ok) {
-      const data = await response.json();
-      // Xử lý các định dạng response khác nhau của HF
-      if (Array.isArray(data)) {
-        const vec = Array.isArray(data[0]) ? (Array.isArray(data[0][0]) ? data[0][0] : data[0]) : data;
-        if (Array.isArray(vec) && vec.length > 10) return vec;
+// Stop words tieng Viet
+const STOP_WORDS = new Set(['va','cua','cho','voi','trong','co','la','duoc','cac','nhung','khong','nay','do','de','theo','hay','gi','tu','can','muon','bao','nhieu','the','nao','nhu','thi','ma','mot','se','ve','khi','tai','len','hoi','xem','ban','toi','minh']);
+
+// ─── Tìm kiếm Keyword (TF-normalized) ────────────────────────────────────────
+function retrieveRelevantChunks(question, topK = 10) {
+  if (rawDB.length === 0) return [];
+
+  const qRaw = question.toLowerCase().trim();
+  const qNorm = normalize(qRaw);
+
+  // Tách từ khóa, bỏ stop words
+  const keywords = qNorm.split(/\s+/).filter(w => w.length > 1 && !STOP_WORDS.has(w));
+
+  // Mở rộng từ khóa từ alias
+  const expandedKeywords = [...keywords];
+  for (const [abbr, expansions] of Object.entries(ALIASES)) {
+    if (qRaw.includes(abbr) || qNorm.includes(abbr)) {
+      for (const exp of expansions) {
+        expandedKeywords.push(...normalize(exp).split(/\s+/).filter(w => !STOP_WORDS.has(w)));
       }
     }
-    // 503 = model đang load → trả về null, không throw
-    console.warn(`[ragService] HuggingFace status ${response.status} — dùng Gemini thuần`);
-  } catch (err) {
-    console.warn('[ragService] HuggingFace timeout/error:', err.message);
   }
+  const uniqueKw = [...new Set(expandedKeywords)].filter(w => w.length > 1);
 
-  // Thử Gemini embedding làm fallback
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (apiKey) {
-    for (const model of ['text-embedding-004', 'embedding-001']) {
-      try {
-        const url = `${GEMINI_BASE}/${model}:embedContent?key=${apiKey}`;
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: `models/${model}`,
-            content: { parts: [{ text: question }] },
-            taskType: 'RETRIEVAL_QUERY',
-          }),
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          const values = data?.embedding?.values;
-          if (values?.length > 0) return values;
-        }
-      } catch (_) { /* thử model tiếp theo */ }
+  const scoredChunks = rawDB.map(chunk => {
+    const raw = chunk.content.toLowerCase();
+    const norm = normalize(chunk.content);
+    const chunkLen = Math.max(norm.length, 1);
+    let score = 0;
+
+    // Khớp cụm từ nguyên văn → bonus cao nhất
+    if (raw.includes(qRaw)) score += 100;
+    else if (norm.includes(qNorm)) score += 60;
+
+    // TF-normalized: tần suất / độ dài chunk
+    // → chunk ngắn và chuyên biệt được ưu tiên hơn PDF dài
+    for (const kw of uniqueKw) {
+      const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      const count = (norm.match(re) || []).length;
+      if (count > 0) {
+        const tf = (count / chunkLen) * 1000;
+        score += tf * (1 + kw.length * 0.15);
+      }
     }
-  }
 
-  return null; // Không throw — cho phép Gemini trả lời thuần
-}
+    // Bonus neu chunk co ma mon hoc (chu + so) va tu khoa lien quan
+    if (/[A-Z]{2,4}\d{3}/.test(chunk.content)) {
+      score += 15;
+    }
 
-// ─── Bước 2: Tìm chunks liên quan ─────────────────────────────────────────────
-function retrieveRelevantChunks(queryEmbedding, topK = 5) {
-  if (!queryEmbedding || vectorDB.length === 0) return [];
-  if (queryEmbedding.length !== vectorDB[0].embedding.length) {
-    console.warn(`[ragService] Vector dim mismatch: query=${queryEmbedding.length}, db=${vectorDB[0].embedding.length}`);
-    return [];
-  }
-  return vectorDB
-    .map(chunk => ({ ...chunk, similarity: cosineSimilarity(queryEmbedding, chunk.embedding) }))
-    .filter(c => c.similarity > 0.3)
+    if (chunk.category) {
+      const cat = normalize(chunk.category);
+      for (const kw of uniqueKw) {
+        if (cat.includes(kw)) score += 20;
+      }
+    }
+
+    return { ...chunk, similarity: score };
+  });
+
+  const results = scoredChunks
+    .filter(c => c.similarity > 0)
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, topK);
+
+  console.log(`[ragService] Keyword search: "${question}" -> ${results.length} chunks, top: ${results.slice(0,3).map(r=>r.id+':'+r.similarity.toFixed(1)).join(', ')}`);
+  return results;
 }
 
-// ─── Bước 3: Tạo câu trả lời bằng Gemini với RAG context ─────────────────────
+// ─── Tạo câu trả lời với Gemini ──────────────────────────────────────────────
 async function generateAnswerWithContext(question, relevantChunks, conversationHistory = []) {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return { text: 'GEMINI_API_KEY chưa được cấu hình. Liên hệ daotao@uit.edu.vn.', model: 'no_key' };
 
-  const historyText = conversationHistory.slice(-6)
-    .map(m => `${m.role === 'user' ? 'Người dùng' : 'Trợ lý'}: ${m.content}`)
+  // Lấy tối đa 4 turn gần nhất, mỗi turn tối đa 300 ký tự
+  const historyText = conversationHistory
+    .slice(-4)
+    .map(m => `${m.role === 'user' ? 'Người dùng' : 'Trợ lý'}: ${String(m.content).slice(0, 300)}`)
     .join('\n');
 
-  const contextText = relevantChunks.map((c, i) => `[${i + 1}] ${c.content}`).join('\n\n');
+  // Giới hạn mỗi chunk tối đa 800 ký tự để không làm prompt quá dài
+  const contextText = relevantChunks
+    .map((c, i) => `[${i + 1}] ${String(c.content).slice(0, 800)}`)
+    .join('\n\n');
 
-  const prompt = `Bạn là trợ lý AI học vụ của Trường Đại học Công nghệ Thông tin (UIT).
-Dựa vào các THÔNG TIN TRÍCH XUẤT dưới đây, hãy trả lời câu hỏi của người dùng.
-Lưu ý: "Công nghệ phần mềm" và "Kỹ thuật phần mềm" là một.
-Nội dung của bạn phải:
-1. Chính xác, ngắn gọn, thân thiện (có emoji).
-2. Nếu thông tin trích xuất không đủ chi tiết nhưng bạn có thể suy luận được từ ngữ cảnh (ví dụ tóm tắt những gì sẽ được học), hãy cố gắng trả lời một cách khái quát.
-3. CHỈ khi nào hoàn toàn không có bất kỳ thông tin nào liên quan, bạn mới dùng câu trả lời: "Để biết chi tiết về nội dung này, bạn vui lòng truy cập portal.uit.edu.vn hoặc liên hệ daotao@uit.edu.vn để được hỗ trợ nhé."
+  const systemPrompt = `Bạn là trợ lý AI học vụ của Trường Đại học Công nghệ Thông tin UIT.
+Nhiệm vụ: Trả lời câu hỏi của người dùng DỰA TRÊN tài liệu trích xuất bên dưới.
+Quy tắc:
+- Ngắn gọn, thân thiện, dùng emoji phù hợp.
+- Trình bày theo gạch đầu dòng nếu có nhiều ý.
+- "Công nghệ phần mềm" = "Kỹ thuật phần mềm" (cùng một ngành).
+- Nếu tài liệu đã có thông tin → trả lời trực tiếp, KHÔNG bảo người dùng tra thêm.
+- Chỉ khi KHÔNG CÓ BẤT KỲ thông tin nào trong tài liệu mới nói: "Để biết thêm chi tiết, bạn truy cập portal.uit.edu.vn hoặc liên hệ daotao@uit.edu.vn nhé."
+- KHÔNG bịa thêm thông tin ngoài tài liệu.
+- Trả lời hoàn chỉnh, KHÔNG bị cắt ngang.`;
 
-${relevantChunks.length > 0 ? `THÔNG TIN TRÍCH XUẤT:\n${contextText}\n` : ''}
-${historyText ? `\nLỊCH SỬ HỘI THOẠI:\n${historyText}` : ''}
-CÂU HỎI HIỆN TẠI: ${question}`;
+  const userPrompt = `${relevantChunks.length > 0 ? `TÀI LIỆU THAM KHẢO:\n${contextText}\n\n` : ''}${historyText ? `LỊCH SỬ HỘI THOẠI:\n${historyText}\n\n` : ''}CÂU HỎI: ${question}`;
 
-  const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
   for (const model of models) {
     try {
       const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;
@@ -158,55 +176,62 @@ CÂU HỎI HIỆN TẠI: ${question}`;
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 1200 },
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            temperature: 0.15,
+            maxOutputTokens: 4000,  // Tăng lên để không bị cắt
+            stopSequences: [],
+          },
         }),
       });
+
       if (response.status === 429) {
-        console.warn(`[ragService] Model ${model} bị rate limit (429). Đang thử model khác...`);
-        continue; // Thử model tiếp theo thay vì dừng hẳn
-      }
-      if (!response.ok) {
-        const errData = await response.text();
-        console.warn(`[ragService] Model ${model} failed (${response.status}):`, errData);
+        console.warn(`[ragService] ${model} rate limit 429 → thử model tiếp`);
         continue;
       }
+      if (!response.ok) {
+        const err = await response.text();
+        console.warn(`[ragService] ${model} failed (${response.status}):`, err);
+        continue;
+      }
+
       const data = await response.json();
+      const finishReason = data?.candidates?.[0]?.finishReason;
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+      if (finishReason === 'MAX_TOKENS') {
+        console.warn(`[ragService] ${model} bị cắt do MAX_TOKENS — thêm dấu "..." cho người dùng biết`);
+        return { text: (text || '') + '\n\n*(Câu trả lời bị cắt do quá dài. Bạn thử hỏi cụ thể hơn nhé!)*', model };
+      }
+
       if (text) return { text, model };
     } catch (err) {
-      console.warn(`[ragService] Model ${model} error:`, err.message);
+      console.warn(`[ragService] ${model} error:`, err.message);
     }
   }
 
-  return { text: 'Xin lỗi, hệ thống AI đang quá tải. Xin bạn vui lòng thử lại sau 1 phút.', model: 'fallback' };
+  return { text: 'Xin lỗi, hệ thống AI đang quá tải. Vui lòng thử lại sau ít phút nhé! 🙏', model: 'fallback' };
 }
 
-// ─── Hàm chính: RAG Pipeline (không bao giờ throw) ───────────────────────────
+// ─── Hàm chính: RAG Pipeline ─────────────────────────────────────────────────
 export async function ragChat(question, conversationHistory = []) {
   const cacheKey = simpleHash(question.toLowerCase().trim());
 
   const cached = memoryCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    console.log(`[ragService] Cache hit: "${question}"`);
     return { ...cached.data, fromCache: true };
   }
 
-  // Embed query (trả null nếu thất bại, không throw)
-  const queryEmbedding = await embedQuery(question);
-
-  // Tìm chunks (trả [] nếu embedding null)
-  const relevantChunks = retrieveRelevantChunks(queryEmbedding);
-  console.log(`[ragService] embedding=${queryEmbedding ? 'OK' : 'null'}, chunks=${relevantChunks.length}`);
-
-  // Luôn tạo được câu trả lời (kể cả khi không có RAG context)
+  const relevantChunks = retrieveRelevantChunks(question);
   const { text: answer, model } = await generateAnswerWithContext(question, relevantChunks, conversationHistory);
 
   const sources = relevantChunks.map(c => ({
-    id: c.id, category: c.category, similarity: Math.round(c.similarity * 100),
+    id: c.id, category: c.category, similarity: Math.round(c.similarity),
   }));
 
   const result = { answer, sources, model, fromCache: false };
   memoryCache.set(cacheKey, { data: result, timestamp: Date.now() });
   return result;
 }
-

@@ -159,6 +159,7 @@ export const UIT_KNOWLEDGE = {
   },
 
   mon_hoc_pho_bien: [
+    // Môn chung (đại cương ngành CNTT)
     { ma: 'IT001', ten: 'Nhập môn lập trình', tc: 4, mo_ta: 'Nhập môn lập trình với ngôn ngữ C. Kiến thức cơ bản về biến, vòng lặp, hàm, mảng.' },
     { ma: 'IT002', ten: 'Lập trình hướng đối tượng', tc: 4, mo_ta: 'OOP với Java/C++. Kế thừa, đa hình, đóng gói, abstraction.' },
     { ma: 'IT003', ten: 'Cấu trúc dữ liệu và giải thuật', tc: 4, mo_ta: 'Stack, Queue, Tree, Graph, các thuật toán sắp xếp và tìm kiếm.' },
@@ -168,7 +169,16 @@ export const UIT_KNOWLEDGE = {
     { ma: 'SE104', ten: 'Nhập môn Công nghệ phần mềm', tc: 3, mo_ta: 'SDLC, mô hình phát triển phần mềm, UML, Agile/Scrum.' },
     { ma: 'CS114', ten: 'Học máy', tc: 3, mo_ta: 'Các thuật toán Machine Learning cơ bản: Regression, Classification, Clustering.' },
     { ma: 'IS207', ten: 'Phát triển ứng dụng Web', tc: 4, mo_ta: 'HTML/CSS/JS, React/Vue, Node.js, REST API.' },
-    { ma: 'NT101', ten: 'An toàn mạng máy tính', tc: 3, mo_ta: 'Bảo mật mạng, tường lửa, VPN, phát hiện xâm nhập.' },
+    // Môn chuyên ngành AN TOÀN THÔNG TIN (ATTT)
+    { ma: 'NT101', ten: 'An toàn mạng máy tính', tc: 3, mo_ta: 'Bảo mật mạng, tường lửa, VPN, phát hiện xâm nhập. Môn chuyên ngành bắt buộc của ATTT.' },
+    { ma: 'NT140', ten: 'An toàn mạng', tc: 4, mo_ta: 'An toàn mạng nâng cao. Áp dụng từ khóa 2023 trở đi. Bắt buộc ngành ATTT.' },
+    { ma: 'NT219', ten: 'An toàn mạng nâng cao', tc: 3, mo_ta: 'Tấn công mạng, phòng thủ nâng cao, phân tích lưu lượng mạng. Ngành ATTT.' },
+    { ma: 'NT334', ten: 'Bảo mật hệ thống', tc: 3, mo_ta: 'Bảo mật hệ điều hành, ứng dụng, cloud. Môn ATTT chuyên sâu.' },
+    { ma: 'NT204', ten: 'Kiểm thử xâm nhập (Pentesting)', tc: 3, mo_ta: 'Kỹ thuật tấn công và kiểm tra bảo mật hệ thống thực tế. Môn ATTT.' },
+    { ma: 'NT230', ten: 'Mật mã học', tc: 3, mo_ta: 'Lý thuyết mã hóa, AES, RSA, ECC, chữ ký số. Môn cơ sở quan trọng của ATTT.' },
+    { ma: 'NT532', ten: 'Phân tích mã độc', tc: 3, mo_ta: 'Phân tích virus, ransomware, trojan. Kỹ thuật reverse engineering. Ngành ATTT.' },
+    { ma: 'NT521', ten: 'Điều tra số (Digital Forensics)', tc: 3, mo_ta: 'Thu thập bằng chứng số, phân tích sự cố, pháp y kỹ thuật số. Ngành ATTT.' },
+    { ma: 'IS201', ten: 'Quản lý an toàn thông tin', tc: 3, mo_ta: 'Chính sách bảo mật, ISO 27001, quản lý rủi ro thông tin. Ngành ATTT.' },
   ],
 
   quy_dinh_hoc_vu: {

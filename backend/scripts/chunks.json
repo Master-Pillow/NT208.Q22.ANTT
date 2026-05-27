@@ -187,7 +187,47 @@
   {
     "id": "mon_nt101",
     "category": "mon_hoc",
-    "content": "Môn học An toàn mạng máy tính (mã: NT101): 3 tín chỉ. Bảo mật mạng, tường lửa, VPN, phát hiện xâm nhập."
+    "content": "Môn học An toàn mạng máy tính (mã: NT101): 3 tín chỉ. Bảo mật mạng, tường lửa, VPN, phát hiện xâm nhập. Môn chuyên ngành bắt buộc của ATTT."
+  },
+  {
+    "id": "mon_nt140",
+    "category": "mon_hoc",
+    "content": "Môn học An toàn mạng (mã: NT140): 4 tín chỉ. An toàn mạng nâng cao. Áp dụng từ khóa 2023 trở đi. Bắt buộc ngành ATTT."
+  },
+  {
+    "id": "mon_nt219",
+    "category": "mon_hoc",
+    "content": "Môn học An toàn mạng nâng cao (mã: NT219): 3 tín chỉ. Tấn công mạng, phòng thủ nâng cao, phân tích lưu lượng mạng. Ngành ATTT."
+  },
+  {
+    "id": "mon_nt334",
+    "category": "mon_hoc",
+    "content": "Môn học Bảo mật hệ thống (mã: NT334): 3 tín chỉ. Bảo mật hệ điều hành, ứng dụng, cloud. Môn ATTT chuyên sâu."
+  },
+  {
+    "id": "mon_nt204",
+    "category": "mon_hoc",
+    "content": "Môn học Kiểm thử xâm nhập (Pentesting) (mã: NT204): 3 tín chỉ. Kỹ thuật tấn công và kiểm tra bảo mật hệ thống thực tế. Môn ATTT."
+  },
+  {
+    "id": "mon_nt230",
+    "category": "mon_hoc",
+    "content": "Môn học Mật mã học (mã: NT230): 3 tín chỉ. Lý thuyết mã hóa, AES, RSA, ECC, chữ ký số. Môn cơ sở quan trọng của ATTT."
+  },
+  {
+    "id": "mon_nt532",
+    "category": "mon_hoc",
+    "content": "Môn học Phân tích mã độc (mã: NT532): 3 tín chỉ. Phân tích virus, ransomware, trojan. Kỹ thuật reverse engineering. Ngành ATTT."
+  },
+  {
+    "id": "mon_nt521",
+    "category": "mon_hoc",
+    "content": "Môn học Điều tra số (Digital Forensics) (mã: NT521): 3 tín chỉ. Thu thập bằng chứng số, phân tích sự cố, pháp y kỹ thuật số. Ngành ATTT."
+  },
+  {
+    "id": "mon_is201",
+    "category": "mon_hoc",
+    "content": "Môn học Quản lý an toàn thông tin (mã: IS201): 3 tín chỉ. Chính sách bảo mật, ISO 27001, quản lý rủi ro thông tin. Ngành ATTT."
   },
   {
     "id": "faq_0",

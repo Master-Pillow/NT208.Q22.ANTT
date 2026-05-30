@@ -7,34 +7,35 @@ import { AIChatProvider } from './contexts/AIChatContext';
 import { AppShell, routeForRole } from './components/layout/AppShell';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { Unauthorized } from './components/layout/Unauthorized';
+import { pageImporters } from './routes/preload';
+import AdminAiHubPage from './views/admin/AiHubPage';
 
-const LoginPage = lazy(() => import('./views/LoginPage'));
-const UITFaqPage = lazy(() => import('./views/shared/UITFaqPage'));
-const AccountProfilePage = lazy(() => import('./views/shared/AccountProfilePage'));
+const LoginPage = lazy(pageImporters.login);
+const UITFaqPage = lazy(pageImporters.uitFaq);
+const AccountProfilePage = lazy(pageImporters.accountProfile);
 
-const AdminDashboardPage = lazy(() => import('./views/admin/DashboardPage'));
-const AdminStudentsPage = lazy(() => import('./views/admin/StudentsPage'));
-const AdminClassesPage = lazy(() => import('./views/admin/ClassesPage'));
-const AdminAdvisorsPage = lazy(() => import('./views/admin/AdvisorsPage'));
-const AdminCoursesPage = lazy(() => import('./views/admin/CoursesPage'));
-const AdminAiHubPage = lazy(() => import('./views/admin/AiHubPage'));
-const AdminAiAnomalyPage = lazy(() => import('./views/admin/AiAnomalyPage'));
-const AdminAiBriefPage = lazy(() => import('./views/admin/AiBriefPage'));
-const AdminAiQueryPage = lazy(() => import('./views/admin/AiQueryPage'));
-const AdminAiPatternsPage = lazy(() => import('./views/admin/AiPatternsPage'));
+const AdminDashboardPage = lazy(pageImporters.adminDashboard);
+const AdminStudentsPage = lazy(pageImporters.adminStudents);
+const AdminClassesPage = lazy(pageImporters.adminClasses);
+const AdminAdvisorsPage = lazy(pageImporters.adminAdvisors);
+const AdminCoursesPage = lazy(pageImporters.adminCourses);
+const AdminAiAnomalyPage = lazy(pageImporters.adminAiAnomaly);
+const AdminAiBriefPage = lazy(pageImporters.adminAiBrief);
+const AdminAiQueryPage = lazy(pageImporters.adminAiQuery);
+const AdminAiPatternsPage = lazy(pageImporters.adminAiPatterns);
 
-const AdvisorDashboardPage = lazy(() => import('./views/advisor/DashboardPage'));
-const AdvisorStudentsPage = lazy(() => import('./views/advisor/StudentsPage'));
-const AdvisorAppointmentsPage = lazy(() => import('./views/advisor/AppointmentsPage'));
-const AdvisorMessagesPage = lazy(() => import('./views/advisor/MessagesPage'));
-const AdvisorAiAnomalyPage = lazy(() => import('./views/advisor/AiAnomalyPage'));
-const AdvisorAiBriefPage = lazy(() => import('./views/advisor/AiBriefPage'));
+const AdvisorDashboardPage = lazy(pageImporters.advisorDashboard);
+const AdvisorStudentsPage = lazy(pageImporters.advisorStudents);
+const AdvisorAppointmentsPage = lazy(pageImporters.advisorAppointments);
+const AdvisorMessagesPage = lazy(pageImporters.advisorMessages);
+const AdvisorAiAnomalyPage = lazy(pageImporters.advisorAiAnomaly);
+const AdvisorAiBriefPage = lazy(pageImporters.advisorAiBrief);
 
-const StudentProfilePage = lazy(() => import('./views/student/ProfilePage'));
-const StudentGradesPage = lazy(() => import('./views/student/GradesPage'));
-const StudentAppointmentsPage = lazy(() => import('./views/student/AppointmentsPage'));
-const StudentMessagesPage = lazy(() => import('./views/student/MessagesPage'));
-const StudentNotificationsPage = lazy(() => import('./views/student/NotificationsPage'));
+const StudentProfilePage = lazy(pageImporters.studentProfile);
+const StudentGradesPage = lazy(pageImporters.studentGrades);
+const StudentAppointmentsPage = lazy(pageImporters.studentAppointments);
+const StudentMessagesPage = lazy(pageImporters.studentMessages);
+const StudentNotificationsPage = lazy(pageImporters.studentNotifications);
 
 const LoadingScreen = () => (
   <div className="min-h-screen bg-slate-50 flex items-center justify-center text-primary">

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Send } from 'lucide-react';
+import { AlertCircle, Check, CheckCheck, Send } from 'lucide-react';
 import apiClient from '../../lib/api';
 import { io, Socket } from 'socket.io-client';
 
@@ -9,12 +9,21 @@ interface Message {
   sender_role: 'ADVISOR' | 'STUDENT';
   content: string;
   created_at: string;
+  is_read: boolean;
 }
 
 interface Conversation {
   id: number;
   advisor_name: string;
   advisor_email: string;
+  unread_count?: number;
+  is_unread?: boolean;
+}
+
+interface MessagesReadEvent {
+  conversationId: number;
+  readerRole: 'ADVISOR' | 'STUDENT';
+  messageIds: number[];
 }
 
 let socket: Socket | null = null;
@@ -44,6 +53,23 @@ export const StudentMessages = () => {
     setMessages(data.messages || []);
   }
 
+  async function markConversationAsRead(conversationId: number) {
+    try {
+      const { data } = await apiClient.patch(`/conversations/${conversationId}/read`);
+      const readMessageIds: number[] = data?.read_message_ids || [];
+
+      setConversation((prev) => prev ? { ...prev, unread_count: 0, is_unread: false } : prev);
+
+      if (readMessageIds.length > 0) {
+        setMessages((prev) => prev.map((msg) =>
+          readMessageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
+        ));
+      }
+    } catch (err) {
+      console.error('[StudentMessages/read]', err);
+    }
+  }
+
   useEffect(() => {
     loadMessages()
       .catch((err) => {
@@ -58,6 +84,7 @@ export const StudentMessages = () => {
 
     const sock = getSocket();
     sock.emit('join_conversation', conversation.id);
+    markConversationAsRead(conversation.id);
 
     const handleNewMessage = (msg: Message) => {
       if (msg.conversation_id !== conversation.id) return;
@@ -66,12 +93,26 @@ export const StudentMessages = () => {
         if (prev.some((item) => item.id === msg.id)) return prev;
         return [...prev, msg];
       });
+
+      if (msg.sender_role === 'ADVISOR') {
+        markConversationAsRead(conversation.id);
+      }
+    };
+
+    const handleMessagesRead = (event: MessagesReadEvent) => {
+      if (event.conversationId !== conversation.id) return;
+
+      setMessages((prev) => prev.map((msg) =>
+        event.messageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
+      ));
     };
 
     sock.on('new_message', handleNewMessage);
+    sock.on('messages_read', handleMessagesRead);
 
     return () => {
       sock.off('new_message', handleNewMessage);
+      sock.off('messages_read', handleMessagesRead);
     };
   }, [conversation?.id]);
 
@@ -163,13 +204,18 @@ export const StudentMessages = () => {
                     }`}
                   >
                     <p>{msg.content}</p>
-                    <p
-                      className={`text-[10px] mt-1 ${
-                        isStudent ? 'text-blue-100' : 'text-slate-400'
+                    <div
+                      className={`text-[10px] mt-1 flex items-center gap-1 ${
+                        isStudent ? 'text-blue-100 justify-end' : 'text-slate-400'
                       }`}
                     >
-                      {new Date(msg.created_at).toLocaleString('vi-VN')}
-                    </p>
+                      <span>{new Date(msg.created_at).toLocaleString('vi-VN')}</span>
+                      {isStudent && (
+                        msg.is_read
+                          ? <CheckCheck className="w-3 h-3 text-blue-100" />
+                          : <Check className="w-3 h-3 text-blue-100" />
+                      )}
+                    </div>
                   </div>
                 </div>
               );

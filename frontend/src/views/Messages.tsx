@@ -27,6 +27,8 @@ interface Chat {
   idNumber:    string;   // mssv
   lastMessage: string;
   time:        string;
+  unreadCount?: number;
+  isUnread?: boolean;
 }
 
 interface Message {
@@ -37,6 +39,12 @@ interface Message {
   content:         string;
   created_at:      string;
   is_read:         boolean;
+}
+
+interface MessagesReadEvent {
+  conversationId: number;
+  readerRole: 'ADVISOR' | 'STUDENT';
+  messageIds: number[];
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -79,6 +87,41 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
   const [sending,        setSending]        = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const applyReadReceipt = (event: MessagesReadEvent) => {
+    setMessages(prev => prev.map(msg =>
+      event.messageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
+    ));
+
+    if (event.readerRole === 'ADVISOR') {
+      setChats(prev => prev.map(chat =>
+        chat.id === event.conversationId
+          ? { ...chat, unreadCount: 0, isUnread: false }
+          : chat
+      ));
+    }
+  };
+
+  const markConversationAsRead = async (conversationId: number) => {
+    try {
+      const { data } = await apiClient.patch(`/conversations/${conversationId}/read`);
+      const readMessageIds: number[] = data?.read_message_ids || [];
+
+      setChats(prev => prev.map(chat =>
+        chat.id === conversationId
+          ? { ...chat, unreadCount: 0, isUnread: false }
+          : chat
+      ));
+
+      if (readMessageIds.length > 0) {
+        setMessages(prev => prev.map(msg =>
+          readMessageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
+        ));
+      }
+    } catch (err) {
+      console.error('[Messages] Không thể đánh dấu đã đọc:', err);
+    }
+  };
 
   // ── 1. Fetch danh sách conversations ─────────────────────────
   useEffect(() => {
@@ -125,6 +168,8 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
             idNumber:    initialContact!.mssv,
             lastMessage: 'Cuộc trò chuyện mới',
             time:        '',
+            unreadCount: 0,
+            isUnread: false,
           };
           setChats(prev => [newChat, ...prev]);
         }
@@ -138,6 +183,13 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     openOrCreateConversation();
   }, [initialContact]);
 
+  useEffect(() => {
+    if (chats.length === 0) return;
+
+    const sock = getSocket();
+    chats.forEach(chat => sock.emit('join_conversation', chat.id));
+  }, [chats]);
+
   // ── 3. Fetch tin nhắn khi đổi conversation ───────────────────
   useEffect(() => {
     if (!activeChatId) return;
@@ -147,6 +199,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
         setLoadingMsgs(true);
         const { data } = await apiClient.get(`/conversations/${activeChatId}/messages`);
         setMessages(data ?? []);
+        await markConversationAsRead(activeChatId);
       } catch (err) {
         console.error('[Messages] Lỗi lấy messages:', err);
       } finally {
@@ -162,21 +215,52 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
 
     // Lắng nghe tin nhắn mới
     const handleNewMessage = (msg: Message) => {
+      if (msg.conversation_id !== activeChatId) {
+        setChats(prev => prev.map(c => {
+          if (c.id !== msg.conversation_id) return c;
+
+          const unreadCount = msg.sender_role === 'STUDENT'
+            ? Number(c.unreadCount || 0) + 1
+            : Number(c.unreadCount || 0);
+
+          return {
+            ...c,
+            lastMessage: msg.content,
+            time: new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            unreadCount,
+            isUnread: unreadCount > 0,
+          };
+        }));
+        return;
+      }
+
       if (msg.conversation_id === activeChatId) {
-        setMessages(prev => [...prev, msg]);
+        setMessages(prev => {
+          if (prev.some(item => item.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
         // Cập nhật lastMessage trong chat list
         setChats(prev => prev.map(c =>
           c.id === activeChatId
             ? { ...c, lastMessage: msg.content, time: new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) }
             : c
         ));
+        if (msg.sender_role === 'STUDENT') {
+          markConversationAsRead(msg.conversation_id);
+        }
       }
     };
 
+    const handleMessagesRead = (event: MessagesReadEvent) => {
+      applyReadReceipt(event);
+    };
+
     sock.on('new_message', handleNewMessage);
+    sock.on('messages_read', handleMessagesRead);
 
     return () => {
       sock.off('new_message', handleNewMessage);
+      sock.off('messages_read', handleMessagesRead);
     };
   }, [activeChatId]);
 
@@ -263,7 +347,10 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
               <p className="text-sm font-medium">Chưa có cuộc trò chuyện nào</p>
             </div>
           ) : (
-            filteredChats.map(chat => (
+            filteredChats.map(chat => {
+              const unreadCount = Number(chat.unreadCount || 0);
+
+              return (
               <div
                 key={chat.id}
                 onClick={() => setActiveChatId(chat.id)}
@@ -281,13 +368,18 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
                     alt={chat.name}
                     className="w-11 h-11 rounded-full object-cover shadow-sm border border-slate-200"
                   />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-0.5">
                     <h3 className={cn(
                       'font-bold truncate text-sm',
-                      activeChatId === chat.id ? 'text-primary' : 'text-slate-900'
+                      unreadCount > 0 ? 'text-slate-950' : activeChatId === chat.id ? 'text-primary' : 'text-slate-900'
                     )}>
                       {chat.name}
                     </h3>
@@ -299,7 +391,8 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
                   <span className="text-[10px] font-mono tracking-wider text-slate-400">{chat.idNumber}</span>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

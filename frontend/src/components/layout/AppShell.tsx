@@ -4,6 +4,7 @@ import { Sidebar } from '../Sidebar';
 import { Toolbar } from '../Toolbar';
 import { useAuth } from '../../auth/AuthContext';
 import { preloadRoleRoutes } from '../../routes/preload';
+import { UITFaqWidget } from '../UITFaqWidget';
 
 const legacyViewRoutes: Record<string, string> = {
   adminDashboard: '/admin/dashboard',
@@ -38,12 +39,22 @@ export const AppShell = () => {
   }, [role]);
 
   const navigateLegacyView = (view: string) => {
+    const currentRole = String(currentUser?.role || '').toUpperCase();
+
     if (view === 'profile') {
-      navigate(routeForRole(String(currentUser?.role || '').toUpperCase()));
+      if (currentRole === 'STUDENT') {
+        navigate('/student/profile');
+      } else if (currentRole === 'ADVISOR') {
+        navigate('/advisor/profile');
+      } else if (currentRole === 'ADMIN') {
+        navigate('/admin/profile');
+      } else {
+        navigate('/');
+      }
       return;
     }
 
-    navigate(legacyViewRoutes[view] || routeForRole(String(currentUser?.role || '').toUpperCase()));
+    navigate(legacyViewRoutes[view] || routeForRole(currentRole));
   };
 
   const handleSearchSelect = (item: { type: string; id: number | null; code: string }) => {
@@ -77,6 +88,9 @@ export const AppShell = () => {
         <div className="flex-1 overflow-y-auto w-full pt-32 px-4 sm:px-8 lg:px-10 pb-12">
           <Outlet />
         </div>
+
+        {/* Widget Chat nổi đồng bộ dữ liệu với Trang Chat lớn */}
+        <UITFaqWidget />
       </main>
     </div>
   );

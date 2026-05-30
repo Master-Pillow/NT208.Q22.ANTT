@@ -1,4 +1,4 @@
-console.log("Running from:", import.meta.url);
+console.log("Running from:", import.meta.url); // restarted2
 
 import express from "express";
 import cors from "cors";
@@ -6,6 +6,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import multer from "multer";
 
 import { pool } from "./db.js";
 import { verifyToken } from "./middleware/auth.js";
@@ -16,6 +19,7 @@ import studentRouter from "./routes/studentRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
 import aiAnomalyRouter from "./routes/aiAnomalyRoutes.js";
 import aiQueryRouter from "./routes/aiQueryRoutes.js";
+import uitFaqRouter from "./routes/uitFaqRoutes.js";
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "uit_advisorhub_secret_2026";
@@ -60,8 +64,42 @@ const getConversationForUser = async (conversationId, user) => {
   return canAccess ? conversation : null;
 };
 
-app.use(cors());
+// CORS: cho phép mọi origin (local dev + production)
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Cho phép curl / Postman (không có origin) và các origin trong danh sách
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: origin ${origin} không được phép`));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static uploads
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "../uploads/"));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + "-" + file.originalname);
+  },
+});
+const upload = multer({ storage: storage });
 
 // ==========================================
 // SOCKET.IO
@@ -70,8 +108,9 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 app.set("io", io);
@@ -154,7 +193,10 @@ app.post("/auth/login", async (req, res) => {
         password_hash,
         full_name,
         role,
-        student_id
+        student_id,
+        avatar_url,
+        cover_url,
+        bio
       FROM users
       WHERE email = $1
       `,
@@ -203,10 +245,83 @@ app.post("/auth/login", async (req, res) => {
         full_name: user.full_name,
         role: normalizedUserRole,
         student_id: user.student_id,
+        avatar_url: user.avatar_url,
+        cover_url: user.cover_url,
+        bio: user.bio,
       },
     });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+});
+
+// ==========================================
+// UPDATE PROFILE
+// ==========================================
+app.put("/auth/profile", verifyToken, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), async (req, res) => {
+  try {
+    const { bio } = req.body;
+    let avatarUrl = undefined;
+    let coverUrl = undefined;
+
+    if (req.files) {
+      if (req.files.avatar && req.files.avatar[0]) {
+        avatarUrl = "/uploads/" + req.files.avatar[0].filename;
+      }
+      if (req.files.cover && req.files.cover[0]) {
+        coverUrl = "/uploads/" + req.files.cover[0].filename;
+      }
+    }
+
+    // Dynamic update query
+    let updateFields = [];
+    let queryParams = [];
+    let paramIndex = 1;
+
+    if (bio !== undefined) {
+      updateFields.push(`bio = $${paramIndex++}`);
+      queryParams.push(bio);
+    }
+    if (avatarUrl !== undefined) {
+      updateFields.push(`avatar_url = $${paramIndex++}`);
+      queryParams.push(avatarUrl);
+    }
+    if (coverUrl !== undefined) {
+      updateFields.push(`cover_url = $${paramIndex++}`);
+      queryParams.push(coverUrl);
+    }
+
+    if (updateFields.length > 0) {
+      queryParams.push(req.user.id);
+      await pool.query(`UPDATE users SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`, queryParams);
+    }
+
+    const result = await pool.query(
+      "SELECT id, email, full_name, role, student_id, bio, avatar_url, cover_url FROM users WHERE id = $1",
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
+    }
+
+    const user = result.rows[0];
+    return res.json({
+      message: "Cập nhật hồ sơ thành công",
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        student_id: user.student_id,
+        avatar_url: user.avatar_url,
+        cover_url: user.cover_url,
+        bio: user.bio,
+      },
+    });
+  } catch (err) {
+    console.error("UPDATE PROFILE ERROR:", err);
     return res.status(500).json({ message: "Lỗi server" });
   }
 });
@@ -220,6 +335,11 @@ app.use("/student", verifyToken, studentRouter);
 app.use("/admin", verifyToken, adminRouter);
 app.use("/ai", verifyToken, aiQueryRouter);
 app.use("/ai", verifyToken, aiAnomalyRouter);
+
+// ==========================================
+// UIT FAQ — PUBLIC (không cần đăng nhập)
+// ==========================================
+app.use("/uit-faq", uitFaqRouter);
 
 // ==========================================
 // ADMIN - TẠO ADVISOR
@@ -739,8 +859,37 @@ app.post("/conversations", verifyToken, async (req, res) => {
 });
 
 // ==========================================
+// GRACEFUL SHUTDOWN (Giải quyết triệt để EADDRINUSE trên Windows)
+// ==========================================
+const closeServer = (signal) => {
+  console.log(`\n[Server] Nhận được tín hiệu ${signal}. Đang giải phóng port...`);
+  httpServer.close(() => {
+    console.log('[Server] Đã giải phóng port thành công.');
+    process.exit(0);
+  });
+};
+
+// Xử lý riêng cho nodemon restart
+process.once('SIGUSR2', () => {
+  httpServer.close(() => {
+    process.kill(process.pid, 'SIGUSR2');
+  });
+});
+
+process.on('SIGINT', () => closeServer('SIGINT')); // Ctrl+C
+process.on('SIGTERM', () => closeServer('SIGTERM'));
+
+// Bắt lỗi không xác định để tránh treo process
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught Exception:', err);
+  closeServer('uncaughtException');
+});
+
+// ==========================================
 // START SERVER
 // ==========================================
-httpServer.listen(4000, () => {
-  console.log("Backend & Socket.io running on http://localhost:4000");
+import { config } from './config.js';
+const PORT = config.port || Number(process.env.PORT) || 4000;
+httpServer.listen(PORT, () => {
+  console.log(`Backend & Socket.io running on port ${PORT}`);
 });

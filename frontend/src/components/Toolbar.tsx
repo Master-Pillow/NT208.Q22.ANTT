@@ -30,6 +30,8 @@ interface CurrentUser {
   full_name?: string;
   role?: string;
   student_id?: number | null;
+  avatar_url?: string;
+  bio?: string;
 }
 
 interface AppointmentRequest {
@@ -445,7 +447,7 @@ export const Toolbar = ({
           </div>
 
           <img
-            src={`https://api.dicebear.com/7.x/initials/svg?seed=${avatarSeed}`}
+            src={currentUser?.avatar_url ? `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${currentUser.avatar_url}` : `https://api.dicebear.com/7.x/initials/svg?seed=${avatarSeed}`}
             alt={displayName}
             onClick={() => setShowSettings(!showSettings)}
             className="w-10 h-10 rounded-full object-cover ring-2 ring-primary-fixed shrink-0 cursor-pointer"
@@ -472,15 +474,7 @@ export const Toolbar = ({
                   Xem hồ sơ
                 </button>
 
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer">
-                  <UserCog className="w-4 h-4 ml-1" />
-                  Edit Account Info
-                </button>
-
-                <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer">
-                  <Shield className="w-4 h-4 ml-1" />
-                  Quyền riêng tư & bảo mật
-                </button>
+                
               </div>
 
               <div className="p-2 border-t border-slate-100 bg-slate-50/50">

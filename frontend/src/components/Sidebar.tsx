@@ -33,6 +33,7 @@ const adminItems: NavItem[] = [
   { to: '/admin/advisors', label: 'Cố vấn', icon: Users },
   { to: '/admin/courses', label: 'Môn học', icon: FileText },
   { to: '/admin/ai', label: 'AI học vụ', icon: Sparkles, match: '/admin/ai' },
+  { to: '/admin/faq', label: 'AI Chatbox UIT', icon: Sparkles },
 ];
 
 const advisorItems: NavItem[] = [
@@ -42,6 +43,7 @@ const advisorItems: NavItem[] = [
   { to: '/advisor/messages', label: 'Tin nhắn', icon: MessageSquare },
   { to: '/advisor/ai/anomaly', label: 'AI: Cảnh báo', icon: AlertTriangle },
   { to: '/advisor/ai/brief', label: 'AI: Brief lớp mình', icon: Sparkles },
+  { to: '/advisor/faq', label: 'AI Chatbox UIT', icon: Sparkles },
 ];
 
 const studentItems: NavItem[] = [
@@ -50,6 +52,7 @@ const studentItems: NavItem[] = [
   { to: '/student/appointments', label: 'Lịch hẹn', icon: Calendar },
   { to: '/student/messages', label: 'Tin nhắn', icon: MessageSquare },
   { to: '/student/notifications', label: 'Thông báo', icon: Bell },
+  { to: '/student/faq', label: 'AI Chatbox UIT', icon: Sparkles },
 ];
 
 export const Sidebar: React.FC = () => {

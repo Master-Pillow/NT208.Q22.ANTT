@@ -6,6 +6,9 @@ export interface CurrentUser {
   full_name?: string;
   role?: 'ADMIN' | 'ADVISOR' | 'STUDENT' | string;
   student_id?: number | null;
+  avatar_url?: string;
+  cover_url?: string;
+  bio?: string;
 }
 
 interface AuthContextValue {

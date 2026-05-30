@@ -1,0 +1,28 @@
+services:
+  # ============================================================
+  # BACKEND — Node.js Express API
+  # ============================================================
+  - type: web
+    name: advisorhub-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false           # Nhập tay trong Render Dashboard
+      - key: JWT_SECRET
+        sync: false           # Nhập tay trong Render Dashboard
+      - key: GEMINI_API_KEY
+        sync: false           # Nhập tay trong Render Dashboard
+      - key: ALLOWED_ORIGINS
+        sync: false           # Nhập URL Vercel của frontend
+
+# ============================================================
+# Hướng dẫn thêm biến môi trường:
+#   Vào Render Dashboard → Service → Environment → Add Env Var
+#   Nhập từng biến theo file backend/.env.example
+# ============================================================

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { TrendingDown, AlertCircle } from 'lucide-react';
+import { TrendingDown, AlertCircle, MessageSquare, FileText } from 'lucide-react';
 import { PieChart, Pie, Cell } from 'recharts';
-import { AISupportWidget } from '../components/AISupportWidget';
+
 import apiClient from '../lib/api';
 
 // ─────────────────────────────────────────────────────────────────
@@ -38,318 +38,343 @@ interface RiskStudent {
   current_gpa: number;
   credit_debt: number;
 }
+// Thêm interface DashboardProps và gán vào Dashboard
+interface DashboardProps {
+  onNavigate?: (view: string) => void;
+  onMessageStudent?: (student: any) => void;
+  onNoteStudent?: (studentId: string) => void;
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────
-export const Dashboard = () => {
-  const [riskStudents,      setRiskStudents]      = useState<RiskStudent[]>([]);
-  const [isLoadingStudents, setIsLoadingStudents] = useState(true);
-  const [studentsError,     setStudentsError]     = useState('');
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onMessageStudent, onNoteStudent }) => {
+  const [riskStudents, setRiskStudents] = useState<RiskStudent[]>([]);
+    const [isLoadingStudents, setIsLoadingStudents] = useState(true);
+    const [studentsError, setStudentsError] = useState('');
 
-  const [stats,          setStats]          = useState<DashboardStats | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [statsError,     setStatsError]     = useState('');
+    const [stats, setStats] = useState<DashboardStats | null>(null);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
+    const [statsError, setStatsError] = useState('');
 
-  // ─────────────────────────────────────────────────────────────
-  // Fetch 1: At-risk students
-  // ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function fetchRiskStudents() {
-      try {
-        setIsLoadingStudents(true);
-        setStudentsError('');
+    // ─────────────────────────────────────────────────────────────
+    // Fetch 1: At-risk students
+    // ─────────────────────────────────────────────────────────────
+    useEffect(() => {
+      async function fetchRiskStudents() {
+        try {
+          setIsLoadingStudents(true);
+          setStudentsError('');
 
-        const { data } = await apiClient.get('/advisor/students');
+          const {data} = await apiClient.get('/advisor/students');
 
-        if (data && Array.isArray(data)) {
-          // Ép kiểu về number trước khi sort
-          const mapped = [...data].map((s: any) => ({
-            ...s,
-            current_gpa: Number(s.current_gpa),
-            credit_debt: Number(s.credit_debt),
-          }));
-          const sorted = mapped.sort((a: RiskStudent, b: RiskStudent) => {
-            if (b.credit_debt !== a.credit_debt) return b.credit_debt - a.credit_debt;
-            return a.current_gpa - b.current_gpa;
-          });
-          setRiskStudents(sorted.slice(0, 3));
+          if (data && Array.isArray(data)) {
+            // Ép kiểu về number trước khi sort
+            const mapped = [...data].map((s: any) => ({
+              ...s,
+              current_gpa: Number(s.current_gpa),
+              credit_debt: Number(s.credit_debt),
+            }));
+            const sorted = mapped.sort((a: RiskStudent, b: RiskStudent) => {
+              if (b.credit_debt !== a.credit_debt) return b.credit_debt - a.credit_debt;
+              return a.current_gpa - b.current_gpa;
+            });
+            setRiskStudents(sorted.slice(0, 3));
+          }
+        } catch (err) {
+          console.error('[Dashboard] Error fetching risk students:', err);
+          setStudentsError('Không thể tải danh sách sinh viên rủi ro.');
+        } finally {
+          setIsLoadingStudents(false);
         }
-      } catch (err) {
-        console.error('[Dashboard] Error fetching risk students:', err);
-        setStudentsError('Không thể tải danh sách sinh viên rủi ro.');
-      } finally {
-        setIsLoadingStudents(false);
       }
-    }
 
-    fetchRiskStudents();
-  }, []);
+      fetchRiskStudents();
+    }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // Fetch 2: Aggregated stats
-  // ─────────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function fetchDashboardStats() {
-      try {
-        setIsLoadingStats(true);
-        setStatsError('');
+    // ─────────────────────────────────────────────────────────────
+    // Fetch 2: Aggregated stats
+    // ─────────────────────────────────────────────────────────────
+    useEffect(() => {
+      async function fetchDashboardStats() {
+        try {
+          setIsLoadingStats(true);
+          setStatsError('');
 
-        const { data } = await apiClient.get('/advisor/dashboard/stats');
-        setStats(data);
-      } catch (err) {
-        console.error('[Dashboard] Error fetching stats:', err);
-        setStatsError('Không thể tải thống kê dashboard.');
-      } finally {
-        setIsLoadingStats(false);
+          const {data} = await apiClient.get('/advisor/dashboard/stats');
+          setStats(data);
+        } catch (err) {
+          console.error('[Dashboard] Error fetching stats:', err);
+          setStatsError('Không thể tải thống kê dashboard.');
+        } finally {
+          setIsLoadingStats(false);
+        }
       }
-    }
 
-    fetchDashboardStats();
-  }, []);
+      fetchDashboardStats();
+    }, []);
 
-  // ─────────────────────────────────────────────────────────────
-  // Render helpers
-  // ─────────────────────────────────────────────────────────────
-  const getGpaDropDisplay = (gpa: number) => {
-    const drop = (4.0 - Number(gpa)).toFixed(2);
-    return `-${drop}`;
-  };
-
-  const isErrorRow = (i: number) => i % 2 === 0;
-
-  const translatePerformanceName = (name: string) => {
-    const map: Record<string, string> = {
-      Excellent: 'Xuất sắc',
-      Good: 'Tốt',
-      Average: 'Trung bình',
-      Poor: 'Yếu',
+    // ─────────────────────────────────────────────────────────────
+    // Render helpers
+    // ─────────────────────────────────────────────────────────────
+    const getGpaDropDisplay = (gpa: number) => {
+      const drop = (4.0 - Number(gpa)).toFixed(2);
+      return `-${drop}`;
     };
-    return map[name] || name;
-  };
 
-  return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12 max-w-6xl mx-auto xl:mx-0">
-      <div className="mb-10">
-        <h2 className="text-4xl font-headline font-black text-on-surface tracking-tight mb-2">
-          Tổng quan học tập
-        </h2>
-        <p className="text-on-surface-variant font-medium">
-          Theo dõi tình hình học tập, cảnh báo rủi ro và hỗ trợ sinh viên tại Trường Đại học Công nghệ Thông tin.
-        </p>
-      </div>
+    const isErrorRow = (i: number) => i % 2 === 0;
 
-      <div className="grid grid-cols-12 gap-8">
+    const translatePerformanceName = (name: string) => {
+      const map: Record<string, string> = {
+        Excellent: 'Xuất sắc',
+        Good: 'Tốt',
+        Average: 'Trung bình',
+        Poor: 'Yếu',
+      };
+      return map[name] || name;
+    };
 
-        {/* RED FLAGS TABLE */}
-        <section className="col-span-12 lg:col-span-7 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h3 className="text-xl font-headline font-bold text-blue-900">Cảnh báo học vụ</h3>
-              <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">Theo dõi sinh viên có nguy cơ</p>
-            </div>
-            <button className="text-primary text-xs font-bold uppercase tracking-widest hover:opacity-70 transition-opacity cursor-pointer">
-              Xem tất cả
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-widest text-slate-400 border-b border-surface-container/50">
-                  <th className="pb-4 font-semibold">Họ tên sinh viên</th>
-                  <th className="pb-4 font-semibold">MSSV</th>
-                  <th className="pb-4 font-semibold">GPA</th>
-                  <th className="pb-4 font-semibold text-center">Nợ tín chỉ</th>
-                  <th className="pb-4 font-semibold text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                {isLoadingStudents ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">
-                      Đang đồng bộ dữ liệu từ Server...
-                    </td>
-                  </tr>
-                ) : studentsError ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center">
-                      <span className="inline-flex items-center gap-2 text-red-500 text-xs font-semibold">
-                        <AlertCircle className="w-4 h-4" />
-                        {studentsError}
-                      </span>
-                    </td>
-                  </tr>
-                ) : riskStudents.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">
-                      Không có sinh viên rủi ro nào.
-                    </td>
-                  </tr>
-                ) : (
-                  riskStudents.map((s, i) => {
-                    const nameParts = (s.full_name || 'Chưa có tên').split(' ');
-                    const initials = nameParts.length > 1
-                      ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
-                      : nameParts[0][0];
-                    const isErr = isErrorRow(i);
-
-                    return (
-                      <tr
-                        key={s.id}
-                        className="group hover:bg-surface-container-low/50 transition-colors cursor-pointer"
-                      >
-                        <td className="py-4 font-semibold text-on-surface flex items-center gap-3">
-                          <div
-                            className={`w-8 h-8 rounded-full ${isErr ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'} flex items-center justify-center font-bold text-xs shadow-sm uppercase`}
-                          >
-                            {initials}
-                          </div>
-                          {s.full_name}
-                        </td>
-                        <td className="py-4 text-slate-500 font-mono text-xs">{s.mssv}</td>
-                        <td className="py-4">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 ${isErr ? 'bg-error-container/50 text-error' : 'bg-orange-100/50 text-orange-700'} rounded-full text-[10px] font-bold`}
-                          >
-                            {getGpaDropDisplay(s.current_gpa)}
-                            <TrendingDown className="w-3 h-3 ml-1" />
-                          </span>
-                        </td>
-                        <td
-                          className={`py-4 text-right font-mono ${isErr ? 'text-error' : 'text-orange-600'} font-bold`}
-                        >
-                          {s.credit_debt > 0 ? `${s.credit_debt} TC` : '—'}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* PIE CHART */}
-        <section className="col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 flex flex-col">
-          <div className="mb-6">
-            <h3 className="text-xl font-headline font-bold text-blue-900">Phân bố học lực</h3>
-            <p className="text-[10px] font-bold text-primary uppercase tracking-[0.1em] mt-1">
-              Học kỳ: Thu 2026 - UIT
+    return (
+        <div className="space-y-8 animate-in fade-in duration-500 pb-12 max-w-6xl mx-auto xl:mx-0">
+          <div className="mb-10">
+            <h2 className="text-4xl font-headline font-black text-on-surface tracking-tight mb-2">
+              Tổng quan học tập
+            </h2>
+            <p className="text-on-surface-variant font-medium">
+              Theo dõi tình hình học tập, cảnh báo rủi ro và hỗ trợ sinh viên tại Trường Đại học Công nghệ Thông tin.
             </p>
           </div>
 
-          <div className="flex flex-col items-center justify-center flex-1">
-            {isLoadingStats ? (
-              <div className="flex items-center gap-3 text-slate-400 py-12">
-                <span className="w-5 h-5 border-2 border-slate-200 border-t-primary rounded-full animate-spin" />
-                <span className="text-sm font-medium">Đang tải biểu đồ...</span>
+          <div className="grid grid-cols-12 gap-8">
+
+            {/* RED FLAGS TABLE */}
+            <section
+                className="col-span-12 lg:col-span-7 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
+              <div className="flex justify-between items-center mb-8">
+                <div>
+                  <h3 className="text-xl font-headline font-bold text-blue-900">Cảnh báo học vụ</h3>
+                  <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">Theo dõi sinh viên có nguy cơ</p>
+                </div>
+                <button
+                    className="text-primary text-xs font-bold uppercase tracking-widest hover:opacity-70 transition-opacity cursor-pointer">
+                  Xem tất cả
+                </button>
               </div>
-            ) : statsError ? (
-              <div className="flex items-center gap-2 text-red-400 text-xs font-semibold py-12">
-                <AlertCircle className="w-4 h-4" />
-                {statsError}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                  <tr className="text-[10px] uppercase tracking-widest text-slate-400 border-b border-surface-container/50">
+                    <th className="pb-4 font-semibold">Họ tên sinh viên</th>
+                    <th className="pb-4 font-semibold">MSSV</th>
+                    <th className="pb-4 font-semibold">GPA</th>
+                    <th className="pb-4 font-semibold text-center">Nợ tín chỉ</th>
+                    <th className="pb-4 font-semibold text-right">Thao tác</th>
+                  </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                  {isLoadingStudents ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">
+                          Đang đồng bộ dữ liệu từ Server...
+                        </td>
+                      </tr>
+                  ) : studentsError ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center">
+                      <span className="inline-flex items-center gap-2 text-red-500 text-xs font-semibold">
+                        <AlertCircle className="w-4 h-4"/>
+                        {studentsError}
+                      </span>
+                        </td>
+                      </tr>
+                  ) : riskStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">
+                          Không có sinh viên rủi ro nào.
+                        </td>
+                      </tr>
+                  ) : (
+                      riskStudents.map((s, i) => {
+                        const nameParts = (s.full_name || 'Chưa có tên').split(' ');
+                        const initials = nameParts.length > 1
+                            ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`
+                            : nameParts[0][0];
+                        const isErr = isErrorRow(i);
+
+                        return (
+                            <tr
+                                key={s.id}
+                                className="group hover:bg-surface-container-low/50 transition-colors cursor-pointer"
+                            >
+                              <td className="py-4 font-semibold text-on-surface flex items-center gap-3">
+                                <div
+                                    className={`w-8 h-8 rounded-full ${isErr ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'} flex items-center justify-center font-bold text-xs shadow-sm uppercase`}
+                                >
+                                  {initials}
+                                </div>
+                                {s.full_name}
+                              </td>
+                              <td className="py-4 text-slate-500 font-mono text-xs">{s.mssv}</td>
+                              <td className="py-4">
+                          <span
+                              className={`inline-flex items-center px-2 py-1 ${isErr ? 'bg-error-container/50 text-error' : 'bg-orange-100/50 text-orange-700'} rounded-full text-[10px] font-bold`}
+                          >
+                            {getGpaDropDisplay(s.current_gpa)}
+                            <TrendingDown className="w-3 h-3 ml-1"/>
+                          </span>
+                              </td>
+                              <td
+                                  className={`py-4 text-center font-mono ${isErr ? 'text-error' : 'text-orange-600'} font-bold`}
+                              >
+                                {s.credit_debt > 0 ? `${s.credit_debt} TC` : '—'}
+                              </td>
+                              <td className="py-4 text-right pr-4">
+                                <div className="flex justify-end gap-2 transition-opacity">
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); onMessageStudent?.({ id: s.id, name: s.full_name, mssv: s.mssv }); }}
+                                      className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                      title="Nhắn tin với sinh viên"
+                                  >
+                                    <MessageSquare className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                      onClick={(e) => { e.stopPropagation(); onNoteStudent?.(String(s.id)); }}
+                                      className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
+                                      title="Thêm ghi chú tư vấn"
+                                  >
+                                    <FileText className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                        );
+                      })
+                  )}
+                  </tbody>
+                </table>
               </div>
-            ) : stats ? (
-              <>
-                <div className="relative w-48 h-48 mb-8">
-                  <PieChart width={192} height={192}>
-                    <Pie
-                      data={stats.performanceDistribution}
-                      innerRadius={70}
-                      outerRadius={90}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {stats.performanceDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            </section>
+
+            {/* PIE CHART */}
+            <section
+                className="col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100 flex flex-col">
+              <div className="mb-6">
+                <h3 className="text-xl font-headline font-bold text-blue-900">Phân bố học lực</h3>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-[0.1em] mt-1">
+                  Học kỳ: Thu 2026 - UIT
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center justify-center flex-1">
+                {isLoadingStats ? (
+                    <div className="flex items-center gap-3 text-slate-400 py-12">
+                      <span className="w-5 h-5 border-2 border-slate-200 border-t-primary rounded-full animate-spin"/>
+                      <span className="text-sm font-medium">Đang tải biểu đồ...</span>
+                    </div>
+                ) : statsError ? (
+                    <div className="flex items-center gap-2 text-red-400 text-xs font-semibold py-12">
+                      <AlertCircle className="w-4 h-4"/>
+                      {statsError}
+                    </div>
+                ) : stats ? (
+                    <>
+                      <div className="relative w-48 h-48 mb-8">
+                        <PieChart width={192} height={192}>
+                          <Pie
+                              data={stats.performanceDistribution}
+                              innerRadius={70}
+                              outerRadius={90}
+                              paddingAngle={3}
+                              dataKey="value"
+                              stroke="none"
+                          >
+                            {stats.performanceDistribution.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color}/>
+                            ))}
+                          </Pie>
+                        </PieChart>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-4xl font-black text-blue-900 font-serif">
                       {Number(stats.avgGpa).toFixed(2)}
                     </span>
-                    <span className="text-[9px] uppercase tracking-widest font-bold text-slate-400 mt-1">
+                          <span className="text-[9px] uppercase tracking-widest font-bold text-slate-400 mt-1">
                       GPA TB
                     </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4 w-full px-4">
-                  {stats.performanceDistribution.map((item, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <span
-                        className="w-2 h-2 rounded-full shadow-sm"
-                        style={{ backgroundColor: item.color }}
-                      />
-                      <div>
-                        <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">
-                          {translatePerformanceName(item.name)}
-                        </p>
-                        <p className="text-sm font-bold text-on-surface">{item.value}%</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : null}
-          </div>
-        </section>
 
-        {/* KILLER SUBJECTS */}
-        <section className="col-span-12 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
-          <div className="mb-10">
-            <h3 className="text-xl font-headline font-bold text-blue-900">Môn học có tỉ lệ rớt cao</h3>
-            <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">
-              Phân tích các môn có tỉ lệ rớt cao trong học kỳ hiện tại
-            </p>
-          </div>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-4 w-full px-4">
+                        {stats.performanceDistribution.map((item, i) => (
+                            <div key={i} className="flex items-center gap-3">
+                      <span
+                          className="w-2 h-2 rounded-full shadow-sm"
+                          style={{backgroundColor: item.color}}
+                      />
+                              <div>
+                                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">
+                                  {translatePerformanceName(item.name)}
+                                </p>
+                                <p className="text-sm font-bold text-on-surface">{item.value}%</p>
+                              </div>
+                            </div>
+                        ))}
+                      </div>
+                    </>
+                ) : null}
+              </div>
+            </section>
 
-          {isLoadingStats ? (
-            <div className="flex items-center gap-3 text-slate-400 py-4">
-              <span className="w-5 h-5 border-2 border-slate-200 border-t-primary rounded-full animate-spin" />
-              <span className="text-sm font-medium">Đang phân tích dữ liệu...</span>
-            </div>
-          ) : statsError ? (
-            <div className="flex items-center gap-2 text-red-400 text-xs font-semibold py-4">
-              <AlertCircle className="w-4 h-4" />
-              {statsError}
-            </div>
-          ) : stats?.killerSubjects && stats.killerSubjects.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
-              {stats.killerSubjects.map((sub, i) => (
-                <div key={i} className="space-y-3 cursor-pointer group">
-                  <div className="flex justify-between items-end">
-                    <p className="text-sm font-bold text-on-surface leading-tight group-hover:text-primary transition-colors">
-                      {sub.name}
-                    </p>
-                    <span className={`text-xs font-mono font-bold ${sub.text}`}>
+            {/* KILLER SUBJECTS */}
+            <section
+                className="col-span-12 bg-surface-container-lowest rounded-xl p-8 shadow-[0_20px_40px_rgba(0,74,198,0.04)] border border-slate-100">
+              <div className="mb-10">
+                <h3 className="text-xl font-headline font-bold text-blue-900">Môn học có tỉ lệ rớt cao</h3>
+                <p className="text-xs text-slate-400 uppercase tracking-widest mt-1">
+                  Phân tích các môn có tỉ lệ rớt cao trong học kỳ hiện tại
+                </p>
+              </div>
+
+              {isLoadingStats ? (
+                  <div className="flex items-center gap-3 text-slate-400 py-4">
+                    <span className="w-5 h-5 border-2 border-slate-200 border-t-primary rounded-full animate-spin"/>
+                    <span className="text-sm font-medium">Đang phân tích dữ liệu...</span>
+                  </div>
+              ) : statsError ? (
+                  <div className="flex items-center gap-2 text-red-400 text-xs font-semibold py-4">
+                    <AlertCircle className="w-4 h-4"/>
+                    {statsError}
+                  </div>
+              ) : stats?.killerSubjects && stats.killerSubjects.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
+                    {stats.killerSubjects.map((sub, i) => (
+                        <div key={i} className="space-y-3 cursor-pointer group">
+                          <div className="flex justify-between items-end">
+                            <p className="text-sm font-bold text-on-surface leading-tight group-hover:text-primary transition-colors">
+                              {sub.name}
+                            </p>
+                            <span className={`text-xs font-mono font-bold ${sub.text}`}>
                       {sub.failRate}%
                     </span>
+                          </div>
+                          <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+                            <div
+                                className={`h-full ${sub.color} rounded-full transition-all duration-1000 ease-out`}
+                                style={{width: `${Math.min(sub.failRate, 100)}%`}}
+                            />
+                          </div>
+                          <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">
+                            Mã môn: {sub.code}
+                          </p>
+                        </div>
+                    ))}
                   </div>
-                  <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${sub.color} rounded-full transition-all duration-1000 ease-out`}
-                      style={{ width: `${Math.min(sub.failRate, 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">
-                    Mã môn: {sub.code}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-slate-400 text-sm">Chưa có dữ liệu môn học rủi ro.</p>
-          )}
-        </section>
+              ) : (
+                  <p className="text-slate-400 text-sm">Chưa có dữ liệu môn học rủi ro.</p>
+              )}
+            </section>
 
-      </div>
-
-      {/* AI Support Widget */}
-      <AISupportWidget />
-    </div>
-  );
-};
+          </div>
+        </div>
+    );
+  };

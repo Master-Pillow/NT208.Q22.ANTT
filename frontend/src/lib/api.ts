@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// Khi chạy local: VITE_API_URL chưa set → fallback localhost:4000
+// Khi deploy production: VITE_API_URL = URL backend thật (vd: https://advisorhub-api.onrender.com)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
 const apiClient = axios.create({
-  baseURL: 'http://localhost:4000',
+  baseURL: API_BASE_URL,
 });
 
 // Tự động gắn token vào header của mọi request
@@ -59,3 +63,14 @@ export const getAnomalyPatterns = () => apiClient.get('/ai/anomaly-patterns');
 
 export const generateAiBrief = (classCode: string) =>
   apiClient.post('/ai/briefs/generate', { classCode });
+
+// UIT FAQ — public endpoint (no auth needed)
+export const askUitFaq = (question: string, sessionId?: string) =>
+  fetch(`${API_BASE_URL}/uit-faq/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, sessionId }),
+  }).then((r) => r.json());
+
+export const getUitFaqSuggestions = () =>
+  fetch(`${API_BASE_URL}/uit-faq/suggestions`).then((r) => r.json());

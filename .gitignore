@@ -52,8 +52,13 @@ coverage/
 # Optional eslint cache
 .eslintcache
 
-# Local environment examples
-.env.*
+# Local environment examples — *.example có thể commit
+.env
+.env.local
+.env.development
+.env.production
+!.env.example
+!.env.*.example
 
 # PostgreSQL dumps
 *.sql.backup

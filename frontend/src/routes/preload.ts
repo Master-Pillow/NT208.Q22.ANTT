@@ -5,6 +5,8 @@ type PageImporter = () => Promise<PageModule>;
 
 export const pageImporters = {
   login: () => import('../views/LoginPage'),
+  accountProfile: () => import('../views/shared/AccountProfilePage'),
+  uitFaq: () => import('../views/shared/UITFaqPage'),
 
   adminDashboard: () => import('../views/admin/DashboardPage'),
   adminStudents: () => import('../views/admin/StudentsPage'),
@@ -44,6 +46,8 @@ const preloadImporters = (importers: PageImporter[]) =>
 const routePreloads: Record<string, PageImporter[]> = {
   '/login': [pageImporters.login],
 
+  '/admin/profile': [pageImporters.accountProfile],
+  '/admin/faq': [pageImporters.uitFaq],
   '/admin/dashboard': [pageImporters.adminDashboard],
   '/admin/students': [pageImporters.adminStudents],
   '/admin/classes': [pageImporters.adminClasses],
@@ -60,6 +64,8 @@ const routePreloads: Record<string, PageImporter[]> = {
   '/admin/ai/query': [pageImporters.adminAiQuery],
   '/admin/ai/patterns': [pageImporters.adminAiPatterns],
 
+  '/advisor/profile': [pageImporters.accountProfile],
+  '/advisor/faq': [pageImporters.uitFaq],
   '/advisor/dashboard': [pageImporters.advisorDashboard],
   '/advisor/students': [pageImporters.advisorStudents],
   '/advisor/appointments': [pageImporters.advisorAppointments],
@@ -67,6 +73,7 @@ const routePreloads: Record<string, PageImporter[]> = {
   '/advisor/ai/anomaly': [pageImporters.advisorAiAnomaly],
   '/advisor/ai/brief': [pageImporters.advisorAiBrief],
 
+  '/student/faq': [pageImporters.uitFaq],
   '/student/profile': [pageImporters.studentProfile],
   '/student/grades': [pageImporters.studentGrades],
   '/student/appointments': [pageImporters.studentAppointments],

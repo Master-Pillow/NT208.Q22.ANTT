@@ -24,12 +24,11 @@ try {
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-// Danh sách model thử theo thứ tự ưu tiên (nếu model đầu fail thì thử tiếp)
+// Danh sách model thử theo thứ tự ưu tiên (model đầu fail thì thử tiếp).
+// Chỉ giữ các model CÒN quota free (các model 2.0/1.5 cũ đã bị limit 0).
 const GEMINI_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
 ];
 
 // ─── Phân loại câu hỏi ───────────────────────────────────────────────────────

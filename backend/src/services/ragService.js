@@ -169,7 +169,9 @@ Quy tắc:
 
   const userPrompt = `${relevantChunks.length > 0 ? `TÀI LIỆU THAM KHẢO:\n${contextText}\n\n` : ''}${historyText ? `LỊCH SỬ HỘI THOẠI:\n${historyText}\n\n` : ''}CÂU HỎI: ${question}`;
 
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+  // gemini-2.0-flash đã hết quota free (limit 0). Dùng 2.5-flash + 2.5-flash-lite
+  // (đều còn quota free + hỗ trợ Google Search grounding) để có dự phòng thật sự.
+  const models = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
   for (const model of models) {
     try {
       const url = `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`;

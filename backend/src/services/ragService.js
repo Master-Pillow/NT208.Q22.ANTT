@@ -156,15 +156,15 @@ async function generateAnswerWithContext(question, relevantChunks, conversationH
     .map((c, i) => `[${i + 1}]${c.category ? ` (${c.category})` : ''} ${String(c.content).slice(0, 800)}`)
     .join('\n\n');
 
-  const systemPrompt = `Bạn là trợ lý AI học vụ của Trường Đại học Công nghệ Thông tin UIT.
-Nhiệm vụ: Trả lời câu hỏi của người dùng DỰA TRÊN tài liệu trích xuất bên dưới.
+  const systemPrompt = `Bạn là trợ lý AI học vụ của Trường Đại học Công nghệ Thông tin UIT (ĐHQG-HCM).
+Nhiệm vụ: Trả lời hữu ích, đúng trọng tâm câu hỏi của người dùng.
 Quy tắc:
-- Ngắn gọn, thân thiện, dùng emoji phù hợp.
-- Trình bày theo gạch đầu dòng nếu có nhiều ý.
+- Ngắn gọn, thân thiện, dùng emoji phù hợp; trình bày gạch đầu dòng nếu có nhiều ý.
 - "Công nghệ phần mềm" = "Kỹ thuật phần mềm" (cùng một ngành).
-- Nếu tài liệu đã có thông tin → trả lời trực tiếp, KHÔNG bảo người dùng tra thêm.
-- Chỉ khi KHÔNG CÓ BẤT KỲ thông tin nào trong tài liệu mới nói: "Để biết thêm chi tiết, bạn truy cập portal.uit.edu.vn hoặc liên hệ daotao@uit.edu.vn nhé."
-- KHÔNG bịa thêm thông tin ngoài tài liệu.
+- ƯU TIÊN dùng TÀI LIỆU THAM KHẢO bên dưới khi nó có thông tin → trả lời trực tiếp, KHÔNG bảo người dùng tra thêm.
+- NẾU TÀI LIỆU KHÔNG CÓ hoặc không đủ thông tin: hãy DÙNG CÔNG CỤ TÌM KIẾM GOOGLE để tra cứu thông tin mới nhất (ưu tiên nguồn chính thức như uit.edu.vn, tuyensinh.uit.edu.vn, portal.uit.edu.vn), rồi tổng hợp lại trả lời. Mở đầu bằng "ℹ️ Theo thông tin tra cứu:" và nếu có thể thì nêu nguồn.
+- KHÔNG bịa các con số chính xác (học phí, chỉ tiêu, mốc thời gian, điểm chuẩn) nếu không chắc — hãy tra cứu, hoặc nói rõ số liệu có thể thay đổi và cần kiểm chứng tại portal.uit.edu.vn / daotao@uit.edu.vn.
+- Chỉ từ chối khi câu hỏi hoàn toàn không liên quan đến học tập/UIT (tán gẫu, chính trị, đời tư...).
 - Trả lời hoàn chỉnh, KHÔNG bị cắt ngang.`;
 
   const userPrompt = `${relevantChunks.length > 0 ? `TÀI LIỆU THAM KHẢO:\n${contextText}\n\n` : ''}${historyText ? `LỊCH SỬ HỘI THOẠI:\n${historyText}\n\n` : ''}CÂU HỎI: ${question}`;
@@ -179,10 +179,11 @@ Quy tắc:
         body: JSON.stringify({
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          // Cho phép Gemini tự tra Google khi tài liệu không có thông tin (grounding).
+          tools: [{ google_search: {} }],
           generationConfig: {
             temperature: 0.15,
             maxOutputTokens: 4000,  // Tăng lên để không bị cắt
-            stopSequences: [],
           },
         }),
       });
@@ -199,7 +200,9 @@ Quy tắc:
 
       const data = await response.json();
       const finishReason = data?.candidates?.[0]?.finishReason;
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      // Gộp text từ MỌI part (câu trả lời có grounding có thể bị tách nhiều phần)
+      const text = (data?.candidates?.[0]?.content?.parts || [])
+        .map(p => p?.text).filter(Boolean).join('').trim();
 
       if (finishReason === 'MAX_TOKENS') {
         console.warn(`[ragService] ${model} bị cắt do MAX_TOKENS — thêm dấu "..." cho người dùng biết`);

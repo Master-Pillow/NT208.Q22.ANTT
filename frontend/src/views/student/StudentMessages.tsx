@@ -30,7 +30,7 @@ let socket: Socket | null = null;
 
 const getSocket = (): Socket => {
   if (!socket) {
-    socket = io('http://localhost:4000', { transports: ['websocket'] });
+    socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4000', { transports: ['websocket'] });
   }
 
   return socket;

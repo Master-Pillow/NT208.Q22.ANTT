@@ -351,8 +351,9 @@ async function askGeminiAboutUIT(question, conversationHistory = []) {
   });
 
   // Lấy Top 2 tài liệu có liên quan nhất (điểm > 0)
-  // Khôi phục mức giới hạn quét tài liệu lên 1.000.000 ký tự theo yêu cầu
-  const MAX_CHARS_PER_DOC = 1000000;
+  // Giới hạn ~4000 ký tự/tài liệu: đủ ngữ cảnh cho câu trả lời mà không làm
+  // prompt phình to vượt giới hạn token của Gemini Flash (tránh lỗi/chậm/tốn quota).
+  const MAX_CHARS_PER_DOC = 4000;
   const topDocs = scoredDocs.filter(d => d.score > 0).sort((a, b) => b.score - a.score).slice(0, 2);
   if (topDocs.length > 0) {
     extraContext = topDocs.map((d, i) => `[Tài liệu ${i + 1}] Tiêu đề: ${d.title}\nTrích xuất: ${d.content.slice(0, MAX_CHARS_PER_DOC)}${d.content.length > MAX_CHARS_PER_DOC ? '...(còn nữa)' : ''}`).join('\n\n');

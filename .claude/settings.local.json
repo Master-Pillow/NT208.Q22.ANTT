@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node scripts/test_key.js)",
+      "Bash(git check-ignore *)",
+      "Bash(git status *)"
+    ]
+  }
+}

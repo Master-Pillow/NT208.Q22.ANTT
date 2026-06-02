@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, X, Send, ChevronDown, Sparkles, BookOpen, DollarSign, Calendar, Phone, RotateCcw, Copy, CheckCheck, Wifi, WifiOff, Maximize2 } from 'lucide-react';
+import { GraduationCap, X, Send, Square, ChevronDown, Sparkles, BookOpen, DollarSign, Calendar, Phone, RotateCcw, Copy, CheckCheck, Wifi, WifiOff, Maximize2 } from 'lucide-react';
 import { useAIChat, Message } from '../contexts/AIChatContext';
 import { useAuth } from '../auth/AuthContext';
 
@@ -23,6 +23,9 @@ const SOURCE_LABELS: Record<string, string> = {
   gemini_ai: '✨ Trả lời bởi AI (Trọng tâm)',
   scraped_direct_summary: '⚡ Trích xuất tự động',
   scraped_direct: '📄 Trích xuất nguyên văn',
+  rag_vector: '✨ Trả lời bởi AI',
+  rag_cache: '⚡ Trả lời nhanh',
+  rule_based: '🤖 Hệ thống',
 };
 
 // ─── Markdown Renderer đơn giản ────────────────────────────────────────────────
@@ -33,8 +36,33 @@ function renderMarkdown(text: string): React.ReactNode {
   lines.forEach((line, i) => {
     if (!line.trim()) { elements.push(<br key={i} />); return; }
     const processInline = (str: string): React.ReactNode[] => {
-      const parts = str.split(/(\*\*[^*]+\*\*)/g);
-      return parts.map((part, j) => part.startsWith('**') && part.endsWith('**') ? <strong key={j} className="font-semibold text-slate-800">{part.slice(2, -2)}</strong> : <span key={j}>{part}</span>);
+      // Hỗ trợ: **đậm**, *nghiêng*, `code`, [chữ](url) và URL trần (https://...)
+      const nodes: React.ReactNode[] = [];
+      const regex = /(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)]+\))|(`[^`]+`)|(\*[^*\n]+\*)|(https?:\/\/[^\s)]+)/g;
+      let last = 0;
+      let key = 0;
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(str)) !== null) {
+        if (m.index > last) nodes.push(<span key={key++}>{str.slice(last, m.index)}</span>);
+        const tok = m[0];
+        if (tok.startsWith('**')) {
+          nodes.push(<strong key={key++} className="font-semibold text-slate-800">{tok.slice(2, -2)}</strong>);
+        } else if (tok.startsWith('`')) {
+          nodes.push(<code key={key++} className="px-1 py-0.5 rounded bg-slate-100 text-[12px] text-rose-600 font-mono">{tok.slice(1, -1)}</code>);
+        } else if (tok.startsWith('[')) {
+          const lm = tok.match(/\[([^\]]+)\]\(([^)]+)\)/);
+          nodes.push(lm
+            ? <a key={key++} href={lm[2]} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline underline-offset-2 hover:text-blue-700 break-all">{lm[1]}</a>
+            : <span key={key++}>{tok}</span>);
+        } else if (tok.startsWith('http')) {
+          nodes.push(<a key={key++} href={tok} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline underline-offset-2 hover:text-blue-700 break-all">{tok}</a>);
+        } else {
+          nodes.push(<em key={key++} className="italic text-slate-600">{tok.slice(1, -1)}</em>);
+        }
+        last = regex.lastIndex;
+      }
+      if (last < str.length) nodes.push(<span key={key++}>{str.slice(last)}</span>);
+      return nodes;
     };
     if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('🔹 ')) {
       const isBullet = line.startsWith('🔹 ') ? '🔹' : '•';
@@ -57,10 +85,44 @@ const TypingDots = () => (
   </div>
 );
 
+// ─── Hiệu ứng gõ chữ dần (typewriter) như ChatGPT ────────────────────────────
+// Hiển thị `text` tăng dần khi `enabled`. Tự điều chỉnh tốc độ để câu dài
+// không phải chờ lâu (~tối đa ~120 bước). Trả về { shown, done, skip }.
+function useTypewriter(text: string, enabled: boolean) {
+  const [count, setCount] = useState(enabled ? 0 : text.length);
+  const intervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!enabled) { setCount(text.length); return; }
+    setCount(0);
+    const step = Math.max(1, Math.ceil(text.length / 120));
+    let i = 0;
+    const id = window.setInterval(() => {
+      i = Math.min(text.length, i + step);
+      setCount(i);
+      if (i >= text.length) { window.clearInterval(id); intervalRef.current = null; }
+    }, 16);
+    intervalRef.current = id;
+    return () => window.clearInterval(id);
+  }, [text, enabled]);
+
+  const skip = () => {
+    if (intervalRef.current) { window.clearInterval(intervalRef.current); intervalRef.current = null; }
+    setCount(text.length);
+  };
+
+  return { shown: text.slice(0, count), done: count >= text.length, skip };
+}
+
 const MessageBubble = ({ msg }: { msg: Message }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => { navigator.clipboard.writeText(msg.content); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  
+
+  const { shown, done, skip } = useTypewriter(msg.content, !!msg.animate);
+  const endRef = useRef<HTMLDivElement>(null);
+  // Cuộn theo khi chữ đang chạy để luôn thấy dòng mới nhất
+  useEffect(() => { if (msg.animate && !done) endRef.current?.scrollIntoView({ block: 'end' }); }, [shown, msg.animate, done]);
+
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end gap-2 group">
@@ -83,9 +145,20 @@ const MessageBubble = ({ msg }: { msg: Message }) => {
           <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm"><TypingDots /></div>
         ) : (
           <>
-            <div className="bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm text-sm text-slate-700 leading-relaxed">{renderMarkdown(msg.content)}</div>
-            <div className="flex items-center gap-2 mt-1.5">
+            <div
+              onClick={msg.animate && !done ? skip : undefined}
+              title={msg.animate && !done ? 'Bấm để hiện toàn bộ' : undefined}
+              className={`bg-white border border-slate-100 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm text-sm text-slate-700 leading-relaxed ${msg.animate && !done ? 'cursor-pointer' : ''}`}
+            >
+              {renderMarkdown(shown)}
+              {msg.animate && !done && <span className="inline-block w-[2px] h-3.5 ml-0.5 align-middle bg-blue-400 animate-pulse rounded-full" />}
+            </div>
+            <div ref={endRef} />
+            <div className={`flex items-center gap-2 mt-1.5 transition-opacity ${msg.animate && !done ? 'opacity-0' : 'opacity-100'}`}>
               <span className="text-[10px] text-slate-400">{msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
+              {msg.source && SOURCE_LABELS[msg.source] && (
+                <span className="text-[10px] text-slate-400/90 bg-slate-100 px-1.5 py-0.5 rounded-full">{SOURCE_LABELS[msg.source]}</span>
+              )}
               <button onClick={handleCopy} className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto text-slate-400 hover:text-slate-600 p-0.5 rounded" title="Sao chép">{copied ? <CheckCheck size={12} className="text-emerald-500" /> : <Copy size={12} />}</button>
             </div>
           </>
@@ -101,7 +174,7 @@ export const UITFaqWidget: React.FC = () => {
   const navigate = useNavigate();
   const { role } = useAuth();
   
-  const { messages, input, isLoading, isOnline, unreadCount, setInput, sendMessage, handleReset, clearUnread } = useAIChat();
+  const { messages, input, isLoading, isOnline, unreadCount, setInput, sendMessage, stop, handleReset, clearUnread } = useAIChat();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -193,7 +266,15 @@ export const UITFaqWidget: React.FC = () => {
             <div className="px-4 py-3 bg-white border-t border-slate-100 shrink-0">
               <div className={`flex items-center gap-2 bg-[#f6f8fc] border rounded-2xl px-3 py-2 transition-all duration-200 ${input ? 'border-[#004ac6]/40 shadow-[0_0_0_3px_rgba(0,74,198,0.08)]' : 'border-slate-200'}`}>
                 <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }} placeholder="Nhập câu hỏi về UIT..." disabled={isLoading} className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none border-none resize-none" />
-                <button onClick={() => sendMessage(input)} disabled={!input.trim() || isLoading} className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 ${input.trim() && !isLoading ? 'bg-gradient-to-br from-[#004ac6] to-[#2563eb] text-white hover:shadow-md hover:shadow-blue-500/30 active:scale-95' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>{isLoading ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={14} />}</button>
+                {isLoading ? (
+                  <button onClick={stop} title="Dừng trả lời" className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 bg-rose-50 text-rose-500 hover:bg-rose-100 active:scale-95">
+                    <Square size={13} className="fill-rose-500" />
+                  </button>
+                ) : (
+                  <button onClick={() => sendMessage(input)} disabled={!input.trim()} className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-150 ${input.trim() ? 'bg-gradient-to-br from-[#004ac6] to-[#2563eb] text-white hover:shadow-md hover:shadow-blue-500/30 active:scale-95' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
+                    <Send size={14} />
+                  </button>
+                )}
               </div>
             </div>
           </>

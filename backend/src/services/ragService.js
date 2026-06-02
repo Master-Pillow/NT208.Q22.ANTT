@@ -150,9 +150,10 @@ async function generateAnswerWithContext(question, relevantChunks, conversationH
     .map(m => `${m.role === 'user' ? 'Người dùng' : 'Trợ lý'}: ${String(m.content).slice(0, 300)}`)
     .join('\n');
 
-  // Giới hạn mỗi chunk tối đa 800 ký tự để không làm prompt quá dài
+  // Giới hạn mỗi chunk tối đa 800 ký tự để không làm prompt quá dài.
+  // Kèm category (nếu có) để mô hình bám sát đúng chủ đề, tăng độ chính xác.
   const contextText = relevantChunks
-    .map((c, i) => `[${i + 1}] ${String(c.content).slice(0, 800)}`)
+    .map((c, i) => `[${i + 1}]${c.category ? ` (${c.category})` : ''} ${String(c.content).slice(0, 800)}`)
     .join('\n\n');
 
   const systemPrompt = `Bạn là trợ lý AI học vụ của Trường Đại học Công nghệ Thông tin UIT.
@@ -232,6 +233,12 @@ export async function ragChat(question, conversationHistory = []) {
   }));
 
   const result = { answer, sources, model, fromCache: false };
-  memoryCache.set(cacheKey, { data: result, timestamp: Date.now() });
+
+  // KHÔNG cache các câu trả lời lỗi/tạm thời (key sai, quá tải, fallback) —
+  // nếu cache, người dùng sẽ nhận lại câu lỗi suốt 12h dù lỗi đã được khắc phục.
+  const TRANSIENT_MODELS = new Set(['no_key', 'fallback']);
+  if (!TRANSIENT_MODELS.has(model)) {
+    memoryCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  }
   return result;
 }

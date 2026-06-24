@@ -1,6 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, GraduationCap, Mail, Network } from 'lucide-react';
+import { ArrowLeft, BookOpen, GraduationCap, Mail, Network, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Cell,
+} from 'recharts';
 import { PageLayout } from '../../components/layout/PageLayout';
 import apiClient from '../../lib/api';
 
@@ -21,16 +36,53 @@ interface SelectedList {
   students: Student[];
 }
 
+interface ClassMetrics {
+  total_students: number;
+  avg_gpa: number | null;
+  fail_rate: number;
+  at_risk_count: number;
+  grade_distribution: Record<string, number>;
+  gpa_by_semester: Array<{
+    semester: string;
+    avg_gpa: number | null;
+    avg_numeric: number | null;
+    fail_rate: number;
+  }>;
+  failrate_by_course: Array<{
+    code: string;
+    name: string;
+    total: number;
+    failed: number;
+    absent: number;
+    fail_rate: number;
+  }>;
+  gpa_histogram: Array<{ bucket: string; count: number }>;
+  top_improving: Array<{ full_name: string; mssv: string; gpa_delta: number }>;
+  top_declining: Array<{ full_name: string; mssv: string; gpa_delta: number }>;
+}
+
 const teachingClasses = [
   { code: 'IT001.N11', title: 'Cấu trúc dữ liệu', Icon: Network },
   { code: 'NT101.N22', title: 'Mạng máy tính', Icon: BookOpen },
 ];
+
+const gradeColors: Record<string, string> = {
+  A: '#2563eb',
+  B: '#059669',
+  C: '#f59e0b',
+  D: '#ea580c',
+  F: '#dc2626',
+  ABSENT: '#7c2d12',
+  IN_PROGRESS: '#64748b',
+};
 
 export default function StudentsPage() {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedList, setSelectedList] = useState<SelectedList | null>(null);
+  const [classMetrics, setClassMetrics] = useState<ClassMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
 
   useEffect(() => {
     async function fetchStudents() {
@@ -46,6 +98,28 @@ export default function StudentsPage() {
 
     fetchStudents();
   }, []);
+
+  useEffect(() => {
+    async function fetchClassMetrics() {
+      if (!selectedList || selectedList.type !== 'advising') {
+        setClassMetrics(null);
+        return;
+      }
+
+      try {
+        setMetricsLoading(true);
+        const { data } = await apiClient.get(`/advisor/classes/${selectedList.code}/metrics`);
+        setClassMetrics(data);
+      } catch (error) {
+        console.error('Lỗi lấy phân tích lớp:', error);
+        setClassMetrics(null);
+      } finally {
+        setMetricsLoading(false);
+      }
+    }
+
+    fetchClassMetrics();
+  }, [selectedList]);
 
   const advisingClasses = useMemo(() => {
     const classMap = new Map<string, { code: string; cohort: string; students: Student[] }>();
@@ -64,6 +138,13 @@ export default function StudentsPage() {
     return Array.from(classMap.values());
   }, [students]);
 
+  const gradeDistribution = useMemo(() => {
+    if (!classMetrics) return [];
+    return Object.entries(classMetrics.grade_distribution)
+      .filter(([, value]) => Number(value) > 0)
+      .map(([name, value]) => ({ name, value }));
+  }, [classMetrics]);
+
   const getTeachingStudents = (classIndex: number) =>
     students.filter((_, index) => index % teachingClasses.length === classIndex);
 
@@ -77,6 +158,137 @@ export default function StudentsPage() {
         },
       },
     });
+  };
+
+  const renderClassMetrics = () => {
+    if (selectedList?.type !== 'advising') return null;
+
+    if (metricsLoading) {
+      return <div className="rounded-2xl bg-white p-6 text-sm font-semibold text-slate-500">Đang tải phân tích lớp...</div>;
+    }
+
+    if (!classMetrics) return null;
+
+    return (
+      <section className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-bold uppercase text-slate-400">GPA TB lớp</p>
+            <p className="mt-2 text-3xl font-black text-blue-900">{classMetrics.avg_gpa?.toFixed(2) || '-'}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-bold uppercase text-slate-400">Tỷ lệ rớt/vắng</p>
+            <p className="mt-2 text-3xl font-black text-red-700">{classMetrics.fail_rate.toFixed(1)}%</p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-bold uppercase text-slate-400">Sinh viên rủi ro</p>
+            <p className="mt-2 text-3xl font-black text-orange-700">{classMetrics.at_risk_count}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <p className="text-xs font-bold uppercase text-slate-400">Sĩ số</p>
+            <p className="mt-2 text-3xl font-black text-blue-900">{classMetrics.total_students}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900">GPA trung bình theo kỳ</h3>
+            <div className="mt-5 h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={classMetrics.gpa_by_semester}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="semester" tick={{ fontSize: 12 }} />
+                  <YAxis domain={[0, 4]} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Line dataKey="avg_gpa" name="GPA TB" stroke="#2563eb" strokeWidth={3} connectNulls />
+                  <Line dataKey="fail_rate" name="Tỷ lệ rớt (%)" stroke="#dc2626" strokeWidth={3} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900">Phân bố điểm</h3>
+            <div className="mt-5 h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip />
+                  <Legend />
+                  <Pie data={gradeDistribution} dataKey="value" nameKey="name" outerRadius={96} label>
+                    {gradeDistribution.map((entry) => (
+                      <Cell key={entry.name} fill={gradeColors[entry.name] || '#64748b'} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900">Phân bố GPA sinh viên</h3>
+            <div className="mt-5 h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={classMetrics.gpa_histogram}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" name="Số sinh viên" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900">Môn có tỷ lệ rớt cao</h3>
+            <div className="mt-5 h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={classMetrics.failrate_by_course} layout="vertical" margin={{ left: 36 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis type="number" tick={{ fontSize: 12 }} />
+                  <YAxis type="category" dataKey="code" tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="fail_rate" name="Tỷ lệ rớt/vắng (%)" fill="#dc2626" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-6">
+            <h3 className="text-lg font-black text-emerald-900">Top sinh viên tiến bộ</h3>
+            <div className="mt-4 space-y-3">
+              {classMetrics.top_improving.length ? classMetrics.top_improving.map((student) => (
+                <div key={student.mssv} className="flex items-center justify-between rounded-xl bg-white px-4 py-3">
+                  <div>
+                    <p className="font-bold text-slate-900">{student.full_name}</p>
+                    <p className="text-xs font-semibold text-slate-400">{student.mssv}</p>
+                  </div>
+                  <span className="font-black text-emerald-700">+{Number(student.gpa_delta).toFixed(2)}</span>
+                </div>
+              )) : <p className="text-sm font-semibold text-emerald-700">Chưa có dữ liệu đủ để xếp hạng.</p>}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-red-100 bg-red-50 p-6">
+            <h3 className="text-lg font-black text-red-900">Top sinh viên tụt GPA</h3>
+            <div className="mt-4 space-y-3">
+              {classMetrics.top_declining.length ? classMetrics.top_declining.map((student) => (
+                <div key={student.mssv} className="flex items-center justify-between rounded-xl bg-white px-4 py-3">
+                  <div>
+                    <p className="font-bold text-slate-900">{student.full_name}</p>
+                    <p className="text-xs font-semibold text-slate-400">{student.mssv}</p>
+                  </div>
+                  <span className="font-black text-red-700">{Number(student.gpa_delta).toFixed(2)}</span>
+                </div>
+              )) : <p className="text-sm font-semibold text-red-700">Chưa phát hiện sinh viên tụt GPA.</p>}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   };
 
   const renderStudentTable = (rows: Student[]) => (
@@ -155,6 +367,7 @@ export default function StudentsPage() {
               </p>
             </div>
 
+            {renderClassMetrics()}
             {renderStudentTable(selectedList.students)}
           </>
         ) : (
@@ -235,6 +448,10 @@ export default function StudentsPage() {
                       <p className="text-sm font-semibold text-slate-400 mt-1">Khóa {item.cohort}</p>
                       <p className="mt-8 text-4xl font-black text-primary">{item.students.length}</p>
                       <p className="text-xs font-bold uppercase tracking-normal text-slate-400">Sinh viên cố vấn</p>
+                      <div className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-blue-700">
+                        <TrendingDown className="h-4 w-4" />
+                        Xem phân tích lớp
+                      </div>
                     </button>
                   ))}
                 </div>

@@ -1,7 +1,26 @@
 import express from 'express';
+import multer from 'multer';
 import { pool } from '../db.js';
+import { parseStudentGradePdf } from '../services/studentGradePdfService.js';
+import {
+  createStudentGradeImport,
+  ensureStudentGradeImportSchema,
+  getCurrentStudent,
+  importStudentGrades,
+} from '../services/studentGradeImportService.js';
+import { getStudentMetricsForUser } from '../services/studentMetricsService.js';
 
 const router = express.Router();
+const gradePdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/pdf') return cb(null, true);
+    return cb(new Error('Chỉ hỗ trợ file PDF bảng điểm.'));
+  },
+});
 
 function normalizeRole(role) {
   return String(role || '').trim().toUpperCase();
@@ -89,6 +108,8 @@ router.get('/me', requireStudent, async (req, res) => {
 // GET /student/academic
 router.get('/academic', requireStudent, async (req, res) => {
   try {
+    await ensureStudentGradeImportSchema();
+
     const summaryResult = await pool.query(
       `
       SELECT
@@ -121,7 +142,9 @@ router.get('/academic', requireStudent, async (req, res) => {
         c.credits,
         e.semester,
         g.letter_grade,
-        g.gpa_points
+        g.numeric_grade,
+        g.gpa_points,
+        COALESCE(g.status, 'GRADED') AS status
       FROM users u
       JOIN students s ON s.id = u.student_id
       JOIN enrollments e ON e.student_id = s.id
@@ -141,6 +164,72 @@ router.get('/academic', requireStudent, async (req, res) => {
     console.error('[student/academic]', err);
     res.status(500).json({
       message: 'Lỗi server',
+      detail: err.message,
+    });
+  }
+});
+
+// GET /student/metrics
+router.get('/metrics', requireStudent, async (req, res) => {
+  try {
+    const metrics = await getStudentMetricsForUser(req.user.id);
+    return res.json(metrics);
+  } catch (err) {
+    console.error('[student/metrics]', err);
+    return res.status(500).json({
+      message: 'Không thể tính xu hướng điểm học tập.',
+      detail: err.message,
+    });
+  }
+});
+
+// POST /student/grade-imports/preview
+router.post('/grade-imports/preview', requireStudent, gradePdfUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Vui lòng chọn file PDF bảng điểm.' });
+    }
+
+    const student = await getCurrentStudent(req.user);
+    if (!student) {
+      return res.status(403).json({ message: 'Chỉ sinh viên mới được đồng bộ bảng điểm.' });
+    }
+
+    const payload = await parseStudentGradePdf(req.file.buffer);
+    const created = await createStudentGradeImport({ student, payload });
+
+    return res.status(created.mismatch ? 422 : 201).json({
+      import_id: created.import.id,
+      status: created.import.status,
+      error_message: created.error_message,
+      student: payload.student,
+      summary: payload.summary,
+      semester_summaries: payload.semester_summaries,
+      courses: payload.courses,
+      page_count: payload.page_count,
+    });
+  } catch (err) {
+    console.error('[student/grade-imports/preview]', err);
+    return res.status(500).json({
+      message: 'Không thể đọc file PDF bảng điểm.',
+      detail: err.message,
+    });
+  }
+});
+
+// POST /student/grade-imports/:id/confirm
+router.post('/grade-imports/:id/confirm', requireStudent, async (req, res) => {
+  try {
+    const result = await importStudentGrades({
+      importId: req.params.id,
+      user: req.user,
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error('[student/grade-imports/confirm]', err);
+    return res.status(500).json({
+      message: 'Không thể import bảng điểm.',
       detail: err.message,
     });
   }

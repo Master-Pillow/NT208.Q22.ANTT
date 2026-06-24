@@ -1,12 +1,13 @@
-// routes/advisorRoutes.js
+﻿// routes/advisorRoutes.js
 import { Router } from 'express';
-import { pool } from '../db.js';   // ← relative path lên thư mục cha
+import { advisorCanAccessClass, getClassMetrics } from '../services/classMetricsService.js';
+import { pool } from '../db.js';   // â† relative path lÃªn thÆ° má»¥c cha
 
 const router = Router();
 
 // GET /advisor/students?advisorId=<id>
 router.get('/students', async (req, res) => {
-  const advisorId = req.user.id; // ✅ Chỉ lấy ID từ token
+  const advisorId = req.user.id; // âœ… Chá»‰ láº¥y ID tá»« token
 
   try {
     const query = `
@@ -56,7 +57,7 @@ router.get('/students', async (req, res) => {
     return res.json(result.rows);
   } catch (err) {
     console.error('GET /advisor/students ERROR:', err.message);
-    return res.status(500).json({ message: 'Lỗi server khi lấy danh sách sinh viên.' });
+    return res.status(500).json({ message: 'Lá»—i server khi láº¥y danh sÃ¡ch sinh viÃªn.' });
   }
 });
 
@@ -151,18 +152,34 @@ router.get('/dashboard/stats', async (req, res) => {
     });
   } catch (err) {
     console.error('GET /advisor/dashboard/stats ERROR:', err.message);
-    return res.status(500).json({ message: 'Lỗi server khi lấy thống kê.' });
+    return res.status(500).json({ message: 'Lá»—i server khi láº¥y thá»‘ng kÃª.' });
+  }
+});
+
+// GET /advisor/classes/:code/metrics - phân tích lớp cố vấn được phân công
+router.get('/classes/:code/metrics', async (req, res) => {
+  try {
+    const canAccess = await advisorCanAccessClass(req.user.id, req.params.code);
+    if (!canAccess) {
+      return res.status(403).json({ message: 'Bạn không có quyền xem phân tích của lớp này.' });
+    }
+
+    const metrics = await getClassMetrics(req.params.code);
+    return res.json(metrics);
+  } catch (err) {
+    console.error('GET /advisor/classes/:code/metrics ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tính phân tích lớp.' });
   }
 });
 
 export default router;
 // ===============================================================
-// LOG NOTES - Ghi chú tư vấn CRUD
+// LOG NOTES - Ghi chÃº tÆ° váº¥n CRUD
 // ===============================================================
 
 const requireAdvisor = (req, res, next) => {
   if (req.user?.role !== 'ADVISOR') {
-    return res.status(403).json({ message: 'Chỉ advisor mới được truy cập.' });
+    return res.status(403).json({ message: 'Chá»‰ advisor má»›i Ä‘Æ°á»£c truy cáº­p.' });
   }
   next();
 };
@@ -245,7 +262,7 @@ router.get('/log-notes', requireAdvisor, async (req, res) => {
     return res.json(result.rows);
   } catch (err) {
     console.error('GET /advisor/log-notes ERROR:', err.message);
-    return res.status(500).json({ message: 'Lỗi server khi lấy ghi chú tư vấn.' });
+    return res.status(500).json({ message: 'Lá»—i server khi láº¥y ghi chÃº tÆ° váº¥n.' });
   }
 });
 
@@ -255,11 +272,11 @@ router.post('/log-notes', requireAdvisor, async (req, res) => {
   const { student_id, reason, action_plan, note } = req.body;
 
   if (!student_id) {
-    return res.status(400).json({ message: 'Thiếu student_id.' });
+    return res.status(400).json({ message: 'Thiáº¿u student_id.' });
   }
 
   if (!reason?.trim() && !action_plan?.trim() && !note?.trim()) {
-    return res.status(400).json({ message: 'Cần nhập ít nhất 1 nội dung ghi chú.' });
+    return res.status(400).json({ message: 'Cáº§n nháº­p Ã­t nháº¥t 1 ná»™i dung ghi chÃº.' });
   }
 
   try {
@@ -267,7 +284,7 @@ router.post('/log-notes', requireAdvisor, async (req, res) => {
 
     if (!inScope) {
       return res.status(403).json({
-        message: 'Bạn không có quyền ghi chú cho sinh viên này.',
+        message: 'Báº¡n khÃ´ng cÃ³ quyá»n ghi chÃº cho sinh viÃªn nÃ y.',
       });
     }
 
@@ -295,7 +312,7 @@ router.post('/log-notes', requireAdvisor, async (req, res) => {
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('POST /advisor/log-notes ERROR:', err.message);
-    return res.status(500).json({ message: 'Lỗi server khi tạo ghi chú tư vấn.' });
+    return res.status(500).json({ message: 'Lá»—i server khi táº¡o ghi chÃº tÆ° váº¥n.' });
   }
 });
 
@@ -311,7 +328,7 @@ router.patch('/log-notes/:id', requireAdvisor, async (req, res) => {
 
       if (!inScope) {
         return res.status(403).json({
-          message: 'Bạn không có quyền chuyển ghi chú sang sinh viên này.',
+          message: 'Báº¡n khÃ´ng cÃ³ quyá»n chuyá»ƒn ghi chÃº sang sinh viÃªn nÃ y.',
         });
       }
     }
@@ -347,13 +364,13 @@ router.patch('/log-notes/:id', requireAdvisor, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy ghi chú tư vấn.' });
+      return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº tÆ° váº¥n.' });
     }
 
     return res.json(result.rows[0]);
   } catch (err) {
     console.error('PATCH /advisor/log-notes/:id ERROR:', err.message);
-    return res.status(500).json({ message: 'Lỗi server khi cập nhật ghi chú tư vấn.' });
+    return res.status(500).json({ message: 'Lá»—i server khi cáº­p nháº­t ghi chÃº tÆ° váº¥n.' });
   }
 });
 
@@ -382,13 +399,14 @@ router.delete('/log-notes/:id', requireAdvisor, async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Không tìm thấy ghi chú tư vấn.' });
+      return res.status(404).json({ message: 'KhÃ´ng tÃ¬m tháº¥y ghi chÃº tÆ° váº¥n.' });
     }
 
-    return res.json({ message: 'Đã xóa ghi chú tư vấn.' });
+    return res.json({ message: 'ÄÃ£ xÃ³a ghi chÃº tÆ° váº¥n.' });
   } catch (err) {
     console.error('DELETE /advisor/log-notes/:id ERROR:', err.message);
-    return res.status(500).json({ message: 'Lỗi server khi xóa ghi chú tư vấn.' });
+    return res.status(500).json({ message: 'Lá»—i server khi xÃ³a ghi chÃº tÆ° váº¥n.' });
   }
 });
+
 

@@ -1,10 +1,18 @@
 ﻿// routes/adminRoutes.js
 import { Router } from 'express';
+import multer from 'multer';
+import { importStudentAccountsForAdmin } from '../services/adminStudentImportService.js';
 import { pool } from '../db.js';
 import { getClassMetrics } from '../services/classMetricsService.js';
 import { sendNotificationEmail } from '../services/emailService.js';
 
 const router = Router();
+const studentAccountUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 3 * 1024 * 1024,
+  },
+});
 
 // â”€â”€ Middleware: chá»‰ ADMIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const requireAdmin = (req, res, next) => {
@@ -15,6 +23,61 @@ const requireAdmin = (req, res, next) => {
 };
 
 router.use(requireAdmin);
+
+// GET /admin/students - danh sách sinh viên toàn hệ thống
+router.get('/students', async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        s.id,
+        s.mssv,
+        s.full_name,
+        s.email,
+        s.phone,
+        s.class_code,
+        s.cohort,
+        s.status,
+        u.id AS user_id,
+        u.email AS login_email,
+        CASE WHEN u.id IS NULL THEN FALSE ELSE TRUE END AS has_account
+      FROM students s
+      LEFT JOIN users u ON u.student_id = s.id
+      ORDER BY s.class_code ASC NULLS LAST, s.full_name ASC
+      LIMIT 500
+      `
+    );
+
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('GET /admin/students ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể lấy danh sách sinh viên.' });
+  }
+});
+
+// POST /admin/student-accounts/import - admin import lớp, sinh viên và tài khoản STUDENT từ CSV
+router.post('/student-accounts/import', studentAccountUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'Vui lòng chọn file CSV danh sách sinh viên.' });
+    }
+
+    const result = await importStudentAccountsForAdmin({
+      buffer: req.file.buffer,
+    });
+
+    return res.status(201).json({
+      message: `Đã xử lý ${result.total_rows} dòng, tạo ${result.created_count} tài khoản, cập nhật ${result.updated_count} sinh viên, bỏ qua ${result.skipped_count} dòng.`,
+      ...result,
+    });
+  } catch (err) {
+    console.error('POST /admin/student-accounts/import ERROR:', err.message);
+    return res.status(500).json({
+      message: 'Không thể import danh sách sinh viên.',
+      detail: err.message,
+    });
+  }
+});
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // 1. OVERVIEW

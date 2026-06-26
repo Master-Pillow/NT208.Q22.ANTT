@@ -5,6 +5,13 @@ import { pool } from '../db.js';   // â† relative path lÃªn thÆ° má»�
 
 const router = Router();
 
+function requireAdvisorRole(req, res, next) {
+  if (String(req.user?.role || '').toUpperCase() !== 'ADVISOR') {
+    return res.status(403).json({ message: 'Chỉ cố vấn mới được thực hiện thao tác này.' });
+  }
+  return next();
+}
+
 // GET /advisor/students?advisorId=<id>
 router.get('/students', async (req, res) => {
   const advisorId = req.user.id; // âœ… Chá»‰ láº¥y ID tá»« token
@@ -58,6 +65,34 @@ router.get('/students', async (req, res) => {
   } catch (err) {
     console.error('GET /advisor/students ERROR:', err.message);
     return res.status(500).json({ message: 'Lá»—i server khi láº¥y danh sÃ¡ch sinh viÃªn.' });
+  }
+});
+
+// GET /advisor/classes - danh sách lớp sinh hoạt được admin phân công, kể cả lớp chưa có sinh viên
+router.get('/classes', requireAdvisorRole, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        cl.code,
+        cl.name,
+        cl.cohort,
+        cl.program,
+        COUNT(s.id)::int AS student_count
+      FROM advisor_class ac
+      JOIN admin_classes cl ON cl.code = ac.class_code
+      LEFT JOIN students s ON s.class_code = cl.code
+      WHERE ac.advisor_id = $1
+      GROUP BY cl.code, cl.name, cl.cohort, cl.program
+      ORDER BY cl.code ASC
+      `,
+      [req.user.id]
+    );
+
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('GET /advisor/classes ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể lấy danh sách lớp cố vấn.' });
   }
 });
 

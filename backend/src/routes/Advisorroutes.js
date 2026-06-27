@@ -1,9 +1,14 @@
-﻿// routes/advisorRoutes.js
+// routes/advisorRoutes.js
 import { Router } from 'express';
 import { advisorCanAccessClass, getClassMetrics } from '../services/classMetricsService.js';
+import { ensureStudentGradeImportSchema } from '../services/studentGradeImportService.js';
 import { pool } from '../db.js';   // â† relative path lÃªn thÆ° má»¥c cha
 
 const router = Router();
+
+function normalizeRole(role) {
+  return String(role || '').trim().toUpperCase();
+}
 
 // GET /advisor/students?advisorId=<id>
 router.get('/students', async (req, res) => {
@@ -169,6 +174,136 @@ router.get('/classes/:code/metrics', async (req, res) => {
   } catch (err) {
     console.error('GET /advisor/classes/:code/metrics ERROR:', err.message);
     return res.status(500).json({ message: 'Không thể tính phân tích lớp.' });
+  }
+});
+
+// GET /advisor/students/:id/academic - bảng điểm chi tiết của sinh viên thuộc lớp cố vấn
+router.get('/students/:id/academic', async (req, res) => {
+  const advisorId = req.user.id;
+  const studentId = req.params.id;
+
+  if (normalizeRole(req.user?.role) !== 'ADVISOR') {
+    return res.status(403).json({ message: 'Chỉ cố vấn mới được xem bảng điểm sinh viên.' });
+  }
+
+  try {
+    await ensureStudentGradeImportSchema();
+
+    const studentResult = await pool.query(
+      `
+      SELECT
+        s.id,
+        s.full_name,
+        s.mssv,
+        s.class_code,
+        s.cohort
+      FROM students s
+      JOIN advisor_class ac ON ac.class_code = s.class_code
+      WHERE s.id = $1
+        AND ac.advisor_id = $2
+      LIMIT 1
+      `,
+      [studentId, advisorId]
+    );
+
+    const student = studentResult.rows[0];
+    if (!student) {
+      return res.status(403).json({ message: 'Bạn không có quyền xem bảng điểm của sinh viên này.' });
+    }
+
+    const coursesResult = await pool.query(
+      `
+      SELECT
+        e.semester,
+        c.code AS course_code,
+        c.name AS course_name,
+        c.credits,
+        g.letter_grade,
+        g.numeric_grade,
+        g.gpa_points,
+        CASE WHEN g.id IS NULL THEN 'IN_PROGRESS' ELSE COALESCE(g.status, 'GRADED') END AS status
+      FROM enrollments e
+      JOIN courses c ON c.id = e.course_id
+      LEFT JOIN grades g ON g.enrollment_id = e.id
+      WHERE e.student_id = $1
+      ORDER BY e.semester DESC, c.code ASC
+      `,
+      [studentId]
+    );
+
+    const semesterMap = new Map();
+    let totalCredits = 0;
+    let earnedCredits = 0;
+    let debtCredits = 0;
+    let weightedGpa = 0;
+    let gradedCredits = 0;
+
+    for (const course of coursesResult.rows) {
+      const semester = course.semester || 'Chưa xác định';
+      const credits = Number(course.credits || 0);
+      const status = course.status || 'GRADED';
+      const letterGrade = course.letter_grade || null;
+      const gpaPoints = course.gpa_points === null ? null : Number(course.gpa_points);
+
+      if (!semesterMap.has(semester)) {
+        semesterMap.set(semester, {
+          semester,
+          total_credits: 0,
+          earned_credits: 0,
+          debt_credits: 0,
+          weighted_gpa: 0,
+          graded_credits: 0,
+          failed_courses: 0,
+          courses: [],
+        });
+      }
+
+      const item = semesterMap.get(semester);
+      item.total_credits += credits;
+      totalCredits += credits;
+
+      if (status === 'GRADED') {
+        item.graded_credits += credits;
+        gradedCredits += credits;
+
+        if (gpaPoints !== null && Number.isFinite(gpaPoints)) {
+          item.weighted_gpa += gpaPoints * credits;
+          weightedGpa += gpaPoints * credits;
+        }
+
+        if (letterGrade === 'F') {
+          item.failed_courses += 1;
+          item.debt_credits += credits;
+          debtCredits += credits;
+        } else {
+          item.earned_credits += credits;
+          earnedCredits += credits;
+        }
+      }
+
+      item.courses.push(course);
+    }
+
+    const semesters = Array.from(semesterMap.values()).map((semester) => ({
+      ...semester,
+      gpa: semester.graded_credits > 0
+        ? Number((semester.weighted_gpa / semester.graded_credits).toFixed(2))
+        : null,
+    }));
+
+    return res.json({
+      student,
+      summary: {
+        total_credits: totalCredits,
+        earned_credits: earnedCredits,
+        debt_credits: debtCredits,
+        current_gpa: gradedCredits > 0 ? Number((weightedGpa / gradedCredits).toFixed(2)) : null,
+      },
+      semesters,
+    });
+  } catch (err) {
+    console.error('GET /advisor/students/:id/academic ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể lấy bảng điểm sinh viên.' });
   }
 });
 
@@ -408,5 +543,3 @@ router.delete('/log-notes/:id', requireAdvisor, async (req, res) => {
     return res.status(500).json({ message: 'Lá»—i server khi xÃ³a ghi chÃº tÆ° váº¥n.' });
   }
 });
-
-

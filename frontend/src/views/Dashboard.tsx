@@ -134,6 +134,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onMessageStude
       return map[name] || name;
     };
 
+    const getKillerSubjectBarColor = (index: number) => {
+      if (index < 2) return '#dc2626';
+      if (index < 4) return '#f97316';
+      return '#2563eb';
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500 pb-12 max-w-6xl mx-auto xl:mx-0">
           <div className="mb-10">
@@ -359,8 +365,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onMessageStude
                           </div>
                           <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
                             <div
-                                className={`h-full ${sub.color} rounded-full transition-all duration-1000 ease-out`}
-                                style={{width: `${Math.min(sub.failRate, 100)}%`}}
+                                className="h-full rounded-full transition-all duration-1000 ease-out"
+                                style={{
+                                  width: `${Math.min(sub.failRate, 100)}%`,
+                                  backgroundColor: getKillerSubjectBarColor(i),
+                                }}
                             />
                           </div>
                           <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">

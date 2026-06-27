@@ -194,9 +194,9 @@ app.post("/auth/login", async (req, res) => {
         full_name,
         role,
         student_id,
-        avatar_url,
-        cover_url,
-        bio
+        to_jsonb(users)->>'avatar_url' AS avatar_url,
+        to_jsonb(users)->>'cover_url' AS cover_url,
+        to_jsonb(users)->>'bio' AS bio
       FROM users
       WHERE email = $1
       `,
@@ -298,7 +298,19 @@ app.put("/auth/profile", verifyToken, upload.fields([{ name: 'avatar', maxCount:
     }
 
     const result = await pool.query(
-      "SELECT id, email, full_name, role, student_id, bio, avatar_url, cover_url FROM users WHERE id = $1",
+      `
+      SELECT
+        id,
+        email,
+        full_name,
+        role,
+        student_id,
+        to_jsonb(users)->>'bio' AS bio,
+        to_jsonb(users)->>'avatar_url' AS avatar_url,
+        to_jsonb(users)->>'cover_url' AS cover_url
+      FROM users
+      WHERE id = $1
+      `,
       [req.user.id]
     );
 
@@ -322,6 +334,11 @@ app.put("/auth/profile", verifyToken, upload.fields([{ name: 'avatar', maxCount:
     });
   } catch (err) {
     console.error("UPDATE PROFILE ERROR:", err);
+    if (err.code === "42703") {
+      return res.status(503).json({
+        message: "Database chưa có các cột hồ sơ. Hãy chạy backend/sql/add_user_profile_columns.sql.",
+      });
+    }
     return res.status(500).json({ message: "Lỗi server" });
   }
 });

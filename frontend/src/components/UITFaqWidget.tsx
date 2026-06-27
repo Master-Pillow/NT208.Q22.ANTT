@@ -202,18 +202,18 @@ export const UITFaqWidget: React.FC = () => {
     <>
       <button
         onClick={() => { setIsOpen(true); setIsMinimized(false); clearUnread(); }}
-        className={`fixed bottom-8 right-8 z-40 flex items-center gap-2 bg-gradient-to-r from-[#004ac6] via-[#2563eb] to-[#0058be] text-white px-5 py-3.5 rounded-full shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 active:scale-95 transition-all outline-none font-bold text-sm ${isOpen ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 scale-100'}`}
+        className={`fixed bottom-4 right-8 z-40 flex h-[72px] w-[72px] flex-col items-center justify-center gap-1 bg-gradient-to-r from-[#004ac6] via-[#2563eb] to-[#0058be] text-white rounded-2xl shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-105 active:scale-95 transition-all outline-none font-bold text-sm ${isOpen ? 'opacity-0 pointer-events-none scale-75' : 'opacity-100 scale-100'}`}
       >
         <div className="relative">
           <Sparkles className="w-5 h-5" />
           {unreadCount > 0 && <span className="absolute -top-1 -right-1 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span></span>}
         </div>
-        AI Chatbox UIT
+        AI UIT
       </button>
 
       <div
         ref={chatRef}
-        className={['fixed bottom-8 right-8 z-50', 'w-[390px] flex flex-col', 'bg-white rounded-3xl overflow-hidden', 'shadow-[0_32px_80px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)]', 'transition-all duration-300 origin-bottom-right', isOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-90 pointer-events-none', isMinimized ? 'h-auto' : 'h-[600px]'].join(' ')}
+        className={['fixed bottom-4 right-8 z-50', 'w-[390px] flex flex-col', 'bg-white rounded-3xl overflow-hidden', 'shadow-[0_32px_80px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)]', 'transition-all duration-300 origin-bottom-right', isOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-90 pointer-events-none', isMinimized ? 'h-auto' : 'h-[600px]'].join(' ')}
         style={{ maxHeight: 'calc(100vh - 130px)' }}
       >
         <div className="bg-gradient-to-r from-[#004ac6] via-[#2563eb] to-[#0058be] px-5 py-4 shrink-0">
@@ -227,7 +227,7 @@ export const UITFaqWidget: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-white font-bold text-[15px] leading-tight">AI Chatbox UIT</h3>
+                  <h3 className="text-white font-bold text-[15px] leading-tight">AI UIT</h3>
                   <span className="text-[9px] font-bold text-white/60 bg-white/15 px-1.5 py-0.5 rounded-full tracking-wider uppercase">Beta</span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">

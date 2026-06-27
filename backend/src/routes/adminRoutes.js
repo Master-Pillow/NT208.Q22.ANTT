@@ -4,6 +4,7 @@ import multer from 'multer';
 import { importStudentAccountsForAdmin } from '../services/adminStudentImportService.js';
 import { pool } from '../db.js';
 import { getClassMetrics } from '../services/classMetricsService.js';
+import { getCohortMetrics, getSystemMetrics } from '../services/cohortSystemMetricsService.js';
 import { sendNotificationEmail } from '../services/emailService.js';
 
 const router = Router();
@@ -370,6 +371,28 @@ router.get('/classes/:code/metrics', async (req, res) => {
   } catch (err) {
     console.error('GET /admin/classes/:code/metrics ERROR:', err.message);
     return res.status(500).json({ message: 'KhÃ´ng thá»ƒ tÃ­nh phÃ¢n tÃ­ch lá»›p.' });
+  }
+});
+
+// GET /admin/metrics/cohort/:cohort — phân tích cấp khoá (K1–K4)
+router.get('/metrics/cohort/:cohort', async (req, res) => {
+  try {
+    const metrics = await getCohortMetrics(req.params.cohort);
+    return res.json(metrics);
+  } catch (err) {
+    console.error('GET /admin/metrics/cohort ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tính phân tích khoá.' });
+  }
+});
+
+// GET /admin/metrics/system — phân tích toàn trường (T1–T4)
+router.get('/metrics/system', async (_req, res) => {
+  try {
+    const metrics = await getSystemMetrics();
+    return res.json(metrics);
+  } catch (err) {
+    console.error('GET /admin/metrics/system ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tính phân tích toàn trường.' });
   }
 });
 

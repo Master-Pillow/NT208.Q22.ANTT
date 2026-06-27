@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, GraduationCap, Mail, TrendingDown } from 'lucide-react';
+import { ArrowLeft, GraduationCap, LineChart as LineChartIcon, Mail, TrendingDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bar,
@@ -17,7 +17,9 @@ import {
   Cell,
 } from 'recharts';
 import { PageLayout } from '../../components/layout/PageLayout';
-import apiClient from '../../lib/api';
+import apiClient, { getAdvisorStudentMetrics, type StudentMetricsData } from '../../lib/api';
+import { AiInsightPanel } from '../../components/AiInsightPanel';
+import { StudentMetricsCharts } from '../../components/StudentMetricsCharts';
 
 interface Student {
   id: number;
@@ -74,6 +76,9 @@ export default function StudentsPage() {
   const [selectedClass, setSelectedClass] = useState<SelectedClass | null>(null);
   const [classMetrics, setClassMetrics] = useState<ClassMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentMetrics, setStudentMetrics] = useState<StudentMetricsData | null>(null);
+  const [studentMetricsLoading, setStudentMetricsLoading] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -116,6 +121,27 @@ export default function StudentsPage() {
 
     fetchClassMetrics();
   }, [selectedClass]);
+
+  useEffect(() => {
+    async function fetchStudentMetrics() {
+      if (!selectedStudent) {
+        setStudentMetrics(null);
+        return;
+      }
+      try {
+        setStudentMetricsLoading(true);
+        const { data } = await getAdvisorStudentMetrics(selectedStudent.id);
+        setStudentMetrics(data);
+      } catch (error) {
+        console.error('Lỗi lấy phân tích sinh viên:', error);
+        setStudentMetrics(null);
+      } finally {
+        setStudentMetricsLoading(false);
+      }
+    }
+
+    fetchStudentMetrics();
+  }, [selectedStudent]);
 
   const gradeDistribution = useMemo(() => {
     if (!classMetrics) return [];
@@ -175,7 +201,7 @@ export default function StudentsPage() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">GPA trung bình theo kỳ</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -192,7 +218,7 @@ export default function StudentsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">Phân bố điểm</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -209,7 +235,7 @@ export default function StudentsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">Phân bố GPA</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -224,7 +250,7 @@ export default function StudentsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">Môn có tỷ lệ rớt cao</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -239,6 +265,8 @@ export default function StudentsPage() {
             </div>
           </div>
         </div>
+
+        <AiInsightPanel scope="class" id={selectedClass.code} title={`AI phân tích lớp ${selectedClass.code}`} />
       </section>
     );
   };
@@ -264,13 +292,24 @@ export default function StudentsPage() {
                 <td className="px-6 py-5 text-center font-bold text-primary">{student.class_code}</td>
                 <td className="px-6 py-5 text-center font-bold text-slate-700">{Number(student.current_gpa || 0).toFixed(2)}</td>
                 <td className="px-8 py-5 text-right">
-                  <button
-                    onClick={() => openMessages(student)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-primary hover:bg-primary hover:text-white"
-                  >
-                    <Mail className="w-4 h-4" />
-                    Nhắn tin
-                  </button>
+                  <div className="inline-flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStudent(student)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white"
+                    >
+                      <LineChartIcon className="w-4 h-4" />
+                      Xem phân tích
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openMessages(student)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-primary hover:bg-primary hover:text-white"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Nhắn tin
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -280,12 +319,47 @@ export default function StudentsPage() {
     </section>
   );
 
+  const renderStudentDetail = () => {
+    if (!selectedStudent) return null;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setSelectedStudent(null)}
+          className="flex items-center text-sm font-semibold text-slate-500 hover:text-primary transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Quay lại danh sách sinh viên
+        </button>
+
+        <div>
+          <p className="text-sm font-bold uppercase tracking-normal text-slate-400">Sinh viên</p>
+          <h2 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">{selectedStudent.full_name}</h2>
+          <p className="mt-2 text-slate-500 font-medium">MSSV {selectedStudent.mssv} · Lớp {selectedStudent.class_code}</p>
+        </div>
+
+        <AiInsightPanel scope="student" id={selectedStudent.id} title={`AI phân tích ${selectedStudent.full_name}`} />
+
+        {studentMetricsLoading ? (
+          <div className="rounded-2xl bg-white p-6 text-sm font-semibold text-slate-500">Đang tải phân tích sinh viên...</div>
+        ) : studentMetrics ? (
+          <StudentMetricsCharts metrics={studentMetrics} />
+        ) : (
+          <div className="rounded-2xl bg-white p-6 text-sm font-semibold text-slate-400">Chưa có dữ liệu điểm cho sinh viên này.</div>
+        )}
+      </>
+    );
+  };
+
   return (
     <PageLayout title="Sinh viên lớp mình" breadcrumb={['ADVISOR', 'Sinh viên lớp mình']}>
       <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in duration-500">
-        {selectedClass ? (
+        {selectedStudent ? (
+          renderStudentDetail()
+        ) : selectedClass ? (
           <>
             <button
+              type="button"
               onClick={() => setSelectedClass(null)}
               className="flex items-center text-sm font-semibold text-slate-500 hover:text-primary transition-colors"
             >

@@ -1,6 +1,8 @@
 ﻿// routes/advisorRoutes.js
 import { Router } from 'express';
 import { advisorCanAccessClass, getClassMetrics } from '../services/classMetricsService.js';
+import { getAdvisorMetrics } from '../services/cohortSystemMetricsService.js';
+import { getStudentMetricsById } from '../services/studentMetricsService.js';
 import { pool } from '../db.js';   // â† relative path lÃªn thÆ° má»¥c cha
 
 const router = Router();
@@ -204,6 +206,44 @@ router.get('/classes/:code/metrics', async (req, res) => {
   } catch (err) {
     console.error('GET /advisor/classes/:code/metrics ERROR:', err.message);
     return res.status(500).json({ message: 'Không thể tính phân tích lớp.' });
+  }
+});
+
+// GET /advisor/metrics/overview - phân tích tổng hợp toàn bộ lớp cố vấn phụ trách
+router.get('/metrics/overview', requireAdvisorRole, async (req, res) => {
+  try {
+    const metrics = await getAdvisorMetrics(req.user.id);
+    return res.json(metrics);
+  } catch (err) {
+    console.error('GET /advisor/metrics/overview ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tính phân tích tổng hợp.' });
+  }
+});
+
+// GET /advisor/students/:studentId/metrics - phân tích chi tiết một sinh viên cố vấn phụ trách
+router.get('/students/:studentId/metrics', requireAdvisorRole, async (req, res) => {
+  try {
+    const studentRes = await pool.query(
+      'SELECT id, class_code FROM students WHERE id = $1 LIMIT 1',
+      [req.params.studentId]
+    );
+    const student = studentRes.rows[0];
+    if (!student) {
+      return res.status(404).json({ message: 'Không tìm thấy sinh viên.' });
+    }
+
+    const canAccess = student.class_code
+      ? await advisorCanAccessClass(req.user.id, student.class_code)
+      : false;
+    if (!canAccess) {
+      return res.status(403).json({ message: 'Bạn không phụ trách sinh viên này.' });
+    }
+
+    const metrics = await getStudentMetricsById(student.id);
+    return res.json(metrics);
+  } catch (err) {
+    console.error('GET /advisor/students/:studentId/metrics ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tính phân tích sinh viên.' });
   }
 });
 

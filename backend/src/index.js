@@ -19,6 +19,7 @@ import studentRouter from "./routes/studentRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
 import aiAnomalyRouter from "./routes/aiAnomalyRoutes.js";
 import aiQueryRouter from "./routes/aiQueryRoutes.js";
+import gradeInsightRouter from "./routes/gradeInsightRoutes.js";
 import uitFaqRouter from "./routes/uitFaqRoutes.js";
 
 const app = express();
@@ -335,6 +336,7 @@ app.use("/student", verifyToken, studentRouter);
 app.use("/admin", verifyToken, adminRouter);
 app.use("/ai", verifyToken, aiQueryRouter);
 app.use("/ai", verifyToken, aiAnomalyRouter);
+app.use("/ai", verifyToken, gradeInsightRouter);
 
 // ==========================================
 // UIT FAQ — PUBLIC (không cần đăng nhập)

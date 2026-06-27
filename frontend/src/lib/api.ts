@@ -64,6 +64,80 @@ export const getAnomalyPatterns = () => apiClient.get('/ai/anomaly-patterns');
 export const generateAiBrief = (classCode: string) =>
   apiClient.post('/ai/briefs/generate', { classCode });
 
+// ── AI phân tích điểm (grade insight) ───────────────────────────────────────
+export type InsightScope = 'student' | 'class' | 'cohort' | 'system' | 'advisor';
+
+export interface GradeInsight {
+  scope: InsightScope;
+  id: string;
+  source: 'gemini' | 'rule_based';
+  headline: string;
+  trend: 'up' | 'down' | 'stable';
+  summary_md: string;
+  highlights: string[];
+  risks: string[];
+  commendations: string[];
+  actions: string[];
+  stats: any;
+  generated_at: string;
+  cached?: boolean;
+}
+
+export const getGradeInsight = (
+  scope: InsightScope,
+  id?: string | number,
+  refresh = false
+) =>
+  apiClient.post<GradeInsight>('/ai/grade-insight', {
+    scope,
+    id: id !== undefined ? String(id) : undefined,
+    refresh,
+  });
+
+// ── Metrics cấp khoá / toàn trường (admin) ──────────────────────────────────
+export const getCohortMetrics = (cohort: string) =>
+  apiClient.get(`/admin/metrics/cohort/${encodeURIComponent(cohort)}`);
+
+export const getSystemMetrics = () => apiClient.get('/admin/metrics/system');
+
+// Metrics tổng hợp của cố vấn (gộp mọi lớp phụ trách)
+export const getAdvisorMetrics = () => apiClient.get('/advisor/metrics/overview');
+
+// ── Metrics chi tiết 1 sinh viên ────────────────────────────────────────────
+export interface StudentSemesterMetric {
+  semester: string;
+  gpa: number | null;
+  avg_numeric: number | null;
+  credits_total: number;
+  credits_earned: number;
+  credits_debt: number;
+  failed: number;
+  absent: number;
+  in_progress: number;
+  courses: number;
+  graded_courses: number;
+  gpa_drop: boolean;
+  gpa_delta: number | null;
+  commendation: string | null;
+  cumulative_gpa?: number | null;
+  cumulative_avg_numeric?: number | null;
+}
+
+export interface StudentMetricsData {
+  student: { id: number; mssv: string; full_name: string; class_code: string } | null;
+  cumulative_gpa: number | null;
+  cumulative_avg_numeric: number | null;
+  by_semester: StudentSemesterMetric[];
+  grade_distribution: Record<string, number>;
+  dropped_semesters: string[];
+  improving: boolean;
+  commendations: Array<{ semester: string; label: string; reason: string }>;
+}
+
+// Cố vấn xem metrics của 1 sinh viên trong lớp mình phụ trách
+export const getAdvisorStudentMetrics = (studentId: number | string) =>
+  apiClient.get<StudentMetricsData>(`/advisor/students/${studentId}/metrics`);
+
 // UIT FAQ — public endpoint (no auth needed)
 export const askUitFaq = (question: string, sessionId?: string) =>
   fetch(`${API_BASE_URL}/uit-faq/ask`, {

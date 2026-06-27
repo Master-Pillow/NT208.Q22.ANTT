@@ -25,11 +25,7 @@ function getGradeBucket(letterGrade, status) {
   return letterGrade;
 }
 
-export async function getStudentMetricsForUser(userId) {
-  await ensureStudentGradeImportSchema();
-
-  const result = await pool.query(
-    `
+const STUDENT_GRADE_SELECT = `
     SELECT
       s.id AS student_id,
       s.mssv,
@@ -43,6 +39,13 @@ export async function getStudentMetricsForUser(userId) {
       g.numeric_grade,
       g.gpa_points,
       COALESCE(g.status, 'GRADED') AS status
+`;
+
+export async function getStudentMetricsForUser(userId) {
+  await ensureStudentGradeImportSchema();
+
+  const result = await pool.query(
+    `${STUDENT_GRADE_SELECT}
     FROM users u
     JOIN students s ON s.id = u.student_id
     JOIN enrollments e ON e.student_id = s.id
@@ -54,12 +57,34 @@ export async function getStudentMetricsForUser(userId) {
     [userId]
   );
 
-  const student = result.rows[0]
+  return buildStudentMetrics(result.rows);
+}
+
+export async function getStudentMetricsById(studentId) {
+  await ensureStudentGradeImportSchema();
+
+  const result = await pool.query(
+    `${STUDENT_GRADE_SELECT}
+    FROM students s
+    JOIN enrollments e ON e.student_id = s.id
+    JOIN courses c ON c.id = e.course_id
+    LEFT JOIN grades g ON g.enrollment_id = e.id
+    WHERE s.id = $1
+    ORDER BY e.semester ASC, c.code ASC
+    `,
+    [studentId]
+  );
+
+  return buildStudentMetrics(result.rows);
+}
+
+function buildStudentMetrics(rows) {
+  const student = rows[0]
     ? {
-        id: result.rows[0].student_id,
-        mssv: result.rows[0].mssv,
-        full_name: result.rows[0].full_name,
-        class_code: result.rows[0].class_code,
+        id: rows[0].student_id,
+        mssv: rows[0].mssv,
+        full_name: rows[0].full_name,
+        class_code: rows[0].class_code,
       }
     : null;
 
@@ -74,7 +99,7 @@ export async function getStudentMetricsForUser(userId) {
     IN_PROGRESS: 0,
   };
 
-  for (const row of result.rows) {
+  for (const row of rows) {
     const semester = row.semester || 'UNKNOWN';
     if (!bySemesterMap.has(semester)) {
       const parsed = parseSemesterKey(semester);

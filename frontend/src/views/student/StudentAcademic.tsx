@@ -25,6 +25,8 @@ import {
   YAxis,
 } from 'recharts';
 import apiClient from '../../lib/api';
+import { AiInsightPanel } from '../../components/AiInsightPanel';
+import { useAuth } from '../../auth/AuthContext';
 
 interface CourseItem {
   code: string;
@@ -108,6 +110,7 @@ const statusText: Record<string, string> = {
 const chartMargin = { top: 12, right: 16, bottom: 4, left: 0 };
 
 export const StudentAcademic = () => {
+  const { currentUser } = useAuth();
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [metrics, setMetrics] = useState<StudentMetrics | null>(null);
@@ -373,24 +376,24 @@ export const StudentAcademic = () => {
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-4 gap-5">
-        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+        <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
           <p className="text-xs uppercase font-bold text-slate-400">GPA tích lũy</p>
           <p className="text-3xl font-black text-blue-900 mt-2">
             {Number(metrics?.cumulative_gpa ?? summary?.current_gpa ?? 0).toFixed(2)}
           </p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+        <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
           <p className="text-xs uppercase font-bold text-slate-400">Điểm TB tích lũy</p>
           <p className="text-3xl font-black text-blue-900 mt-2">
             {metrics?.cumulative_avg_numeric?.toFixed(2) || '-'}
           </p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+        <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
           <p className="text-xs uppercase font-bold text-slate-400">Kỳ gần nhất</p>
           <p className="text-3xl font-black text-blue-900 mt-2">{latestSemester?.gpa?.toFixed(2) || '-'}</p>
           <p className="mt-1 text-xs font-semibold text-slate-500">{latestSemester?.semester || 'Chưa có dữ liệu'}</p>
         </div>
-        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+        <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
           <p className="text-xs uppercase font-bold text-slate-400">Kỳ tụt điểm</p>
           <p className="text-3xl font-black text-blue-900 mt-2">{metrics?.dropped_semesters.length || 0}</p>
         </div>
@@ -398,7 +401,7 @@ export const StudentAcademic = () => {
 
       {chartData.length > 0 && (
         <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-black text-slate-900">Xu hướng GPA theo kỳ</h3>
@@ -421,7 +424,7 @@ export const StudentAcademic = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-black text-slate-900">Điểm trung bình thang 10</h3>
@@ -471,7 +474,7 @@ export const StudentAcademic = () => {
 
       {(metrics?.commendations.length || metrics?.dropped_semesters.length) ? (
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">Tiến bộ và tuyên dương</h3>
             <div className="mt-4 space-y-3">
               {metrics?.commendations.length ? (
@@ -487,7 +490,7 @@ export const StudentAcademic = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+          <div className="min-w-0 bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">Kỳ cần chú ý</h3>
             <div className="mt-4 space-y-3">
               {metrics?.dropped_semesters.length ? (
@@ -503,6 +506,10 @@ export const StudentAcademic = () => {
             </div>
           </div>
         </section>
+      ) : null}
+
+      {currentUser?.student_id ? (
+        <AiInsightPanel scope="student" id={currentUser.student_id} title="AI phân tích kết quả học tập của bạn" />
       ) : null}
 
       <section className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm overflow-x-auto">

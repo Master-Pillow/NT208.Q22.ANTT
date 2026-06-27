@@ -80,7 +80,7 @@ export const Sidebar: React.FC = () => {
         </div>
       </div>
 
-      <nav className="flex flex-col gap-2 flex-grow overflow-y-auto">
+      <nav className="flex flex-col gap-2 flex-grow overflow-y-auto overflow-x-hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const activePath = item.match || item.to;
@@ -96,14 +96,14 @@ export const Sidebar: React.FC = () => {
               onFocus={() => preloadRoute(item.to)}
               onClick={() => setOpen(false)}
               className={cn(
-                'flex items-center gap-3 px-4 py-3 rounded-xl hover:translate-x-1 transition-transform duration-200 text-left',
+                'flex items-center gap-3 px-4 py-3 rounded-xl hover:translate-x-1 transition-transform duration-200 text-left min-w-0',
                 isActive
                   ? 'bg-white dark:bg-slate-900 text-blue-700 dark:text-blue-400 font-bold shadow-sm border border-slate-100'
                   : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 font-medium'
               )}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
-              <span>{item.label}</span>
+              <span className="truncate">{item.label}</span>
             </NavLink>
           );
         })}

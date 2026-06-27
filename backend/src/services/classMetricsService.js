@@ -213,7 +213,7 @@ export async function getClassMetrics(classCode) {
             avg_numeric: weightedAverage(student.weighted_numeric, student.credits),
             failed: student.failed,
             absent: student.absent,
-            latest_semester: latest ? .semester || null,
+            latest_semester: latest?.semester || null,
             gpa_delta: latest && previous ? round(latest.gpa - previous.gpa) : null,
         };
     });

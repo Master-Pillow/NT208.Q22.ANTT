@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react';
-import { Download, Loader2, Upload, Users } from 'lucide-react';
+import { Download, Eye, Loader2, Upload, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { PageLayout } from '../../components/layout/PageLayout';
 import apiClient from '../../lib/api';
 
@@ -240,18 +241,19 @@ export default function StudentsPage() {
                   <th className="px-6 py-4">Khóa</th>
                   <th className="px-6 py-4">Email đăng nhập</th>
                   <th className="px-6 py-4">Tài khoản</th>
+                  <th className="px-6 py-4 text-right">Bảng điểm</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-sm font-semibold text-slate-400">
+                    <td colSpan={7} className="px-6 py-8 text-center text-sm font-semibold text-slate-400">
                       Đang tải danh sách sinh viên...
                     </td>
                   </tr>
                 ) : students.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-sm font-semibold text-slate-400">
+                    <td colSpan={7} className="px-6 py-8 text-center text-sm font-semibold text-slate-400">
                       Chưa có sinh viên. Hãy import danh sách CSV để bắt đầu.
                     </td>
                   </tr>
@@ -267,6 +269,15 @@ export default function StudentsPage() {
                         <span className={`rounded-full px-3 py-1 text-xs font-bold ${student.has_account ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
                           {student.has_account ? 'Đã tạo' : 'Chưa có'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          to={`/admin/students/${student.id}/academic`}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-blue-700 hover:bg-blue-50"
+                          title={`Xem bảng điểm ${student.full_name}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Link>
                       </td>
                     </tr>
                   ))

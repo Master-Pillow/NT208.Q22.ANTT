@@ -1,11 +1,11 @@
--- Optional migration for the student PDF grade import feature.
--- Backend also creates these objects lazily, but running this once is cleaner for demo DB setup.
+-- Optional migration for the student DAA grade synchronization feature.
+-- The backend also creates these objects lazily during synchronization.
 
 CREATE TABLE IF NOT EXISTS student_grade_imports (
   id BIGSERIAL PRIMARY KEY,
   student_id BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   mssv VARCHAR(50) NOT NULL,
-  source VARCHAR(50) NOT NULL DEFAULT 'uit-portal-pdf',
+  source VARCHAR(50) NOT NULL DEFAULT 'uit-daa-session',
   raw_payload JSONB NOT NULL,
   normalized_payload JSONB NOT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING'

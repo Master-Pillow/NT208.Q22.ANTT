@@ -59,12 +59,22 @@ export const AppShell = () => {
 
   const handleSearchSelect = (item: { type: string; id: number | null; code: string }) => {
     if (item.type === 'student' && item.id) {
-      navigate(`/advisor/students/${item.id}`);
+      if (role === 'ADMIN') {
+        navigate(`/admin/students/${item.id}/academic`);
+      } else if (role === 'ADVISOR') {
+        navigate(`/advisor/students/${item.id}`);
+      } else {
+        navigate('/student/profile');
+      }
       return;
     }
 
     if (item.type === 'class') {
-      navigate(`/advisor/students/class/${encodeURIComponent(item.code)}`);
+      if (role === 'ADMIN') {
+        navigate('/admin/classes');
+      } else if (role === 'ADVISOR') {
+        navigate(`/advisor/students/class/${encodeURIComponent(item.code)}`);
+      }
     }
   };
 

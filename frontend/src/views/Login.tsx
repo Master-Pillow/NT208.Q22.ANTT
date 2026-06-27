@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { Mail, Lock, ArrowRight, ShieldCheck, BookOpen, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  KeyRound,
+  Lock,
+  Mail,
+  ShieldCheck,
+  UserRound,
+  Users,
+} from 'lucide-react';
 import apiClient from '../lib/api';
 
 interface LoginProps {
@@ -7,8 +16,11 @@ interface LoginProps {
 }
 
 export const Login = ({ onLogin }: LoginProps) => {
+  const [loginMode, setLoginMode] = useState<'ACCOUNT' | 'DAA'>('ACCOUNT');
   const [email, setEmail] = useState('aris.thorne@uit.edu.vn');
   const [password, setPassword] = useState('');
+  const [mssv, setMssv] = useState('24521888');
+  const [daaCookie, setDaaCookie] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -19,10 +31,16 @@ export const Login = ({ onLogin }: LoginProps) => {
     setErrorMsg('');
 
     try {
-      const response = await apiClient.post('/auth/login', {
-        email,
-        password,
-      });
+      const response =
+        loginMode === 'DAA'
+          ? await apiClient.post('/auth/daa-login', {
+              mssv: mssv.trim(),
+              cookie: daaCookie.trim(),
+            })
+          : await apiClient.post('/auth/login', {
+              email,
+              password,
+            });
 
       const { token, user } = response.data;
 
@@ -153,51 +171,127 @@ export const Login = ({ onLogin }: LoginProps) => {
             </div>
           )}
 
+          <div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMode('ACCOUNT');
+                setErrorMsg('');
+              }}
+              className={`min-h-10 rounded-md px-3 text-sm font-bold transition-colors ${
+                loginMode === 'ACCOUNT'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Tài khoản
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMode('DAA');
+                setErrorMsg('');
+              }}
+              className={`min-h-10 rounded-md px-3 text-sm font-bold transition-colors ${
+                loginMode === 'DAA'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Cookie DAA
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 block">
-                Địa chỉ email UIT
-              </label>
+            {loginMode === 'ACCOUNT' ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700 block">
+                    Địa chỉ email UIT
+                  </label>
 
-              <div className="relative group">
-                <Mail className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 outline-none rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
-                  placeholder="name@uit.edu.vn"
-                  required
-                />
-              </div>
-            </div>
+                  <div className="relative group">
+                    <Mail className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
+                      placeholder="name@uit.edu.vn"
+                      required
+                    />
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-bold text-slate-700 block">
-                  Mật khẩu
-                </label>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-bold text-slate-700 block">
+                      Mật khẩu
+                    </label>
 
-                <button
-                  type="button"
-                  className="text-sm font-bold text-primary hover:text-primary-container transition-colors"
-                >
-                  Quên mật khẩu?
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      className="text-sm font-bold text-primary hover:text-primary-container transition-colors"
+                    >
+                      Quên mật khẩu?
+                    </button>
+                  </div>
 
-              <div className="relative group">
-                <Lock className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 outline-none rounded-2xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all tracking-normal"
-                  placeholder="Nhập mật khẩu..."
-                  required
-                />
-              </div>
-            </div>
+                  <div className="relative group">
+                    <Lock className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all tracking-normal"
+                      placeholder="Nhập mật khẩu..."
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700 block">
+                    Mã số sinh viên
+                  </label>
+                  <div className="relative group">
+                    <UserRound className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={mssv}
+                      onChange={(event) => setMssv(event.target.value.replace(/\D/g, ''))}
+                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
+                      placeholder="Nhập MSSV"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-700 block">
+                    Cookie phiên DAA
+                  </label>
+                  <div className="relative group">
+                    <KeyRound className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
+                    <input
+                      type="password"
+                      value={daaCookie}
+                      onChange={(event) => setDaaCookie(event.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 font-mono text-slate-900 focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
+                      placeholder="Dán Request Headers > Cookie"
+                      autoComplete="off"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs font-medium leading-relaxed text-slate-500">
+                    Cookie chỉ được dùng để xác minh phiên DAA và không được lưu.
+                  </p>
+                </div>
+              </>
+            )}
 
             <button
               type="submit"
@@ -208,7 +302,7 @@ export const Login = ({ onLogin }: LoginProps) => {
                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  Đăng nhập
+                  {loginMode === 'DAA' ? 'Đăng nhập bằng DAA' : 'Đăng nhập'}
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </>
               )}

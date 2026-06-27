@@ -16,6 +16,7 @@ const AccountProfilePage = lazy(pageImporters.accountProfile);
 
 const AdminDashboardPage = lazy(pageImporters.adminDashboard);
 const AdminStudentsPage = lazy(pageImporters.adminStudents);
+const AdminStudentAcademicPage = lazy(pageImporters.adminStudentAcademic);
 const AdminClassesPage = lazy(pageImporters.adminClasses);
 const AdminAdvisorsPage = lazy(pageImporters.adminAdvisors);
 const AdminCoursesPage = lazy(pageImporters.adminCourses);
@@ -76,6 +77,7 @@ export default function App() {
                 <Route path="dashboard" element={<AdminDashboardPage />} />
                 <Route path="profile" element={<AccountProfilePage />} />
                 <Route path="students" element={<AdminStudentsPage />} />
+                <Route path="students/:studentId/academic" element={<AdminStudentAcademicPage />} />
                 <Route path="classes" element={<AdminClassesPage />} />
                 <Route path="advisors" element={<AdminAdvisorsPage />} />
                 <Route path="courses" element={<AdminCoursesPage />} />

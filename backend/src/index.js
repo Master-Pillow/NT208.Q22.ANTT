@@ -12,6 +12,11 @@ import multer from "multer";
 
 import { pool } from "./db.js";
 import { verifyToken } from "./middleware/auth.js";
+import { fetchDaaGradePayload } from "./services/daaGradeSyncService.js";
+import {
+  createStudentGradeImport,
+  importStudentGrades,
+} from "./services/studentGradeImportService.js";
 
 import advisorRouter from "./routes/Advisorroutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
@@ -156,17 +161,14 @@ io.on("connection", (socket) => {
   });
 });
 
-// ==========================================
-// DATABASE CHECK
-// ==========================================
-pool
-  .query("SELECT NOW()")
-  .then((res) => {
-    console.log("DB connected:", res.rows[0]);
-  })
-  .catch((err) => {
-    console.error("DB connection error:", err.message);
-  });
+const ensureUserProfileColumns = async () => {
+  await pool.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS bio TEXT,
+      ADD COLUMN IF NOT EXISTS avatar_url TEXT,
+      ADD COLUMN IF NOT EXISTS cover_url TEXT
+  `);
+};
 
 // ==========================================
 // HEALTH CHECK
@@ -254,6 +256,117 @@ app.post("/auth/login", async (req, res) => {
   } catch (err) {
     console.error("LOGIN ERROR:", err);
     return res.status(500).json({ message: "Lỗi server" });
+  }
+});
+
+// ==========================================
+// LOGIN WITH A STUDENT DAA SESSION
+// ==========================================
+app.post("/auth/daa-login", async (req, res) => {
+  try {
+    const mssv = String(req.body?.mssv || "").trim();
+    const cookie = String(req.body?.cookie || "");
+
+    if (!/^\d{6,12}$/.test(mssv) || !cookie.trim()) {
+      return res.status(400).json({
+        message: "Vui lòng nhập đúng MSSV và cookie phiên DAA.",
+      });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        u.id,
+        u.email,
+        u.full_name,
+        u.role,
+        u.student_id,
+        u.avatar_url,
+        u.cover_url,
+        u.bio,
+        s.mssv
+      FROM students s
+      JOIN users u ON u.student_id = s.id
+      WHERE s.mssv = $1
+        AND UPPER(u.role) = 'STUDENT'
+      LIMIT 1
+      `,
+      [mssv]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(403).json({
+        message: "MSSV chưa được Admin tạo tài khoản trên AdvisorHub.",
+      });
+    }
+
+    const user = result.rows[0];
+    const payload = await fetchDaaGradePayload({ cookie, mssv });
+    const gradeImport = await createStudentGradeImport({
+      student: {
+        id: user.student_id,
+        mssv: user.mssv,
+      },
+      payload,
+    });
+
+    if (gradeImport.mismatch) {
+      return res.status(403).json({ message: gradeImport.error_message });
+    }
+
+    const syncResult = await importStudentGrades({
+      importId: gradeImport.import.id,
+      user: {
+        id: user.id,
+        role: "STUDENT",
+        student_id: user.student_id,
+      },
+    });
+
+    if (syncResult.status !== 200) {
+      return res.status(syncResult.status).json(syncResult.body);
+    }
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: "STUDENT",
+        student_id: user.student_id,
+      },
+      JWT_SECRET,
+      { expiresIn: "8h" }
+    );
+
+    return res.json({
+      message: "Đăng nhập bằng DAA thành công.",
+      token,
+      grade_sync: {
+        detected_count: payload.courses.length,
+        imported_count: syncResult.body.imported_count,
+        skipped_count: syncResult.body.skipped_count,
+      },
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: "STUDENT",
+        student_id: user.student_id,
+        avatar_url: user.avatar_url,
+        cover_url: user.cover_url,
+        bio: user.bio,
+      },
+    });
+  } catch (err) {
+    // The full Axios error contains request headers, including the DAA cookie.
+    console.error("[auth/daa-login]", err.message);
+    const status =
+      /cookie|phiên|MSSV|không tìm thấy bảng điểm|không hợp lệ/i.test(err.message)
+        ? 401
+        : 502;
+    return res.status(status).json({
+      message: err.message || "Không thể xác thực phiên DAA.",
+    });
   }
 });
 
@@ -892,6 +1005,20 @@ process.on('uncaughtException', (err) => {
 // ==========================================
 import { config } from './config.js';
 const PORT = config.port || Number(process.env.PORT) || 4000;
-httpServer.listen(PORT, () => {
-  console.log(`Backend & Socket.io running on port ${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+    console.log("DB connected:", result.rows[0]);
+    await ensureUserProfileColumns();
+
+    httpServer.listen(PORT, () => {
+      console.log(`Backend & Socket.io running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("DB startup error:", err.message);
+    process.exit(1);
+  }
+};
+
+startServer();

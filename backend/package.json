@@ -5,9 +5,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "npx kill-port 4000 && nodemon src/index.js",
+    "dev": "nodemon src/index.js",
     "start": "node src/index.js",
-    "crawl": "node scripts/crawlUit.js"
+    "crawl": "node scripts/crawlUit.js",
+    "db:setup": "node scripts/setupDatabase.js",
+    "db:reset": "node scripts/setupDatabase.js --reset",
+    "db:large": "node scripts/setupDatabase.js --reset --large",
+    "smoke": "node scripts/smokeTest.js"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +27,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "nodemailer": "^9.0.1",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
     "socket.io": "^4.8.3",
     "tesseract.js": "^7.0.0",

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 export interface CurrentUser {
   id?: number;
@@ -37,6 +37,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() =>
     normalizeUser(readStoredUser())
   );
+
+  useEffect(() => {
+    const syncAuthentication = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage) return;
+      if (event.key !== 'user' && event.key !== 'token' && event.key !== null) return;
+      setCurrentUser(normalizeUser(readStoredUser()));
+    };
+
+    window.addEventListener('storage', syncAuthentication);
+    return () => window.removeEventListener('storage', syncAuthentication);
+  }, []);
 
   const login = (user: CurrentUser) => {
     const normalizedUser = normalizeUser(user);

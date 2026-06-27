@@ -1,6 +1,5 @@
 import crypto from 'node:crypto';
 import { pool } from '../db.js';
-import { numericToGpaPoints } from './studentGradePdfService.js';
 
 function normalizeRole(role) {
   return String(role || '').trim().toUpperCase();
@@ -20,13 +19,22 @@ function safeNumeric(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function numericToGpaPoints(numericGrade) {
+  if (numericGrade === null || numericGrade === undefined) return null;
+  if (numericGrade >= 8.5) return 4;
+  if (numericGrade >= 7) return 3;
+  if (numericGrade >= 5.5) return 2;
+  if (numericGrade >= 4) return 1;
+  return 0;
+}
+
 export async function ensureStudentGradeImportSchema(client = pool) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS student_grade_imports (
       id BIGSERIAL PRIMARY KEY,
       student_id BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
       mssv VARCHAR(50) NOT NULL,
-      source VARCHAR(50) NOT NULL DEFAULT 'uit-portal-pdf',
+      source VARCHAR(50) NOT NULL DEFAULT 'uit-daa-session',
       raw_payload JSONB NOT NULL,
       normalized_payload JSONB NOT NULL,
       status VARCHAR(20) NOT NULL DEFAULT 'PENDING'
@@ -72,7 +80,7 @@ export async function createStudentGradeImport({ student, payload }) {
   const mismatch = mssv && normalizeText(student.mssv) !== mssv;
   const status = mismatch ? 'FAILED' : 'PENDING';
   const errorMessage = mismatch
-    ? `MSSV trong PDF (${mssv}) không trùng với tài khoản đang đăng nhập (${student.mssv}).`
+    ? `MSSV trong dữ liệu đồng bộ (${mssv}) không trùng với tài khoản đang đăng nhập (${student.mssv}).`
     : null;
 
   const result = await pool.query(
@@ -92,7 +100,7 @@ export async function createStudentGradeImport({ student, payload }) {
     [
       student.id,
       mssv || student.mssv,
-      payload.source || 'uit-portal-pdf',
+      payload.source || 'uit-daa-session',
       payload,
       payload,
       status,
@@ -128,7 +136,7 @@ export async function importStudentGrades({ importId, user }) {
     const student = studentResult.rows[0];
     if (!student) {
       await client.query('ROLLBACK');
-      return { status: 403, body: { message: 'Chỉ sinh viên mới được import bảng điểm.' } };
+      return { status: 403, body: { message: 'Chỉ sinh viên mới được đồng bộ bảng điểm.' } };
     }
 
     const importResult = await client.query(
@@ -144,7 +152,7 @@ export async function importStudentGrades({ importId, user }) {
     const gradeImport = importResult.rows[0];
     if (!gradeImport) {
       await client.query('ROLLBACK');
-      return { status: 404, body: { message: 'Không tìm thấy lần import bảng điểm.' } };
+      return { status: 404, body: { message: 'Không tìm thấy lần đồng bộ bảng điểm.' } };
     }
 
     if (gradeImport.status === 'FAILED') {
@@ -153,9 +161,9 @@ export async function importStudentGrades({ importId, user }) {
     }
 
     const payload = gradeImport.normalized_payload;
-    const pdfMssv = normalizeText(payload.student?.mssv || '');
-    if (pdfMssv !== normalizeText(student.mssv)) {
-      const message = `MSSV trong PDF (${pdfMssv || 'không rõ'}) không trùng với tài khoản đang đăng nhập (${student.mssv}).`;
+    const importedMssv = normalizeText(payload.student?.mssv || '');
+    if (importedMssv !== normalizeText(student.mssv)) {
+      const message = `MSSV trong dữ liệu đồng bộ (${importedMssv || 'không rõ'}) không trùng với tài khoản đang đăng nhập (${student.mssv}).`;
       await client.query(
         `UPDATE student_grade_imports SET status = 'FAILED', error_message = $1 WHERE id = $2`,
         [message, importId]
@@ -239,7 +247,7 @@ export async function importStudentGrades({ importId, user }) {
           numericGrade,
           gpaPoints,
           status,
-          payload.source || 'uit-portal-pdf',
+          payload.source || 'uit-daa-session',
           sourceHash,
         ]
       );
@@ -261,7 +269,7 @@ export async function importStudentGrades({ importId, user }) {
     return {
       status: 200,
       body: {
-        message: 'Import bảng điểm thành công.',
+        message: 'Đồng bộ bảng điểm thành công.',
         imported_count: importedCount,
         skipped_count: skippedCount,
       },

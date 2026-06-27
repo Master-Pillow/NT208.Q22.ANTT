@@ -56,6 +56,106 @@ router.get('/students', async (_req, res) => {
   }
 });
 
+// GET /admin/students/:id/academic - hồ sơ và bảng điểm đã đồng bộ
+router.get('/students/:id/academic', async (req, res) => {
+  try {
+    const studentId = Number(req.params.id);
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      return res.status(400).json({ message: 'Mã sinh viên nội bộ không hợp lệ.' });
+    }
+
+    const [studentResult, summaryResult, coursesResult] = await Promise.all([
+      pool.query(
+        `
+        SELECT
+          s.id,
+          s.mssv,
+          s.full_name,
+          s.email,
+          s.phone,
+          s.class_code,
+          s.cohort,
+          s.status,
+          u.email AS login_email
+        FROM students s
+        LEFT JOIN users u
+          ON u.student_id = s.id
+         AND UPPER(u.role) = 'STUDENT'
+        WHERE s.id = $1
+        LIMIT 1
+        `,
+        [studentId]
+      ),
+      pool.query(
+        `
+        SELECT
+          COUNT(e.id)::int AS total_courses,
+          COALESCE(SUM(c.credits), 0)::int AS total_credits,
+          COALESCE(SUM(c.credits) FILTER (
+            WHERE COALESCE(g.status, 'GRADED') = 'GRADED'
+              AND COALESCE(g.letter_grade, 'F') <> 'F'
+          ), 0)::int AS earned_credits,
+          COUNT(*) FILTER (
+            WHERE g.letter_grade = 'F' OR COALESCE(g.status, 'GRADED') = 'ABSENT'
+          )::int AS failed_courses,
+          ROUND(
+            SUM(g.gpa_points * c.credits::numeric) FILTER (
+              WHERE COALESCE(g.status, 'GRADED') = 'GRADED'
+            )
+            / NULLIF(SUM(c.credits::numeric) FILTER (
+              WHERE COALESCE(g.status, 'GRADED') = 'GRADED'
+            ), 0),
+            2
+          ) AS cumulative_gpa,
+          ROUND(AVG(g.numeric_grade) FILTER (
+            WHERE COALESCE(g.status, 'GRADED') = 'GRADED'
+          )::numeric, 2) AS average_numeric,
+          MAX(g.imported_at) AS last_synced_at
+        FROM enrollments e
+        JOIN courses c ON c.id = e.course_id
+        LEFT JOIN grades g ON g.enrollment_id = e.id
+        WHERE e.student_id = $1
+        `,
+        [studentId]
+      ),
+      pool.query(
+        `
+        SELECT
+          c.code,
+          c.name,
+          c.credits,
+          e.semester,
+          g.numeric_grade,
+          g.letter_grade,
+          g.gpa_points,
+          COALESCE(g.status, 'GRADED') AS status,
+          g.source,
+          g.imported_at
+        FROM enrollments e
+        JOIN courses c ON c.id = e.course_id
+        LEFT JOIN grades g ON g.enrollment_id = e.id
+        WHERE e.student_id = $1
+        ORDER BY e.semester DESC, c.code ASC
+        `,
+        [studentId]
+      ),
+    ]);
+
+    if (studentResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy sinh viên.' });
+    }
+
+    return res.json({
+      student: studentResult.rows[0],
+      summary: summaryResult.rows[0],
+      courses: coursesResult.rows,
+    });
+  } catch (err) {
+    console.error('GET /admin/students/:id/academic ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể lấy bảng điểm sinh viên.' });
+  }
+});
+
 // POST /admin/student-accounts/import - admin import lớp, sinh viên và tài khoản STUDENT từ CSV
 router.post('/student-accounts/import', studentAccountUpload.single('file'), async (req, res) => {
   try {

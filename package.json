@@ -1,5 +1,15 @@
 {
-  "dependencies": {
-    "pdf-parse": "^2.4.5"
+  "name": "advisorhub",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "setup": "npm run install:all && npm run db:setup",
+    "db:setup": "npm run db:setup --prefix backend",
+    "db:reset": "npm run db:reset --prefix backend",
+    "db:large": "npm run db:large --prefix backend",
+    "dev": "node scripts/dev.js",
+    "smoke": "npm run smoke --prefix backend",
+    "check": "npm run lint --prefix frontend && npm run build --prefix frontend"
   }
 }

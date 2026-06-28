@@ -30,4 +30,11 @@ export const config = {
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
   },
+  alerts: {
+    // Tự động gửi email cảnh báo học vụ tới sinh viên khi phát hiện bất thường mới.
+    emailEnabled:
+      String(process.env.ALERT_EMAIL_ENABLED ?? 'true').toLowerCase() !== 'false',
+    // Không gửi quá 1 email/ sinh viên trong khoảng thời gian này (giờ) để tránh spam.
+    throttleHours: Number(process.env.ALERT_EMAIL_THROTTLE_HOURS) || 12,
+  },
 };

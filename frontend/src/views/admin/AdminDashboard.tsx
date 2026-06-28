@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Users, BookOpen, AlertTriangle, GraduationCap, AlertCircle, Loader2 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import apiClient from '../../lib/api';
+import { AdminAnalytics } from './AdminAnalytics';
 
 const COLORS = ['#004ac6', '#2563eb', '#93c5fd', '#ba1a1a'];
 
@@ -142,6 +143,9 @@ export const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Phân tích chuyên sâu: toàn trường (T1–T4) + theo khoá (K1–K4) + AI */}
+      <AdminAnalytics />
     </div>
   );
 };

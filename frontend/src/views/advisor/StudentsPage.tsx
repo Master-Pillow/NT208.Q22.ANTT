@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, GraduationCap, Loader2, Mail, Network, TrendingDown, X } from 'lucide-react';
+import { ArrowLeft, GraduationCap, LineChart as LineChartIcon, Loader2, Mail, TrendingDown, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bar,
@@ -17,7 +17,9 @@ import {
   Cell,
 } from 'recharts';
 import { PageLayout } from '../../components/layout/PageLayout';
-import apiClient from '../../lib/api';
+import apiClient, { getAdvisorStudentMetrics, type StudentMetricsData } from '../../lib/api';
+import { AiInsightPanel } from '../../components/AiInsightPanel';
+import { StudentMetricsCharts } from '../../components/StudentMetricsCharts';
 
 interface Student {
   id: number;
@@ -29,8 +31,15 @@ interface Student {
   credit_debt: number;
 }
 
-interface SelectedList {
-  type: 'teaching' | 'advising';
+interface AdvisorClass {
+  code: string;
+  name?: string | null;
+  cohort?: string | null;
+  program?: string | null;
+  student_count: number;
+}
+
+interface SelectedClass {
   code: string;
   title: string;
   students: Student[];
@@ -42,20 +51,8 @@ interface ClassMetrics {
   fail_rate: number;
   at_risk_count: number;
   grade_distribution: Record<string, number>;
-  gpa_by_semester: Array<{
-    semester: string;
-    avg_gpa: number | null;
-    avg_numeric: number | null;
-    fail_rate: number;
-  }>;
-  failrate_by_course: Array<{
-    code: string;
-    name: string;
-    total: number;
-    failed: number;
-    absent: number;
-    fail_rate: number;
-  }>;
+  gpa_by_semester: Array<{ semester: string; avg_gpa: number | null; fail_rate: number }>;
+  failrate_by_course: Array<{ code: string; name: string; fail_rate: number }>;
   gpa_histogram: Array<{ bucket: string; count: number }>;
   top_improving: Array<{ full_name: string; mssv: string; gpa_delta: number }>;
   top_declining: Array<{ full_name: string; mssv: string; gpa_delta: number }>;
@@ -92,13 +89,8 @@ interface AdvisorAcademicDetail {
   };
   semesters: AdvisorAcademicSemester[];
 }
-const teachingClasses = [
-  { code: 'IT001.N11', title: 'Cấu trúc dữ liệu', Icon: Network },
-  { code: 'NT101.N22', title: 'Mạng máy tính', Icon: BookOpen },
-];
 
 const STUDENTS_PER_PAGE = 15;
-
 const gradeColors: Record<string, string> = {
   A: '#2563eb',
   B: '#059669',
@@ -112,44 +104,52 @@ const gradeColors: Record<string, string> = {
 export default function StudentsPage() {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
+  const [classes, setClasses] = useState<AdvisorClass[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedList, setSelectedList] = useState<SelectedList | null>(null);
+  const [selectedClass, setSelectedClass] = useState<SelectedClass | null>(null);
   const [classMetrics, setClassMetrics] = useState<ClassMetrics | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentMetrics, setStudentMetrics] = useState<StudentMetricsData | null>(null);
+  const [studentMetricsLoading, setStudentMetricsLoading] = useState(false);
   const [academicDetail, setAcademicDetail] = useState<AdvisorAcademicDetail | null>(null);
   const [academicLoading, setAcademicLoading] = useState(false);
   const [academicError, setAcademicError] = useState<string | null>(null);
   const [studentPage, setStudentPage] = useState(1);
 
   useEffect(() => {
-    async function fetchStudents() {
+    async function loadData() {
       try {
-        const { data } = await apiClient.get('/advisor/students');
-        setStudents(Array.isArray(data) ? data : []);
+        setLoading(true);
+        const [studentsRes, classesRes] = await Promise.all([
+          apiClient.get('/advisor/students'),
+          apiClient.get('/advisor/classes'),
+        ]);
+        setStudents(Array.isArray(studentsRes.data) ? studentsRes.data : []);
+        setClasses(Array.isArray(classesRes.data) ? classesRes.data : []);
       } catch (error) {
-        console.error('Lỗi lấy danh sách sinh viên:', error);
+        console.error('Lỗi lấy dữ liệu lớp cố vấn:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchStudents();
+    loadData();
   }, []);
 
   useEffect(() => {
     setStudentPage(1);
-  }, [selectedList?.type, selectedList?.code]);
-
+  }, [selectedClass?.code]);
   useEffect(() => {
     async function fetchClassMetrics() {
-      if (!selectedList || selectedList.type !== 'advising') {
+      if (!selectedClass) {
         setClassMetrics(null);
         return;
       }
 
       try {
         setMetricsLoading(true);
-        const { data } = await apiClient.get(`/advisor/classes/${selectedList.code}/metrics`);
+        const { data } = await apiClient.get(`/advisor/classes/${selectedClass.code}/metrics`);
         setClassMetrics(data);
       } catch (error) {
         console.error('Lỗi lấy phân tích lớp:', error);
@@ -160,24 +160,28 @@ export default function StudentsPage() {
     }
 
     fetchClassMetrics();
-  }, [selectedList]);
+  }, [selectedClass]);
 
-  const advisingClasses = useMemo(() => {
-    const classMap = new Map<string, { code: string; cohort: string; students: Student[] }>();
-
-    students.forEach((student) => {
-      if (!classMap.has(student.class_code)) {
-        classMap.set(student.class_code, {
-          code: student.class_code,
-          cohort: student.cohort || 'N/A',
-          students: [],
-        });
+  useEffect(() => {
+    async function fetchStudentMetrics() {
+      if (!selectedStudent) {
+        setStudentMetrics(null);
+        return;
       }
-      classMap.get(student.class_code)?.students.push(student);
-    });
+      try {
+        setStudentMetricsLoading(true);
+        const { data } = await getAdvisorStudentMetrics(selectedStudent.id);
+        setStudentMetrics(data);
+      } catch (error) {
+        console.error('Lỗi lấy phân tích sinh viên:', error);
+        setStudentMetrics(null);
+      } finally {
+        setStudentMetricsLoading(false);
+      }
+    }
 
-    return Array.from(classMap.values());
-  }, [students]);
+    fetchStudentMetrics();
+  }, [selectedStudent]);
 
   const gradeDistribution = useMemo(() => {
     if (!classMetrics) return [];
@@ -186,8 +190,13 @@ export default function StudentsPage() {
       .map(([name, value]) => ({ name, value }));
   }, [classMetrics]);
 
-  const getTeachingStudents = (classIndex: number) =>
-    students.filter((_, index) => index % teachingClasses.length === classIndex);
+  const openClass = (item: AdvisorClass) => {
+    setSelectedClass({
+      code: item.code,
+      title: `${item.code} - Khóa ${item.cohort || 'N/A'}`,
+      students: students.filter((student) => student.class_code === item.code),
+    });
+  };
 
   const openMessages = (student: Student) => {
     navigate('/advisor/messages', {
@@ -200,7 +209,6 @@ export default function StudentsPage() {
       },
     });
   };
-
   const openAcademicDetail = async (student: Student) => {
     try {
       setAcademicLoading(true);
@@ -240,7 +248,7 @@ export default function StudentsPage() {
   };
 
   const renderClassMetrics = () => {
-    if (selectedList?.type !== 'advising') return null;
+    if (!selectedClass) return null;
 
     if (metricsLoading) {
       return <div className="rounded-2xl bg-white p-6 text-sm font-semibold text-slate-500">Đang tải phân tích lớp...</div>;
@@ -270,14 +278,14 @@ export default function StudentsPage() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">GPA trung bình theo kỳ</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={classMetrics.gpa_by_semester}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="semester" tick={{ fontSize: 12 }} />
-                  <YAxis domain={[0, 4]} tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip />
                   <Legend />
                   <Line dataKey="avg_gpa" name="GPA TB" stroke="#2563eb" strokeWidth={3} connectNulls />
@@ -287,7 +295,7 @@ export default function StudentsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">Phân bố điểm</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -304,8 +312,8 @@ export default function StudentsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-black text-slate-900">Phân bố GPA sinh viên</h3>
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-black text-slate-900">Phân bố GPA</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={classMetrics.gpa_histogram}>
@@ -319,7 +327,7 @@ export default function StudentsPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-black text-slate-900">Môn có tỷ lệ rớt cao</h3>
             <div className="mt-5 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -335,37 +343,7 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-6">
-            <h3 className="text-lg font-black text-emerald-900">Top sinh viên tiến bộ</h3>
-            <div className="mt-4 space-y-3">
-              {classMetrics.top_improving.length ? classMetrics.top_improving.map((student) => (
-                <div key={student.mssv} className="flex items-center justify-between rounded-xl bg-white px-4 py-3">
-                  <div>
-                    <p className="font-bold text-slate-900">{student.full_name}</p>
-                    <p className="text-xs font-semibold text-slate-400">{student.mssv}</p>
-                  </div>
-                  <span className="font-black text-emerald-700">+{Number(student.gpa_delta).toFixed(2)}</span>
-                </div>
-              )) : <p className="text-sm font-semibold text-emerald-700">Chưa có dữ liệu đủ để xếp hạng.</p>}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-red-100 bg-red-50 p-6">
-            <h3 className="text-lg font-black text-red-900">Top sinh viên tụt GPA</h3>
-            <div className="mt-4 space-y-3">
-              {classMetrics.top_declining.length ? classMetrics.top_declining.map((student) => (
-                <div key={student.mssv} className="flex items-center justify-between rounded-xl bg-white px-4 py-3">
-                  <div>
-                    <p className="font-bold text-slate-900">{student.full_name}</p>
-                    <p className="text-xs font-semibold text-slate-400">{student.mssv}</p>
-                  </div>
-                  <span className="font-black text-red-700">{Number(student.gpa_delta).toFixed(2)}</span>
-                </div>
-              )) : <p className="text-sm font-semibold text-red-700">Chưa phát hiện sinh viên tụt GPA.</p>}
-            </div>
-          </div>
-        </div>
+        <AiInsightPanel scope="class" id={selectedClass.code} title={`AI phân tích lớp ${selectedClass.code}`} />
       </section>
     );
   };
@@ -490,7 +468,6 @@ export default function StudentsPage() {
       </div>
     );
   };
-
   const renderStudentTable = (rows: Student[]) => {
     const totalResults = rows.length;
     const totalPages = Math.max(1, Math.ceil(totalResults / STUDENTS_PER_PAGE));
@@ -537,17 +514,26 @@ export default function StudentsPage() {
                   </td>
                   <td className="px-6 py-5 font-mono font-semibold text-slate-600">{student.mssv}</td>
                   <td className="px-6 py-5 text-center font-bold text-primary">{student.class_code}</td>
-                  <td className="px-6 py-5 text-center font-bold text-slate-700">
-                    {Number(student.current_gpa || 0).toFixed(2)}
-                  </td>
+                  <td className="px-6 py-5 text-center font-bold text-slate-700">{Number(student.current_gpa || 0).toFixed(2)}</td>
                   <td className="px-8 py-5 text-right">
-                    <button
-                      onClick={() => openMessages(student)}
-                      className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-primary hover:bg-primary hover:text-white"
-                    >
-                      <Mail className="w-4 h-4" />
-                      Nhắn tin
-                    </button>
+                    <div className="inline-flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStudent(student)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white"
+                      >
+                        <LineChartIcon className="w-4 h-4" />
+                        Xem phân tích
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openMessages(student)}
+                        className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-2 text-sm font-bold text-primary hover:bg-primary hover:text-white"
+                      >
+                        <Mail className="w-4 h-4" />
+                        Nhắn tin
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -586,13 +572,48 @@ export default function StudentsPage() {
       </section>
     );
   };
+  const renderStudentDetail = () => {
+    if (!selectedStudent) return null;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setSelectedStudent(null)}
+          className="flex items-center text-sm font-semibold text-slate-500 hover:text-primary transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Quay lại danh sách sinh viên
+        </button>
+
+        <div>
+          <p className="text-sm font-bold uppercase tracking-normal text-slate-400">Sinh viên</p>
+          <h2 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">{selectedStudent.full_name}</h2>
+          <p className="mt-2 text-slate-500 font-medium">MSSV {selectedStudent.mssv} · Lớp {selectedStudent.class_code}</p>
+        </div>
+
+        <AiInsightPanel scope="student" id={selectedStudent.id} title={`AI phân tích ${selectedStudent.full_name}`} />
+
+        {studentMetricsLoading ? (
+          <div className="rounded-2xl bg-white p-6 text-sm font-semibold text-slate-500">Đang tải phân tích sinh viên...</div>
+        ) : studentMetrics ? (
+          <StudentMetricsCharts metrics={studentMetrics} />
+        ) : (
+          <div className="rounded-2xl bg-white p-6 text-sm font-semibold text-slate-400">Chưa có dữ liệu điểm cho sinh viên này.</div>
+        )}
+      </>
+    );
+  };
+
   return (
     <PageLayout title="Sinh viên lớp mình" breadcrumb={['ADVISOR', 'Sinh viên lớp mình']}>
       <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in duration-500">
-        {selectedList ? (
+        {selectedStudent ? (
+          renderStudentDetail()
+        ) : selectedClass ? (
           <>
             <button
-              onClick={() => setSelectedList(null)}
+              type="button"
+              onClick={() => setSelectedClass(null)}
               className="flex items-center text-sm font-semibold text-slate-500 hover:text-primary transition-colors"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
@@ -600,97 +621,44 @@ export default function StudentsPage() {
             </button>
 
             <div>
-              <p className="text-sm font-bold uppercase tracking-normal text-slate-400">
-                {selectedList.type === 'teaching' ? 'Lớp môn học' : 'Lớp sinh hoạt'}
-              </p>
-              <h2 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">
-                {selectedList.title}
-              </h2>
-              <p className="mt-2 text-slate-500 font-medium">
-                {selectedList.students.length} sinh viên
-              </p>
+              <p className="text-sm font-bold uppercase tracking-normal text-slate-400">Lớp sinh hoạt</p>
+              <h2 className="font-headline text-4xl font-extrabold text-on-surface tracking-tight">{selectedClass.title}</h2>
+              <p className="mt-2 text-slate-500 font-medium">{selectedClass.students.length} sinh viên</p>
             </div>
 
             {renderClassMetrics()}
-            {renderStudentTable(selectedList.students)}
+            {renderStudentTable(selectedClass.students)}
           </>
         ) : (
           <>
             <div>
-              <h2 className="text-4xl font-headline font-black text-on-surface mb-2">
-                Quản lý lớp học
-              </h2>
+              <h2 className="text-4xl font-headline font-black text-on-surface mb-2">Quản lý lớp cố vấn</h2>
               <p className="text-slate-500 font-medium">
-                Tách riêng lớp môn học đang giảng dạy và lớp sinh hoạt đang cố vấn.
+                Lớp được lấy từ phân công của admin. Admin import sinh viên và tài khoản, cố vấn xem danh sách và phân tích lớp.
               </p>
             </div>
 
             <section>
               <div className="flex items-center gap-4 mb-5">
-                <div className="h-8 w-1.5 bg-primary rounded-full" />
-                <h3 className="font-headline text-2xl font-bold text-on-surface">
-                  Lớp môn học đang giảng dạy
-                </h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {teachingClasses.map((item, index) => {
-                  const rows = getTeachingStudents(index);
-                  const Icon = item.Icon;
-
-                  return (
-                    <button
-                      key={item.code}
-                      onClick={() =>
-                        setSelectedList({
-                          type: 'teaching',
-                          code: item.code,
-                          title: `${item.title} (${item.code})`,
-                          students: rows,
-                        })
-                      }
-                      className="text-left rounded-2xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-all"
-                    >
-                      <Icon className="w-6 h-6 text-primary mb-5" />
-                      <h4 className="text-xl font-black text-slate-900">{item.title}</h4>
-                      <p className="text-sm font-semibold text-slate-400 mt-1">{item.code}</p>
-                      <p className="mt-6 text-3xl font-black text-primary">{rows.length}</p>
-                      <p className="text-xs font-bold uppercase tracking-normal text-slate-400">Sinh viên</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section>
-              <div className="flex items-center gap-4 mb-5">
                 <div className="h-8 w-1.5 bg-secondary-container rounded-full" />
-                <h3 className="font-headline text-2xl font-bold text-on-surface">
-                  Lớp sinh hoạt đang cố vấn
-                </h3>
+                <h3 className="font-headline text-2xl font-bold text-on-surface">Lớp sinh hoạt đang cố vấn</h3>
               </div>
               {loading ? (
                 <p className="text-sm text-slate-400">Đang tải dữ liệu lớp...</p>
-              ) : advisingClasses.length === 0 ? (
-                <p className="text-sm text-slate-400">Bạn chưa được phân công lớp sinh hoạt nào.</p>
+              ) : classes.length === 0 ? (
+                <p className="text-sm text-slate-400">Bạn chưa được admin phân công lớp sinh hoạt nào.</p>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {advisingClasses.map((item) => (
+                  {classes.map((item) => (
                     <button
                       key={item.code}
-                      onClick={() =>
-                        setSelectedList({
-                          type: 'advising',
-                          code: item.code,
-                          title: `${item.code} - Khóa ${item.cohort}`,
-                          students: item.students,
-                        })
-                      }
+                      onClick={() => openClass(item)}
                       className="relative overflow-hidden text-left rounded-2xl border border-slate-100 bg-white p-8 shadow-sm hover:shadow-md transition-all"
                     >
                       <GraduationCap className="absolute -right-8 -top-8 w-32 h-32 text-primary opacity-[0.04]" />
                       <h4 className="text-3xl font-black text-slate-900">{item.code}</h4>
-                      <p className="text-sm font-semibold text-slate-400 mt-1">Khóa {item.cohort}</p>
-                      <p className="mt-8 text-4xl font-black text-primary">{item.students.length}</p>
+                      <p className="text-sm font-semibold text-slate-400 mt-1">Khóa {item.cohort || 'N/A'}</p>
+                      <p className="mt-8 text-4xl font-black text-primary">{item.student_count}</p>
                       <p className="text-xs font-bold uppercase tracking-normal text-slate-400">Sinh viên cố vấn</p>
                       <div className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-blue-700">
                         <TrendingDown className="h-4 w-4" />

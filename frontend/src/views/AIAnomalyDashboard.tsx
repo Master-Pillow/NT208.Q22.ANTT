@@ -286,8 +286,21 @@ export const AIAnomalyDashboard: React.FC<AIAnomalyDashboardProps> = ({ currentU
     setMessage('');
     try {
       const { data } = await runAnomalyDetection(classCode || undefined);
+      const emailStats = data.summary.emailStats;
+      let emailNote = '';
+      if (emailStats) {
+        if (emailStats.disabled) {
+          emailNote = ' (email cảnh báo đang tắt)';
+        } else if (emailStats.sent > 0) {
+          emailNote = ` Đã gửi ${emailStats.sent} email cảnh báo tới sinh viên.`;
+        } else if (emailStats.skippedNoSmtp > 0) {
+          emailNote = ' (chưa cấu hình SMTP nên chưa gửi email)';
+        } else if (emailStats.throttled > 0) {
+          emailNote = ` (bỏ qua ${emailStats.throttled} email do gửi quá gần đây)`;
+        }
+      }
       setMessage(
-        `Đã quét ${data.summary.scannedStudents} sinh viên, tạo ${data.summary.insertedAnomalies} cảnh báo mới.`
+        `Đã quét ${data.summary.scannedStudents} sinh viên, tạo ${data.summary.insertedAnomalies} cảnh báo mới.${emailNote}`
       );
       await fetchDashboard();
     } catch (err: any) {

@@ -157,10 +157,10 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
 
         const convId: number = data.id;
 
-        // Kiểm tra xem đã có trong list chưa
-        const exists = chats.find(c => c.id === convId);
-        if (!exists) {
-          // Thêm vào đầu danh sách
+        // Dedupe theo state MỚI NHẤT (prev) để tránh trùng do race với effect fetch.
+        // (Dùng biến `chats` trong closure sẽ là giá trị cũ → dễ chèn trùng.)
+        setChats(prev => {
+          if (prev.some(c => c.id === convId)) return prev;
           const newChat: Chat = {
             id:          convId,
             student_id:  initialContact!.id,
@@ -171,8 +171,8 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
             unreadCount: 0,
             isUnread: false,
           };
-          setChats(prev => [newChat, ...prev]);
-        }
+          return [newChat, ...prev];
+        });
 
         setActiveChatId(convId);
       } catch (err) {

@@ -10,6 +10,7 @@ export const pageImporters = {
 
   adminDashboard: () => import('../views/admin/DashboardPage'),
   adminStudents: () => import('../views/admin/StudentsPage'),
+  adminStudentAcademic: () => import('../views/admin/StudentAcademicDetailPage'),
   adminClasses: () => import('../views/admin/ClassesPage'),
   adminAdvisors: () => import('../views/admin/AdvisorsPage'),
   adminCourses: () => import('../views/admin/CoursesPage'),

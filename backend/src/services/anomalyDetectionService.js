@@ -1,4 +1,6 @@
 import { pool } from '../db.js';
+import { config } from '../config.js';
+import { sendStudentAlertEmail } from './emailService.js';
 
 const HIGH_RISK_COURSE_CODES = new Set([
   'IT002',
@@ -125,6 +127,22 @@ export const ensureAiTables = async (client = pool) => {
 
     CREATE INDEX IF NOT EXISTS idx_ai_briefs_advisor_class_created
       ON ai_briefs(advisor_id, class_code, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ai_student_alert_emails (
+      id BIGSERIAL PRIMARY KEY,
+      student_id BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+      email VARCHAR(255),
+      subject VARCHAR(255),
+      anomaly_count INT NOT NULL DEFAULT 0,
+      anomaly_types JSONB NOT NULL DEFAULT '[]'::jsonb,
+      status VARCHAR(20) NOT NULL DEFAULT 'SENT'
+        CHECK (status IN ('SENT', 'SKIPPED', 'FAILED')),
+      error_message TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ai_student_alert_emails_student_created
+      ON ai_student_alert_emails(student_id, created_at DESC);
   `);
 };
 
@@ -194,6 +212,7 @@ const loadStudentSnapshots = async ({ client, user, classCode }) => {
       s.id AS student_id,
       s.mssv,
       s.full_name,
+      s.email,
       s.class_code,
       s.cohort,
       assigned.advisor_id,
@@ -231,6 +250,7 @@ const loadStudentSnapshots = async ({ client, user, classCode }) => {
         id: Number(row.student_id),
         mssv: row.mssv,
         fullName: row.full_name,
+        email: row.email || null,
         classCode: row.class_code,
         cohort: row.cohort,
         advisorId: row.advisor_id ? Number(row.advisor_id) : null,
@@ -521,6 +541,102 @@ const insertAnomaly = async (client, anomaly) => {
   return result.rows[0];
 };
 
+/**
+ * Gửi email cảnh báo (digest) cho các sinh viên vừa phát sinh bất thường MỚI.
+ * Chạy NGOÀI transaction (sau COMMIT) để không giữ kết nối DB trong lúc gọi SMTP,
+ * best-effort (lỗi gửi mail không làm hỏng lượt quét), có throttle theo sinh viên.
+ *
+ * @param {Map<number, {student: object, anomalies: object[]}>} insertedByStudent
+ */
+const dispatchStudentAlertEmails = async (insertedByStudent) => {
+  const stats = {
+    candidates: insertedByStudent.size,
+    sent: 0,
+    throttled: 0,
+    skippedNoEmail: 0,
+    skippedNoSmtp: 0,
+    failed: 0,
+  };
+
+  if (!config.alerts.emailEnabled) {
+    return { ...stats, disabled: true };
+  }
+
+  const throttleMs = Math.max(0, config.alerts.throttleHours) * 60 * 60 * 1000;
+
+  for (const { student, anomalies } of insertedByStudent.values()) {
+    if (!student.email) {
+      stats.skippedNoEmail += 1;
+      continue;
+    }
+
+    if (throttleMs > 0) {
+      const last = await pool.query(
+        `
+        SELECT created_at
+        FROM ai_student_alert_emails
+        WHERE student_id = $1 AND status = 'SENT'
+        ORDER BY created_at DESC
+        LIMIT 1
+        `,
+        [student.id]
+      );
+      const lastSent = last.rows[0] ? new Date(last.rows[0].created_at).getTime() : null;
+      if (lastSent !== null && Date.now() - lastSent < throttleMs) {
+        stats.throttled += 1;
+        continue;
+      }
+    }
+
+    const subject = `Cảnh báo học vụ: ${anomalies.length} vấn đề cần lưu ý`;
+    let status = 'SENT';
+    let errorMessage = null;
+
+    try {
+      const result = await sendStudentAlertEmail({
+        to: student.email,
+        studentName: student.fullName,
+        anomalies,
+      });
+      if (result.sent) {
+        stats.sent += 1;
+      } else {
+        status = 'SKIPPED';
+        errorMessage = result.reason || 'not_sent';
+        stats.skippedNoSmtp += 1;
+      }
+    } catch (err) {
+      status = 'FAILED';
+      errorMessage = err.message;
+      stats.failed += 1;
+      console.error('[ai/anomaly] Gửi email cảnh báo thất bại:', err.message);
+    }
+
+    try {
+      await pool.query(
+        `
+        INSERT INTO ai_student_alert_emails
+          (student_id, email, subject, anomaly_count, anomaly_types, status, error_message)
+        VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+        `,
+        [
+          student.id,
+          student.email,
+          subject,
+          anomalies.length,
+          JSON.stringify(anomalies.map((a) => a.anomaly_type)),
+          status,
+          errorMessage,
+        ]
+      );
+    } catch (logErr) {
+      console.error('[ai/anomaly] Không ghi được log email cảnh báo:', logErr.message);
+    }
+  }
+
+  return stats;
+};
+
 export const runAnomalyDetection = async ({
   runType = 'MANUAL',
   user,
@@ -552,6 +668,7 @@ export const runAnomalyDetection = async ({
     let insertedCount = 0;
     let skippedDuplicateCount = 0;
     let candidateCount = 0;
+    const insertedByStudent = new Map();
 
     for (const student of students) {
       const targetAdvisorId =
@@ -570,10 +687,15 @@ export const runAnomalyDetection = async ({
           continue;
         }
 
-        await insertAnomaly(client, anomaly);
+        const insertedRow = await insertAnomaly(client, anomaly);
         insertedCount += 1;
         severityCounts[anomaly.severity] += 1;
         typeCounts[anomaly.anomaly_type] = (typeCounts[anomaly.anomaly_type] || 0) + 1;
+
+        if (!insertedByStudent.has(student.id)) {
+          insertedByStudent.set(student.id, { student, anomalies: [] });
+        }
+        insertedByStudent.get(student.id).anomalies.push(insertedRow);
       }
     }
 
@@ -603,6 +725,22 @@ export const runAnomalyDetection = async ({
     );
 
     await client.query('COMMIT');
+
+    // Gửi email cảnh báo cho sinh viên (best-effort, ngoài transaction).
+    const emailStats = await dispatchStudentAlertEmails(insertedByStudent);
+    summary.emailStats = emailStats;
+
+    if (emailStats.sent || emailStats.failed || emailStats.throttled || emailStats.skippedNoSmtp) {
+      try {
+        await pool.query(
+          `UPDATE ai_anomaly_runs SET summary_json = $2::jsonb WHERE id = $1`,
+          [runId, JSON.stringify(summary)]
+        );
+      } catch (updateErr) {
+        console.error('[ai/anomaly] Không cập nhật được summary email:', updateErr.message);
+      }
+    }
+
     return summary;
   } catch (err) {
     await client.query('ROLLBACK');

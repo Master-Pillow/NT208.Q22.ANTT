@@ -1,6 +1,8 @@
 // routes/advisorRoutes.js
 import { Router } from 'express';
 import { advisorCanAccessClass, getClassMetrics } from '../services/classMetricsService.js';
+import { getAdvisorMetrics } from '../services/cohortSystemMetricsService.js';
+import { getStudentMetricsById } from '../services/studentMetricsService.js';
 import { ensureStudentGradeImportSchema } from '../services/studentGradeImportService.js';
 import { pool } from '../db.js';   // â† relative path lÃªn thÆ° má»¥c cha
 
@@ -8,6 +10,13 @@ const router = Router();
 
 function normalizeRole(role) {
   return String(role || '').trim().toUpperCase();
+}
+
+function requireAdvisorRole(req, res, next) {
+  if (normalizeRole(req.user?.role) !== 'ADVISOR') {
+    return res.status(403).json({ message: 'Chỉ cố vấn mới được thực hiện thao tác này.' });
+  }
+  return next();
 }
 
 // GET /advisor/students?advisorId=<id>
@@ -63,6 +72,34 @@ router.get('/students', async (req, res) => {
   } catch (err) {
     console.error('GET /advisor/students ERROR:', err.message);
     return res.status(500).json({ message: 'Lá»—i server khi láº¥y danh sÃ¡ch sinh viÃªn.' });
+  }
+});
+
+// GET /advisor/classes - danh sách lớp sinh hoạt được admin phân công, kể cả lớp chưa có sinh viên
+router.get('/classes', requireAdvisorRole, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        cl.code,
+        cl.name,
+        cl.cohort,
+        cl.program,
+        COUNT(s.id)::int AS student_count
+      FROM advisor_class ac
+      JOIN admin_classes cl ON cl.code = ac.class_code
+      LEFT JOIN students s ON s.class_code = cl.code
+      WHERE ac.advisor_id = $1
+      GROUP BY cl.code, cl.name, cl.cohort, cl.program
+      ORDER BY cl.code ASC
+      `,
+      [req.user.id]
+    );
+
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('GET /advisor/classes ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể lấy danh sách lớp cố vấn.' });
   }
 });
 
@@ -304,6 +341,44 @@ router.get('/students/:id/academic', async (req, res) => {
   } catch (err) {
     console.error('GET /advisor/students/:id/academic ERROR:', err.message);
     return res.status(500).json({ message: 'Không thể lấy bảng điểm sinh viên.' });
+  }
+});
+
+// GET /advisor/metrics/overview - phân tích tổng hợp toàn bộ lớp cố vấn phụ trách
+router.get('/metrics/overview', requireAdvisorRole, async (req, res) => {
+  try {
+    const metrics = await getAdvisorMetrics(req.user.id);
+    return res.json(metrics);
+  } catch (err) {
+    console.error('GET /advisor/metrics/overview ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tính phân tích tổng hợp.' });
+  }
+});
+
+// GET /advisor/students/:studentId/metrics - phân tích chi tiết một sinh viên cố vấn phụ trách
+router.get('/students/:studentId/metrics', requireAdvisorRole, async (req, res) => {
+  try {
+    const studentRes = await pool.query(
+      'SELECT id, class_code FROM students WHERE id = $1 LIMIT 1',
+      [req.params.studentId]
+    );
+    const student = studentRes.rows[0];
+    if (!student) {
+      return res.status(404).json({ message: 'Không tìm thấy sinh viên.' });
+    }
+
+    const canAccess = student.class_code
+      ? await advisorCanAccessClass(req.user.id, student.class_code)
+      : false;
+    if (!canAccess) {
+      return res.status(403).json({ message: 'Bạn không phụ trách sinh viên này.' });
+    }
+
+    const metrics = await getStudentMetricsById(student.id);
+    return res.json(metrics);
+  } catch (err) {
+    console.error('GET /advisor/students/:studentId/metrics ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tính phân tích sinh viên.' });
   }
 });
 

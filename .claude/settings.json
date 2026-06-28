@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"=== FRONTEND package.json deps ===\")",
+      "Bash(node -e 'const p=require\\('\\\\''d:/Study/HK4/Web/Doan4/NT208.Q22.ANTT/frontend/package.json'\\\\''\\); console.log\\('\\\\''deps:'\\\\'',Object.keys\\(p.dependencies||{}\\).join\\('\\\\'', '\\\\''\\)\\); console.log\\('\\\\''dev:'\\\\'',Object.keys\\(p.devDependencies||{}\\).join\\('\\\\'', '\\\\''\\)\\)')",
+      "Bash(echo \"\")",
+      "Bash(echo \"=== BACKEND routes ===\")",
+      "Bash(ls d:/Study/HK4/Web/Doan4/NT208.Q22.ANTT/backend/src/routes/)",
+      "Bash(grep -noE 'router\\\\.\\(get|post|put|patch|delete\\)\\\\\\(['\\\\''\"][^'\\\\''\"]+' d:/Study/HK4/Web/Doan4/NT208.Q22.ANTT/backend/src/routes/__TRACKED_VAR__.js)"
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { TrendingDown, AlertCircle, MessageSquare, FileText } from 'lucide-react';
+import { TrendingDown, AlertCircle, MessageSquare } from 'lucide-react';
 import { PieChart, Pie, Cell } from 'recharts';
 
 import apiClient from '../lib/api';
@@ -48,7 +48,7 @@ interface DashboardProps {
 // ─────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onMessageStudent, onNoteStudent }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onMessageStudent }) => {
   const [riskStudents, setRiskStudents] = useState<RiskStudent[]>([]);
     const [isLoadingStudents, setIsLoadingStudents] = useState(true);
     const [studentsError, setStudentsError] = useState('');
@@ -175,7 +175,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onMessageStude
                     <th className="pb-4 font-semibold">MSSV</th>
                     <th className="pb-4 font-semibold">GPA</th>
                     <th className="pb-4 font-semibold text-center">Nợ tín chỉ</th>
-                    <th className="pb-4 font-semibold text-right">Thao tác</th>
+                    <th className="pb-4 font-semibold text-center">Thao tác</th>
                   </tr>
                   </thead>
                   <tbody className="text-sm">
@@ -235,21 +235,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onMessageStude
                               >
                                 {s.credit_debt > 0 ? `${s.credit_debt} TC` : '—'}
                               </td>
-                              <td className="py-4 text-right pr-4">
-                                <div className="flex justify-end gap-2 transition-opacity">
+                              <td className="py-4 text-center">
+                                <div className="flex justify-center gap-2 transition-opacity">
                                   <button
                                       onClick={(e) => { e.stopPropagation(); onMessageStudent?.({ id: s.id, name: s.full_name, mssv: s.mssv }); }}
                                       className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
                                       title="Nhắn tin với sinh viên"
                                   >
                                     <MessageSquare className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                      onClick={(e) => { e.stopPropagation(); onNoteStudent?.(String(s.id)); }}
-                                      className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors"
-                                      title="Thêm ghi chú tư vấn"
-                                  >
-                                    <FileText className="w-4 h-4" />
                                   </button>
                                 </div>
                               </td>

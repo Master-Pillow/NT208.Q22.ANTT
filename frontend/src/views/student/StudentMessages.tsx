@@ -61,6 +61,7 @@ export const StudentMessages = () => {
       setConversation((prev) => prev ? { ...prev, unread_count: 0, is_unread: false } : prev);
 
       if (readMessageIds.length > 0) {
+        window.dispatchEvent(new Event('messages:changed'));
         setMessages((prev) => prev.map((msg) =>
           readMessageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
         ));
@@ -133,6 +134,7 @@ export const StudentMessages = () => {
         content: trimmedContent,
       });
 
+      window.dispatchEvent(new Event('messages:changed'));
       setContent('');
       await loadMessages();
     } catch (err: any) {

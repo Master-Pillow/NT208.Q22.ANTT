@@ -13,6 +13,7 @@ import {
   Loader2,
   Users,
   AlertCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import apiClient from '../lib/api';
@@ -44,6 +45,14 @@ interface AppointmentRequest {
   student_name?: string | null;
   student_mssv?: string | null;
 }
+interface MessageNotification {
+  conversation_id: number;
+  sender_name?: string | null;
+  sender_detail?: string | null;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  unread_count: number;
+}
 
 interface ToolbarProps {
   currentUser?: CurrentUser | null;
@@ -74,6 +83,7 @@ export const Toolbar = ({
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [messageNotifications, setMessageNotifications] = useState<MessageNotification[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [notificationError, setNotificationError] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
@@ -94,7 +104,9 @@ export const Toolbar = ({
         : 'Cố vấn học vụ';
 
   const avatarSeed = encodeURIComponent(currentUser?.email || displayName);
-  const pendingCount = appointmentRequests.length;
+  const appointmentPendingCount = appointmentRequests.length;
+  const unreadMessageCount = messageNotifications.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
+  const pendingCount = appointmentPendingCount + unreadMessageCount;
 
   const loadAppointmentRequests = useCallback(async () => {
     if (!isAdvisor) {
@@ -117,6 +129,34 @@ export const Toolbar = ({
     }
   }, [isAdvisor]);
 
+  const loadMessageNotifications = useCallback(async () => {
+    if (!currentUser?.id) {
+      setMessageNotifications([]);
+      return;
+    }
+
+    try {
+      const { data } = await apiClient.get('/conversations/unread');
+      setMessageNotifications(Array.isArray(data?.items) ? data.items : []);
+    } catch (err) {
+      console.error('[Toolbar/loadMessageNotifications]', err);
+    }
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    loadMessageNotifications();
+
+    if (!currentUser?.id) return;
+
+    const intervalId = window.setInterval(loadMessageNotifications, 15000);
+    const refreshHandler = () => loadMessageNotifications();
+    window.addEventListener('messages:changed', refreshHandler);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('messages:changed', refreshHandler);
+    };
+  }, [currentUser?.id, loadMessageNotifications]);
   useEffect(() => {
     loadAppointmentRequests();
 
@@ -329,7 +369,7 @@ export const Toolbar = ({
                 <div>
                   <h3 className="font-bold text-slate-900">Thông báo</h3>
                   <p className="text-[11px] text-slate-400 font-medium">
-                    Yêu cầu đặt lịch từ sinh viên
+                    Lịch hẹn và tin nhắn mới
                   </p>
                 </div>
                 {pendingCount > 0 && (
@@ -343,7 +383,7 @@ export const Toolbar = ({
                 {loadingNotifications ? (
                   <div className="p-6 flex items-center gap-2 text-sm text-slate-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Đang tải yêu cầu đặt lịch...
+                    Đang tải thông báo...
                   </div>
                 ) : notificationError ? (
                   <div className="p-4 text-sm text-red-600 flex items-start gap-2">
@@ -352,81 +392,129 @@ export const Toolbar = ({
                   </div>
                 ) : pendingCount === 0 ? (
                   <div className="p-8 text-center text-slate-400">
-                    <Calendar className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                    <p className="text-sm font-semibold">Không có lịch nào chờ duyệt.</p>
+                    <Bell className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                    <p className="text-sm font-semibold">Không có thông báo mới.</p>
                   </div>
                 ) : (
-                  appointmentRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors flex gap-4 group"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                        <Calendar className="w-5 h-5" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-start gap-3 mb-1">
-                          <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                            {request.title}
-                          </h4>
-                          <span className="text-[10px] text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full font-bold shrink-0">
-                            Chờ duyệt
-                          </span>
+                  <>
+                    {messageNotifications.length > 0 && (
+                      <div className="border-b border-slate-100">
+                        <div className="px-4 pt-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          Tin nhắn mới
                         </div>
-
-                        <p className="text-xs text-slate-500 leading-relaxed">
-                          {request.student_name || 'Sinh viên'}
-                          {request.student_mssv ? ` · ${request.student_mssv}` : ''}
-                        </p>
-
-                        <p className="text-xs font-semibold text-blue-700 mt-1">
-                          {formatDateTime(request.start_time)} - {formatDateTime(request.end_time)}
-                        </p>
-
-                        {request.note && (
-                          <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-                            {request.note}
-                          </p>
-                        )}
-
-                        <div className="flex flex-wrap gap-2 mt-3">
+                        {messageNotifications.map((item) => (
                           <button
-                            onClick={() => handleAppointmentDecision(request.id, 'confirmed')}
-                            disabled={actionLoadingId === request.id}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5"
+                            key={item.conversation_id}
+                            type="button"
+                            onClick={() => {
+                              setCurrentView?.(normalizedRole === 'STUDENT' ? 'studentMessages' : 'messages');
+                              setShowNotifications(false);
+                            }}
+                            className="w-full p-4 hover:bg-slate-50 transition-colors flex gap-4 text-left"
                           >
-                            {actionLoadingId === request.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Check className="w-3.5 h-3.5" />
-                            )}
-                            Chấp nhận
+                            <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                              <MessageSquare className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-3 mb-1">
+                                <h4 className="text-sm font-bold text-slate-900 leading-snug truncate">
+                                  {item.sender_name || 'Người gửi'}
+                                </h4>
+                                <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
+                                  {Number(item.unread_count || 0) > 9 ? '9+' : item.unread_count}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 leading-relaxed truncate">
+                                {item.sender_detail || 'Tin nhắn'}
+                              </p>
+                              <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+                                {item.last_message || 'Bạn có tin nhắn mới.'}
+                              </p>
+                            </div>
                           </button>
-                          <button
-                            onClick={() => handleAppointmentDecision(request.id, 'cancelled')}
-                            disabled={actionLoadingId === request.id}
-                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 disabled:opacity-60 text-red-600 border border-red-100 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                            Từ chối
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    </div>
-                  ))
+                    )}
+
+                    {appointmentRequests.length > 0 && (
+                      <div>
+                        <div className="px-4 pt-4 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                          Lịch chờ duyệt
+                        </div>
+                        {appointmentRequests.map((request) => (
+                          <div
+                            key={request.id}
+                            className="p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors flex gap-4 group"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                              <Calendar className="w-5 h-5" />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-3 mb-1">
+                                <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                                  {request.title}
+                                </h4>
+                                <span className="text-[10px] text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full font-bold shrink-0">
+                                  Chờ duyệt
+                                </span>
+                              </div>
+
+                              <p className="text-xs text-slate-500 leading-relaxed">
+                                {request.student_name || 'Sinh viên'}
+                                {request.student_mssv ? ` · ${request.student_mssv}` : ''}
+                              </p>
+
+                              <p className="text-xs font-semibold text-blue-700 mt-1">
+                                {formatDateTime(request.start_time)} - {formatDateTime(request.end_time)}
+                              </p>
+
+                              {request.note && (
+                                <p className="text-xs text-slate-500 mt-2 line-clamp-2">
+                                  {request.note}
+                                </p>
+                              )}
+
+                              <div className="flex flex-wrap gap-2 mt-3">
+                                <button
+                                  onClick={() => handleAppointmentDecision(request.id, 'confirmed')}
+                                  disabled={actionLoadingId === request.id}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5"
+                                >
+                                  {actionLoadingId === request.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Check className="w-3.5 h-3.5" />
+                                  )}
+                                  Chấp nhận
+                                </button>
+                                <button
+                                  onClick={() => handleAppointmentDecision(request.id, 'cancelled')}
+                                  disabled={actionLoadingId === request.id}
+                                  className="px-3 py-1.5 bg-red-50 hover:bg-red-100 disabled:opacity-60 text-red-600 border border-red-100 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                  Từ chối
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div className="p-3 text-center border-t border-slate-100 bg-slate-50/50">
                 <button
                   onClick={() => {
-                    setCurrentView?.('schedule');
+                    setCurrentView?.(normalizedRole === 'STUDENT' ? 'studentMessages' : 'messages');
                     setShowNotifications(false);
                   }}
                   className="text-xs font-bold text-primary hover:opacity-80"
                 >
-                  Mở lịch tư vấn của cố vấn
+                  Mở tin nhắn
                 </button>
               </div>
             </div>

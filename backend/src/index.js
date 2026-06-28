@@ -78,6 +78,25 @@ const getConversationForUser = async (conversationId, user) => {
   return canAccess ? conversation : null;
 };
 
+const getMessageUnreadSenderRole = (role) =>
+  normalizeRole(role) === "STUDENT" ? "ADVISOR" : "STUDENT";
+
+const canAdvisorAccessStudent = async (advisorId, studentId) => {
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM students s
+    JOIN advisor_class ac ON ac.class_code = s.class_code
+    WHERE ac.advisor_id = $1
+      AND s.id = $2
+    LIMIT 1
+    `,
+    [advisorId, studentId]
+  );
+
+  return result.rows.length > 0;
+};
+
 // CORS: cho phép mọi origin (local dev + production)
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
@@ -980,6 +999,96 @@ app.get("/conversations", verifyToken, async (req, res) => {
   }
 });
 
+app.get("/conversations/unread", verifyToken, async (req, res) => {
+  try {
+    const role = normalizeRole(req.user.role);
+    const unreadSenderRole = getMessageUnreadSenderRole(role);
+
+    if (role === "STUDENT") {
+      const result = await pool.query(
+        `
+        SELECT
+          c.id AS conversation_id,
+          c.advisor_id,
+          advisor.full_name AS sender_name,
+          advisor.email AS sender_detail,
+          latest.content AS last_message,
+          latest.created_at AS last_message_at,
+          COALESCE(unread.unread_count, 0)::int AS unread_count
+        FROM conversations c
+        JOIN users student_user ON student_user.student_id = c.student_id
+        LEFT JOIN users advisor ON advisor.id = c.advisor_id
+        JOIN LATERAL (
+          SELECT content, created_at
+          FROM messages
+          WHERE conversation_id = c.id
+            AND sender_role = $2
+            AND COALESCE(is_read, FALSE) = FALSE
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) latest ON true
+        JOIN LATERAL (
+          SELECT COUNT(*) AS unread_count
+          FROM messages
+          WHERE conversation_id = c.id
+            AND sender_role = $2
+            AND COALESCE(is_read, FALSE) = FALSE
+        ) unread ON true
+        WHERE student_user.id = $1
+        ORDER BY latest.created_at DESC
+        `,
+        [req.user.id, unreadSenderRole]
+      );
+
+      const total = result.rows.reduce((sum, row) => sum + Number(row.unread_count || 0), 0);
+      return res.json({ total, items: result.rows });
+    }
+
+    if (role !== "ADVISOR" && role !== "ADMIN") {
+      return res.status(403).json({ message: "Bạn không có quyền xem thông báo tin nhắn." });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        c.id AS conversation_id,
+        c.student_id,
+        s.full_name AS sender_name,
+        s.mssv AS sender_detail,
+        latest.content AS last_message,
+        latest.created_at AS last_message_at,
+        COALESCE(unread.unread_count, 0)::int AS unread_count
+      FROM conversations c
+      JOIN students s ON s.id = c.student_id
+      JOIN LATERAL (
+        SELECT content, created_at
+        FROM messages
+        WHERE conversation_id = c.id
+          AND sender_role = $2
+          AND COALESCE(is_read, FALSE) = FALSE
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) latest ON true
+      JOIN LATERAL (
+        SELECT COUNT(*) AS unread_count
+        FROM messages
+        WHERE conversation_id = c.id
+          AND sender_role = $2
+          AND COALESCE(is_read, FALSE) = FALSE
+      ) unread ON true
+      WHERE c.advisor_id = $1
+      ORDER BY latest.created_at DESC
+      `,
+      [req.user.id, unreadSenderRole]
+    );
+
+    const total = result.rows.reduce((sum, row) => sum + Number(row.unread_count || 0), 0);
+    return res.json({ total, items: result.rows });
+  } catch (err) {
+    console.error("Lỗi lấy thông báo tin nhắn:", err.message);
+    return res.status(500).json({ message: "Lỗi lấy thông báo tin nhắn" });
+  }
+});
 app.get("/conversations/:id/messages", verifyToken, async (req, res) => {
   try {
     const conversation = await getConversationForUser(req.params.id, req.user);
@@ -1049,13 +1158,25 @@ app.patch("/conversations/:id/read", verifyToken, async (req, res) => {
 
 app.post("/conversations", verifyToken, async (req, res) => {
   try {
-    const { student_id } = req.body;
+    const studentId = Number(req.body?.student_id);
+    const role = normalizeRole(req.user.role);
 
-    if (!student_id) {
-      return res.status(400).json({ message: "Thiếu student_id" });
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      return res.status(400).json({ message: "Thiếu student_id hợp lệ" });
     }
 
-    const result = await pool.query(
+    if (role !== "ADVISOR" && role !== "ADMIN") {
+      return res.status(403).json({ message: "Chỉ cố vấn mới được tạo hội thoại với sinh viên." });
+    }
+
+    if (role === "ADVISOR") {
+      const allowed = await canAdvisorAccessStudent(req.user.id, studentId);
+      if (!allowed) {
+        return res.status(403).json({ message: "Bạn chỉ được nhắn tin với sinh viên thuộc lớp mình phụ trách." });
+      }
+    }
+
+    const insertResult = await pool.query(
       `
       INSERT INTO conversations (advisor_id, student_id)
       VALUES ($1, $2)
@@ -1063,16 +1184,50 @@ app.post("/conversations", verifyToken, async (req, res) => {
         SET advisor_id = EXCLUDED.advisor_id
       RETURNING id
       `,
-      [req.user.id, student_id]
+      [req.user.id, studentId]
     );
 
-    res.json(result.rows[0]);
+    const conversationId = insertResult.rows[0].id;
+    const detailResult = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.student_id,
+        s.full_name AS name,
+        s.mssv AS "idNumber",
+        latest.content AS "lastMessage",
+        TO_CHAR(latest.created_at, 'HH24:MI') AS time,
+        latest.created_at AS "lastMessageAt",
+        COALESCE(unread.unread_count, 0)::int AS "unreadCount",
+        (COALESCE(unread.unread_count, 0) > 0) AS "isUnread"
+      FROM conversations c
+      JOIN students s ON s.id = c.student_id
+      LEFT JOIN LATERAL (
+        SELECT content, created_at
+        FROM messages
+        WHERE conversation_id = c.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) latest ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS unread_count
+        FROM messages
+        WHERE conversation_id = c.id
+          AND sender_role = 'STUDENT'
+          AND COALESCE(is_read, FALSE) = FALSE
+      ) unread ON true
+      WHERE c.id = $1
+      LIMIT 1
+      `,
+      [conversationId]
+    );
+
+    return res.json(detailResult.rows[0] || { id: conversationId, student_id: studentId });
   } catch (err) {
     console.error("Lỗi tạo cuộc hội thoại:", err.message);
-    res.status(500).json({ message: "Lỗi tạo cuộc hội thoại" });
+    return res.status(500).json({ message: "Lỗi tạo cuộc hội thoại" });
   }
 });
-
 // ==========================================
 // GRACEFUL SHUTDOWN (Giải quyết triệt để EADDRINUSE trên Windows)
 // ==========================================

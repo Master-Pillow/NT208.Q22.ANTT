@@ -21,7 +21,7 @@ interface MessagesProps {
 }
 
 interface Chat {
-  id:          number;   // conversation_id từ DB
+  id:          number;   // conversation_id từ DB, hoặc số âm cho sinh viên chưa có hội thoại
   student_id:  number;
   name:        string;
   idNumber:    string;   // mssv
@@ -114,6 +114,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
       ));
 
       if (readMessageIds.length > 0) {
+        window.dispatchEvent(new Event('messages:changed'));
         setMessages(prev => prev.map(msg =>
           readMessageIds.includes(msg.id) ? { ...msg, is_read: true } : msg
         ));
@@ -123,17 +124,83 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     }
   };
 
-  // ── 1. Fetch danh sách conversations ─────────────────────────
+  const toChat = (conversation: any, fallback?: Partial<Chat>): Chat => ({
+    id: Number(conversation.id),
+    student_id: Number(conversation.student_id ?? fallback?.student_id),
+    name: conversation.name ?? fallback?.name ?? 'Sinh viên',
+    idNumber: conversation.idNumber ?? conversation.mssv ?? fallback?.idNumber ?? '',
+    lastMessage: conversation.lastMessage ?? fallback?.lastMessage ?? '',
+    time: conversation.time ?? fallback?.time ?? '',
+    unreadCount: Number(conversation.unreadCount ?? fallback?.unreadCount ?? 0),
+    isUnread: Boolean(conversation.isUnread ?? fallback?.isUnread ?? false),
+  });
+
+  const createConversationForStudent = async (student: Contact | Chat) => {
+    const studentId = 'student_id' in student ? student.student_id : student.id;
+    const { data } = await apiClient.post('/conversations', { student_id: studentId });
+    const chat = toChat(data, {
+      student_id: studentId,
+      name: student.name,
+      idNumber: 'mssv' in student ? student.mssv : student.idNumber,
+      lastMessage: 'Cuộc trò chuyện mới',
+    });
+
+    setChats(prev => {
+      const withoutVirtual = prev.filter(item => item.student_id !== chat.student_id || item.id > 0);
+      const exists = withoutVirtual.some(item => item.id === chat.id);
+      return exists
+        ? withoutVirtual.map(item => item.id === chat.id ? { ...item, ...chat } : item)
+        : [chat, ...withoutVirtual];
+    });
+
+    setActiveChatId(chat.id);
+    return chat;
+  };
+
+  const openChat = async (chat: Chat) => {
+    if (chat.id > 0) {
+      setActiveChatId(chat.id);
+      return;
+    }
+
+    try {
+      await createConversationForStudent(chat);
+    } catch (err) {
+      console.error('[Messages] Lỗi tạo conversation:', err);
+    }
+  };
+
+  // ── 1. Fetch danh sách conversations + sinh viên lớp mình ─────
   useEffect(() => {
     async function fetchConversations() {
       try {
         setLoadingChats(true);
-        const { data } = await apiClient.get('/conversations');
-        setChats(data ?? []);
+        const [conversationsRes, studentsRes] = await Promise.all([
+          apiClient.get('/conversations'),
+          apiClient.get('/advisor/students'),
+        ]);
+
+        const conversationChats: Chat[] = (conversationsRes.data ?? []).map((item: any) => toChat(item));
+        const existingStudentIds = new Set(conversationChats.map(chat => chat.student_id));
+        const contactChats: Chat[] = (Array.isArray(studentsRes.data) ? studentsRes.data : [])
+          .filter((student: any) => !existingStudentIds.has(Number(student.id)))
+          .map((student: any) => ({
+            id: -Number(student.id),
+            student_id: Number(student.id),
+            name: student.full_name || 'Sinh viên',
+            idNumber: student.mssv || '',
+            lastMessage: 'Chưa có hội thoại',
+            time: '',
+            unreadCount: 0,
+            isUnread: false,
+          }));
+
+        const mergedChats = [...conversationChats, ...contactChats];
+        setChats(mergedChats);
 
         // Tự động chọn conversation đầu tiên nếu chưa có gì active
-        if (data?.length > 0 && !activeChatId) {
-          setActiveChatId(data[0].id);
+        if (conversationChats.length > 0 && !activeChatId) {
+          setActiveChatId(conversationChats[0].id);
         }
       } catch (err) {
         console.error('[Messages] Lỗi lấy conversations:', err);
@@ -143,56 +210,24 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     }
     fetchConversations();
   }, []);
-
   // ── 2. Xử lý initialContact (navigate từ ClassList/Dashboard) ─
   useEffect(() => {
     if (!initialContact) return;
 
-    async function openOrCreateConversation() {
-      try {
-        // Tạo hoặc lấy conversation với student này
-        const { data } = await apiClient.post('/conversations', {
-          student_id: initialContact!.id,
-        });
-
-        const convId: number = data.id;
-
-        // Dedupe theo state MỚI NHẤT (prev) để tránh trùng do race với effect fetch.
-        // (Dùng biến `chats` trong closure sẽ là giá trị cũ → dễ chèn trùng.)
-        setChats(prev => {
-          if (prev.some(c => c.id === convId)) return prev;
-          const newChat: Chat = {
-            id:          convId,
-            student_id:  initialContact!.id,
-            name:        initialContact!.name,
-            idNumber:    initialContact!.mssv,
-            lastMessage: 'Cuộc trò chuyện mới',
-            time:        '',
-            unreadCount: 0,
-            isUnread: false,
-          };
-          return [newChat, ...prev];
-        });
-
-        setActiveChatId(convId);
-      } catch (err) {
-        console.error('[Messages] Lỗi tạo conversation:', err);
-      }
-    }
-
-    openOrCreateConversation();
+    createConversationForStudent(initialContact).catch((err) => {
+      console.error('[Messages] Lỗi tạo conversation:', err);
+    });
   }, [initialContact]);
-
   useEffect(() => {
     if (chats.length === 0) return;
 
     const sock = getSocket();
-    chats.forEach(chat => sock.emit('join_conversation', chat.id));
+    chats.filter(chat => chat.id > 0).forEach(chat => sock.emit('join_conversation', chat.id));
   }, [chats]);
 
   // ── 3. Fetch tin nhắn khi đổi conversation ───────────────────
   useEffect(() => {
-    if (!activeChatId) return;
+    if (!activeChatId || activeChatId <= 0) return;
 
     async function fetchMessages() {
       try {
@@ -271,7 +306,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
 
   // ── 5. Gửi tin nhắn qua Socket ───────────────────────────────
   const handleSend = () => {
-    if (!inputValue.trim() || !activeChatId || !currentUser) return;
+    if (!inputValue.trim() || !activeChatId || activeChatId <= 0 || !currentUser) return;
 
     setSending(true);
     const sock = getSocket();
@@ -283,6 +318,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
       content:        inputValue.trim(),
     });
 
+    window.dispatchEvent(new Event('messages:changed'));
     setInputValue('');
     setSending(false);
   };
@@ -353,7 +389,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
               return (
               <div
                 key={chat.id}
-                onClick={() => setActiveChatId(chat.id)}
+                onClick={() => openChat(chat)}
                 className={cn(
                   'flex items-center gap-3 px-4 py-4 cursor-pointer transition-colors border-b border-slate-100/80',
                   activeChatId === chat.id

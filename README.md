@@ -8,8 +8,6 @@ kết quả học tập, phát hiện sớm sinh viên có nguy cơ học vụ, 
 và hỗ trợ nhà trường ra quyết định bằng các công cụ phân tích dữ liệu và AI học vụ.
 
 ---
----
-
 ## Mục lục
 
 1. [Web này là gì?](#1-web-này-là-gì)
@@ -132,11 +130,11 @@ sang *chủ động* (cảnh báo sớm, dựa trên dữ liệu).
 > Sau khi cài đặt xong (xem [mục 6](#6-hướng-dẫn-cài-đặt-chi-tiết-dành-cho-người-chạy-local--vps)),
 > mở trình duyệt vào **http://localhost:5173** và đăng nhập bằng [tài khoản demo](#7-tài-khoản-demo).
 
-> ⚠️ **Lưu ý quan trọng:** Không đăng nhập 2 vai trò khác nhau trên 2 tab của **cùng một trình duyệt**,
+> **Lưu ý quan trọng:** Không đăng nhập 2 vai trò khác nhau trên 2 tab của **cùng một trình duyệt**,
 > vì các tab cùng `localhost:5173` dùng chung phiên đăng nhập. Hãy dùng **cửa sổ ẩn danh** hoặc
 > **trình duyệt khác** để thử nhiều vai trò cùng lúc.
 
-### 👤 Vai trò SINH VIÊN (STUDENT)
+### Vai trò SINH VIÊN (STUDENT)
 
 Mục tiêu: theo dõi kết quả học tập của bản thân và kết nối với cố vấn.
 
@@ -155,7 +153,7 @@ Mục tiêu: theo dõi kết quả học tập của bản thân và kết nối
 > dùng được các AI quản lý dành cho ADMIN/ADVISOR (Anomaly, Brief, Chat-to-Data, Pattern Mining —
 > sẽ nhận lỗi 403 nếu cố gọi).
 
-### 🧑‍🏫 Vai trò CỐ VẤN (ADVISOR)
+### Vai trò CỐ VẤN (ADVISOR)
 
 Mục tiêu: theo dõi và hỗ trợ các lớp được phân công.
 
@@ -191,7 +189,7 @@ Mục tiêu: quản lý toàn hệ thống và phân tích dữ liệu toàn tr�
 
 ## 6. Hướng dẫn cài đặt CHI TIẾT (dành cho người chạy local / VPS)
 
-> 📌 Phần này được viết **từng bước một** cho người lần đầu cài dự án, kể cả khi chạy trên
+> Phần này được viết **từng bước một** cho người lần đầu cài dự án, kể cả khi chạy trên
 > **máy ảo / VPS riêng**. Dự án xử lý dữ liệu học vụ nhạy cảm nên **khuyến nghị chạy local**
 > (không public ra Internet). Toàn bộ lệnh dưới đây dùng cho **Windows (PowerShell)**; phần cuối
 > có ghi chú cho **Linux/Ubuntu VPS**.
@@ -221,7 +219,7 @@ psql --version   # ví dụ: psql (PostgreSQL) 14.x trở lên
 Nếu một trong các lệnh báo "không nhận diện được lệnh", hãy cài lại phần mềm tương ứng và
 **khởi động lại PowerShell** (hoặc đăng xuất/đăng nhập lại Windows) để cập nhật biến môi trường PATH.
 
-> 💡 Khi cài PostgreSQL, **ghi nhớ mật khẩu** bạn đặt cho user `postgres` — sẽ cần ở bước cấu hình.
+> Khi cài PostgreSQL, **ghi nhớ mật khẩu** bạn đặt cho user `postgres` — sẽ cần ở bước cấu hình.
 
 ---
 
@@ -253,7 +251,7 @@ psql -U postgres -c "CREATE DATABASE \"LTWeb\";"
 **Cách B — dùng pgAdmin (giao diện):** chuột phải vào *Databases* → *Create* → *Database…* →
 đặt tên `LTWeb` → *Save*.
 
-> ⚠️ Nếu database `LTWeb` đã tồn tại thì **bỏ qua bước này**, không tạo lại.
+> Nếu database `LTWeb` đã tồn tại thì **bỏ qua bước này**, không tạo lại.
 
 ---
 
@@ -292,7 +290,7 @@ Copy-Item backend/.env.example backend/.env
 
 Sau đó **mở `backend/.env` và sửa lại `DATABASE_URL` và `JWT_SECRET`** cho đúng.
 
-> 🔒 **Tuyệt đối không commit** file `.env`, API key, App Password hay cookie DAA lên GitHub.
+> **Tuyệt đối không commit** file `.env`, API key, App Password hay cookie DAA lên GitHub.
 
 ---
 
@@ -317,7 +315,7 @@ Lệnh này sẽ tự động:
 npm run db:large
 ```
 
-> ⚠️ **Cảnh báo:** `npm run db:large` sẽ **reset toàn bộ schema `public`** của database trong
+> **Cảnh báo:** `npm run db:large` sẽ **reset toàn bộ schema `public`** của database trong
 > `DATABASE_URL`. Chỉ dùng cho database demo, **không bao giờ** chạy trên dữ liệu thật.
 
 Các file SQL chính (tham khảo):
@@ -387,7 +385,7 @@ sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'YOUR_PASSWORD';"
 Các bước clone, tạo `backend/.env`, `npm run setup`, `npm run dev` **giữ nguyên** như Windows
 (dùng lệnh `cp` thay cho `Copy-Item`).
 
-> 🔒 **Vì dự án xử lý dữ liệu học vụ nhạy cảm, khuyến nghị chỉ chạy local / trong mạng nội bộ.**
+> **Vì dự án xử lý dữ liệu học vụ nhạy cảm, khuyến nghị chỉ chạy local / trong mạng nội bộ.**
 > Nếu bắt buộc mở ra ngoài, hãy đặt sau reverse proxy (Nginx) có HTTPS, đổi `JWT_SECRET` mạnh,
 > giới hạn `ALLOWED_ORIGINS`, và **không** dùng dữ liệu thật trên server công khai.
 
@@ -419,10 +417,10 @@ Luồng này dành cho **sinh viên** muốn lấy bảng điểm thật từ c�
 7. AdvisorHub xác minh phiên, lấy **bảng điểm + Thời khoá biểu + Lịch thi** (học kỳ hiện tại),
    cập nhật database và cấp JWT.
 
-> ℹ️ TKB và lịch thi chỉ đồng bộ **học kỳ hiện tại** (cổng DAA cần cookie để xem học kỳ khác,
+> TKB và lịch thi chỉ đồng bộ **học kỳ hiện tại** (cổng DAA cần cookie để xem học kỳ khác,
 > mà cookie thì không được lưu lại).
 >
-> 🔒 Cookie chỉ được dùng trong request hiện tại, **không lưu database** và **không ghi log**.
+> Cookie chỉ được dùng trong request hiện tại, **không lưu database** và **không ghi log**.
 > Không gửi cookie qua chat, ảnh chụp, email hay GitHub. Nếu lộ cookie, đăng xuất DAA và đăng nhập
 > lại để hủy phiên cũ.
 
@@ -463,7 +461,7 @@ GMAIL_REFRESH_TOKEN=your_refresh_token
 SMTP_FROM=AdvisorHub <your_account@gmail.com>
 ```
 
-> 💡 **Vì sao dùng Gmail API?** Nhiều host miễn phí (như Render) **chặn cổng SMTP (25/465/587)**
+> **Vì sao dùng Gmail API?** Nhiều host miễn phí (như Render) **chặn cổng SMTP (25/465/587)**
 > nên email gửi qua SMTP sẽ timeout. Gmail API gửi qua HTTPS (443) nên luôn hoạt động và email
 > đi đúng từ địa chỉ Gmail của bạn (hợp lệ DMARC, vào Inbox).
 >

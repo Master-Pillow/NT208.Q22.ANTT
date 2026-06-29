@@ -385,6 +385,12 @@ export async function sendNotificationEmail({ to, subject, text, html }) {
     return { sent: false, skipped: true, reason: 'missing_recipient' };
   }
 
+  // Ưu tiên Brevo (HTTPS 443) khi có API key — tránh việc host chặn cổng SMTP.
+  if (config.brevo.apiKey) {
+    return sendViaBrevo({ to, subject, text, html });
+  }
+
+  // Fallback: SMTP (vd Gmail) — phù hợp chạy local.
   if (!isEmailConfigured()) {
     return { sent: false, skipped: true, reason: 'smtp_not_configured' };
   }

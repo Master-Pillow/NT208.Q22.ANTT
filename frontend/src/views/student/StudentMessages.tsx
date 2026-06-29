@@ -203,7 +203,10 @@ export const StudentMessages = () => {
         // Luôn nhảy xuống tin mới nhất khi mở hội thoại; nút "còn N tin chưa đọc"
         // ở trên cho phép lướt ngược lên chỗ chưa đọc.
         pendingScrollRef.current = 'bottom';
-        await markRead(activeKey!);
+        // KHÔNG await markRead trước khi tắt loading: phải để setMessages +
+        // setLoadingMsgs(false) cùng một lần render thì tin mới hiện ra rồi
+        // useLayoutEffect mới cuộn xuống đáy được. markRead chạy nền là đủ.
+        void markRead(activeKey!);
       } catch (err) {
         console.error('[StudentMessages/loadMessages]', err);
         setErrorMsg('Không thể tải tin nhắn của hội thoại này.');
@@ -283,7 +286,9 @@ export const StudentMessages = () => {
         if (target === 'unread' && unreadDividerRef.current) {
           unreadDividerRef.current.scrollIntoView({ block: 'center' });
         } else {
-          bottomRef.current?.scrollIntoView();
+          const el = scrollRef.current;
+          if (el) el.scrollTop = el.scrollHeight;
+          else bottomRef.current?.scrollIntoView();
         }
         handleScroll();
       });

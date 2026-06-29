@@ -21,9 +21,10 @@ services:
       - key: ALLOWED_ORIGINS
         sync: false           # Nhập URL Vercel của frontend
       # ----- Email (thông báo tin nhắn / lịch hẹn) -----
-      # KHÔNG có các biến này thì backend trên Render sẽ bỏ qua mọi email
-      # với lý do "smtp_not_configured" (email vẫn gửi tốt khi chạy local
-      # vì local đọc backend/.env, còn .env KHÔNG được đẩy lên Render).
+      # Render gói free CHẶN cổng SMTP ra ngoài → phải gửi qua Brevo HTTP API (cổng 443).
+      # Đặt BREVO_API_KEY thì backend ưu tiên Brevo; bỏ trống thì fallback SMTP (chỉ hợp local).
+      - key: BREVO_API_KEY
+        sync: false           # Lấy ở Brevo: SMTP & API → API Keys (dạng xkeysib-...)
       - key: MESSAGE_EMAIL_ENABLED
         value: "true"
       - key: MESSAGE_EMAIL_THROTTLE_MINUTES

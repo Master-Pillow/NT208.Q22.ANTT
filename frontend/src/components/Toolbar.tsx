@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import apiClient from '../lib/api';
+import { getSocket } from '../lib/socket';
 
 interface SearchItem {
   id: number | null;
@@ -148,13 +149,30 @@ export const Toolbar = ({
 
     if (!currentUser?.id) return;
 
+    // Poll dự phòng + sự kiện nội bộ (khi đang ở trang Tin nhắn).
     const intervalId = window.setInterval(loadMessageNotifications, 15000);
     const refreshHandler = () => loadMessageNotifications();
     window.addEventListener('messages:changed', refreshHandler);
 
+    // Realtime: nghe socket trực tiếp để badge chuông nhảy NGAY ở mọi trang,
+    // không cần reload. Bỏ qua tin do chính mình gửi (không đổi unread của mình).
+    const sock = getSocket();
+    const onIncoming = (evt?: any) => {
+      const senderId = evt?.message?.sender_id ?? evt?.sender_id;
+      if (senderId != null && Number(senderId) === Number(currentUser.id)) return;
+      loadMessageNotifications();
+    };
+    const onRead = () => loadMessageNotifications();
+    sock.on('message:new', onIncoming);
+    sock.on('new_message', onIncoming);
+    sock.on('message:read', onRead);
+
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener('messages:changed', refreshHandler);
+      sock.off('message:new', onIncoming);
+      sock.off('new_message', onIncoming);
+      sock.off('message:read', onRead);
     };
   }, [currentUser?.id, loadMessageNotifications]);
   useEffect(() => {

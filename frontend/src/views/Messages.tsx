@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Search, Send, Paperclip, Check, CheckCheck,
   MoreVertical, Phone, Video, MessageSquare, Loader2,
-  Bell, BellOff,
+  Bell, BellOff, ChevronDown,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import apiClient from '../lib/api';
@@ -79,6 +79,31 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
   const [emailEnabled,   setEmailEnabled]   = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const unreadDividerRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollRef = useRef<'unread' | 'bottom' | null>(null);
+  const prevLenRef = useRef(0);
+
+  // Kiểu Messenger: chỉ báo tin chưa đọc + nút cuộn xuống tin mới nhất.
+  const [atBottom, setAtBottom] = useState(true);
+  const [newCount, setNewCount] = useState(0);
+  const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+  const [unreadOnOpen, setUnreadOnOpen] = useState(0);
+
+  const scrollToBottom = (smooth = false) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    setNewCount(0);
+  };
+  const scrollToFirstUnread = () => {
+    unreadDividerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    setAtBottom(bottom);
+    if (bottom) setNewCount(0);
+  };
 
   // Công tắc email chung của tài khoản cố vấn.
   useEffect(() => {
@@ -250,7 +275,14 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     if (chats.length === 0) return;
 
     const sock = getSocket();
-    chats.filter(chat => chat.id > 0).forEach(chat => sock.emit('join_conversation', chat.id));
+    // Join ngay + join lại mỗi khi socket (re)connect. Quan trọng: khi backend
+    // restart (nodemon) socket sẽ reconnect và MẤT hết room đã join phía server,
+    // nếu không join lại thì cố vấn ngừng nhận 'new_message' cho tới khi reload.
+    const joinAll = () => chats.filter(chat => chat.id > 0).forEach(chat => sock.emit('join_conversation', chat.id));
+    joinAll();
+    sock.on('connect', joinAll);
+
+    return () => { sock.off('connect', joinAll); };
   }, [chats]);
 
   // ── 3. Fetch tin nhắn khi đổi conversation ───────────────────
@@ -261,7 +293,14 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
       try {
         setLoadingMsgs(true);
         const { data } = await apiClient.get(`/conversations/${activeChatId}/messages`);
-        setMessages(data ?? []);
+        const list: Message[] = data ?? [];
+        setMessages(list);
+        // Mốc tin chưa đọc cũ nhất (tin sinh viên gửi chưa đọc) — bắt TRƯỚC khi markRead.
+        const unread = list.filter((m) => m.sender_role === 'STUDENT' && !m.is_read);
+        setFirstUnreadId(unread.length ? String(unread[0].id) : null);
+        setUnreadOnOpen(unread.length);
+        setNewCount(0);
+        pendingScrollRef.current = unread.length ? 'unread' : 'bottom';
         await markConversationAsRead(activeChatId);
       } catch (err) {
         console.error('[Messages] Lỗi lấy messages:', err);
@@ -276,11 +315,15 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     const sock = getSocket();
     sock.emit('join_conversation', activeChatId);
 
-    // Lắng nghe tin nhắn mới
+    // Lắng nghe tin nhắn mới. Lưu ý: pg trả BIGINT dạng chuỗi ("53") nên phải
+    // ép Number trước khi so với activeChatId (số) — nếu không sẽ luôn lệch và
+    // tin nhắn không hiện cho tới khi reload.
     const handleNewMessage = (msg: Message) => {
-      if (msg.conversation_id !== activeChatId) {
+      const convId = Number(msg.conversation_id);
+
+      if (convId !== activeChatId) {
         setChats(prev => prev.map(c => {
-          if (c.id !== msg.conversation_id) return c;
+          if (c.id !== convId) return c;
 
           const unreadCount = msg.sender_role === 'STUDENT'
             ? Number(c.unreadCount || 0) + 1
@@ -297,20 +340,18 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
         return;
       }
 
-      if (msg.conversation_id === activeChatId) {
-        setMessages(prev => {
-          if (prev.some(item => item.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-        // Cập nhật lastMessage trong chat list
-        setChats(prev => prev.map(c =>
-          c.id === activeChatId
-            ? { ...c, lastMessage: msg.content, time: new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) }
-            : c
-        ));
-        if (msg.sender_role === 'STUDENT') {
-          markConversationAsRead(msg.conversation_id);
-        }
+      setMessages(prev => {
+        if (prev.some(item => Number(item.id) === Number(msg.id))) return prev;
+        return [...prev, msg];
+      });
+      // Cập nhật lastMessage trong chat list
+      setChats(prev => prev.map(c =>
+        c.id === activeChatId
+          ? { ...c, lastMessage: msg.content, time: new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) }
+          : c
+      ));
+      if (msg.sender_role === 'STUDENT') {
+        markConversationAsRead(convId);
       }
     };
 
@@ -327,9 +368,37 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     };
   }, [activeChatId]);
 
-  // ── 4. Auto scroll xuống cuối ────────────────────────────────
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // ── 4. Cuộn thông minh (kiểu Messenger) ──────────────────────
+  useLayoutEffect(() => {
+    if (pendingScrollRef.current) {
+      const target = pendingScrollRef.current;
+      pendingScrollRef.current = null;
+      prevLenRef.current = messages.length;
+      requestAnimationFrame(() => {
+        if (target === 'unread' && unreadDividerRef.current) {
+          unreadDividerRef.current.scrollIntoView({ block: 'center' });
+        } else {
+          messagesEndRef.current?.scrollIntoView();
+        }
+        handleScroll();
+      });
+      return;
+    }
+
+    const grew = messages.length > prevLenRef.current;
+    prevLenRef.current = messages.length;
+    if (!grew) return;
+
+    const el = scrollRef.current;
+    const last = messages[messages.length - 1];
+    const mine = last?.sender_role === 'ADVISOR';
+    const nearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 140 : true;
+
+    if (mine || nearBottom) {
+      requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }));
+    } else {
+      setNewCount((c) => c + 1);
+    }
   }, [messages]);
 
   // ── 5. Gửi tin nhắn qua Socket ───────────────────────────────
@@ -530,55 +599,101 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
             </div>
 
             {/* Khu vực tin nhắn */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-              {loadingMsgs ? (
-                <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span className="text-sm">Đang tải tin nhắn...</span>
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
-                  <MessageSquare className="w-12 h-12 opacity-20" />
-                  <p className="text-sm font-medium">Bắt đầu cuộc trò chuyện với {activeChat.name}</p>
-                </div>
-              ) : (
-                <>
-                  <div className="text-center">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
-                      Hôm nay
-                    </span>
+            <div className="relative flex-1 min-h-0">
+              <div
+                ref={scrollRef}
+                onScroll={handleScroll}
+                className="absolute inset-0 overflow-y-auto p-6 space-y-4 bg-slate-50/30"
+              >
+                {loadingMsgs ? (
+                  <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Đang tải tin nhắn...</span>
                   </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+                    <MessageSquare className="w-12 h-12 opacity-20" />
+                    <p className="text-sm font-medium">Bắt đầu cuộc trò chuyện với {activeChat.name}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-center">
+                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
+                        Hôm nay
+                      </span>
+                    </div>
 
-                  {messages.map(msg => {
-                    const isMe = msg.sender_role === 'ADVISOR';
-                    return (
-                      <div key={msg.id} className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
-                        <div className={cn('flex flex-col gap-1 max-w-[75%]', isMe ? 'items-end' : 'items-start')}>
-                          <div className={cn(
-                            'px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm',
-                            isMe
-                              ? 'bg-primary text-white font-medium rounded-tr-sm'
-                              : 'bg-white border text-slate-700 border-slate-200 rounded-tl-sm'
-                          )}>
-                            {msg.content}
+                    {messages.map(msg => {
+                      const isMe = msg.sender_role === 'ADVISOR';
+                      return (
+                        <React.Fragment key={msg.id}>
+                          {String(msg.id) === firstUnreadId && (
+                            <div ref={unreadDividerRef} className="flex items-center gap-2 my-3">
+                              <div className="flex-1 h-px bg-rose-200" />
+                              <span className="text-[11px] font-bold uppercase tracking-wide text-rose-500">
+                                Tin nhắn chưa đọc
+                              </span>
+                              <div className="flex-1 h-px bg-rose-200" />
+                            </div>
+                          )}
+                          <div className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
+                            <div className={cn('flex flex-col gap-1 max-w-[75%]', isMe ? 'items-end' : 'items-start')}>
+                              <div className={cn(
+                                'px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-sm',
+                                isMe
+                                  ? 'bg-primary text-white font-medium rounded-tr-sm'
+                                  : 'bg-white border text-slate-700 border-slate-200 rounded-tl-sm'
+                              )}>
+                                {msg.content}
+                              </div>
+                              <div className="flex items-center gap-1.5 px-2">
+                                <span className="text-[10px] text-slate-400 font-semibold">
+                                  {formatTime(msg.created_at)}
+                                </span>
+                                {isMe && (
+                                  msg.is_read
+                                    ? <CheckCheck className="w-3 h-3 text-primary" />
+                                    : <Check className="w-3 h-3 text-slate-400" />
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1.5 px-2">
-                            <span className="text-[10px] text-slate-400 font-semibold">
-                              {formatTime(msg.created_at)}
-                            </span>
-                            {isMe && (
-                              msg.is_read
-                                ? <CheckCheck className="w-3 h-3 text-primary" />
-                                : <Check className="w-3 h-3 text-slate-400" />
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
+                        </React.Fragment>
+                      );
+                    })}
+                  </>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Chỉ báo tin chưa đọc → bấm nhảy tới tin cũ nhất chưa đọc */}
+              {firstUnreadId && unreadOnOpen > 0 && !atBottom && (
+                <button
+                  type="button"
+                  onClick={scrollToFirstUnread}
+                  className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500 text-white text-xs font-bold shadow-lg hover:bg-rose-600 transition-colors"
+                >
+                  <ChevronDown className="w-3.5 h-3.5 rotate-180" />
+                  {unreadOnOpen} tin chưa đọc
+                </button>
               )}
-              <div ref={messagesEndRef} />
+
+              {/* Nút mũi tên cuộn xuống tin mới nhất */}
+              {!atBottom && (
+                <button
+                  type="button"
+                  onClick={() => scrollToBottom(true)}
+                  title="Cuộn xuống tin mới nhất"
+                  className="absolute bottom-4 right-4 z-10 w-10 h-10 rounded-full bg-white border border-slate-200 shadow-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                  {newCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                      {newCount > 9 ? '9+' : newCount}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Input */}

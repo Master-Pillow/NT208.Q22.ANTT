@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertCircle, Bell, BellOff, Check, CheckCheck, Loader2,
+  AlertCircle, Bell, BellOff, Check, CheckCheck, ChevronDown, Loader2,
   MessageSquare, Search, Send, Users, GraduationCap,
 } from 'lucide-react';
 import apiClient from '../../lib/api';
@@ -83,9 +83,36 @@ export const StudentMessages = () => {
   const activeKeyRef = useRef<string | null>(null);
   const threadsRef = useRef<Thread[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const unreadDividerRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollRef = useRef<'unread' | 'bottom' | null>(null);
+  const prevLenRef = useRef(0);
+
+  // Kiểu Messenger: chỉ báo tin chưa đọc + nút cuộn xuống tin mới nhất.
+  const [atBottom, setAtBottom] = useState(true);
+  const [newCount, setNewCount] = useState(0);
+  const [firstUnreadId, setFirstUnreadId] = useState<number | null>(null);
+  const [unreadOnOpen, setUnreadOnOpen] = useState(0);
 
   useEffect(() => { activeKeyRef.current = activeKey; }, [activeKey]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
+
+  const scrollToBottom = (smooth = false) => {
+    bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    setNewCount(0);
+  };
+
+  const scrollToFirstUnread = () => {
+    unreadDividerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+    setAtBottom(bottom);
+    if (bottom) setNewCount(0);
+  };
 
   const activeThread = threads.find((t) => t.key === activeKey) || null;
 
@@ -162,7 +189,14 @@ export const StudentMessages = () => {
       try {
         setLoadingMsgs(true);
         const { data } = await apiClient.get(`/messaging/threads/${activeKey}/messages`);
-        setMessages(data || []);
+        const list: Msg[] = data || [];
+        setMessages(list);
+        // Mốc tin chưa đọc cũ nhất (tin của người kia chưa đọc) — bắt TRƯỚC khi markRead.
+        const unread = list.filter((m) => m.sender_id !== meId && !m.is_read);
+        setFirstUnreadId(unread.length ? Number(unread[0].id) : null);
+        setUnreadOnOpen(unread.length);
+        setNewCount(0);
+        pendingScrollRef.current = unread.length ? 'unread' : 'bottom';
         await markRead(activeKey!);
       } catch (err) {
         console.error('[StudentMessages/loadMessages]', err);
@@ -206,18 +240,65 @@ export const StudentMessages = () => {
       );
     };
 
+    // Khi socket reconnect (vd backend restart), kéo lại danh bạ + tin của hội
+    // thoại đang mở để không sót tin gửi trong lúc mất kết nối. (socket.ts đã tự
+    // join lại phòng user_<id> nên các tin MỚI vẫn về realtime.)
+    const handleReconnect = () => {
+      refreshThreads();
+      const k = activeKeyRef.current;
+      if (k) {
+        apiClient
+          .get(`/messaging/threads/${k}/messages`)
+          .then(({ data }) => setMessages(data || []))
+          .catch(() => {});
+      }
+    };
+
     sock.on('message:new', handleNew);
     sock.on('message:read', handleRead);
+    sock.on('connect', handleReconnect);
 
     return () => {
       sock.off('message:new', handleNew);
       sock.off('message:read', handleRead);
+      sock.off('connect', handleReconnect);
     };
   }, [meId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  // Cuộn thông minh: mở hội thoại → nhảy tới tin chưa đọc cũ nhất (hoặc đáy nếu
+  // đã đọc hết). Tin mới đến → tự cuộn nếu đang ở đáy/tin của mình, ngược lại
+  // tăng badge cho nút mũi tên.
+  useLayoutEffect(() => {
+    if (pendingScrollRef.current) {
+      const target = pendingScrollRef.current;
+      pendingScrollRef.current = null;
+      prevLenRef.current = messages.length;
+      requestAnimationFrame(() => {
+        if (target === 'unread' && unreadDividerRef.current) {
+          unreadDividerRef.current.scrollIntoView({ block: 'center' });
+        } else {
+          bottomRef.current?.scrollIntoView();
+        }
+        handleScroll();
+      });
+      return;
+    }
+
+    const grew = messages.length > prevLenRef.current;
+    prevLenRef.current = messages.length;
+    if (!grew) return;
+
+    const el = scrollRef.current;
+    const last = messages[messages.length - 1];
+    const mine = last?.sender_id === meId;
+    const nearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 140 : true;
+
+    if (mine || nearBottom) {
+      requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }));
+    } else {
+      setNewCount((c) => c + 1);
+    }
+  }, [messages, meId]);
 
   // ── Mở 1 liên hệ (get-or-create thread) ─────────────────────────
   async function openContact(peerUserId: number) {
@@ -484,48 +565,94 @@ export const StudentMessages = () => {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/40">
-                {loadingMsgs ? (
-                  <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-sm">Đang tải tin nhắn...</span>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <p className="text-center text-slate-400 mt-16">
-                    Chưa có tin nhắn. Hãy gửi lời nhắn đầu tiên.
-                  </p>
-                ) : (
-                  messages.map((msg) => {
-                    const mine = msg.sender_id === meId;
-                    return (
-                      <div key={msg.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
-                        <div
-                          className={cn(
-                            'max-w-[72%] rounded-2xl px-4 py-2.5 text-sm',
-                            mine ? 'bg-blue-600 text-white' : 'bg-white border border-slate-100 text-slate-700'
+              <div className="relative flex-1 min-h-0">
+                <div
+                  ref={scrollRef}
+                  onScroll={handleScroll}
+                  className="absolute inset-0 overflow-y-auto p-5 space-y-3 bg-slate-50/40"
+                >
+                  {loadingMsgs ? (
+                    <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="text-sm">Đang tải tin nhắn...</span>
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <p className="text-center text-slate-400 mt-16">
+                      Chưa có tin nhắn. Hãy gửi lời nhắn đầu tiên.
+                    </p>
+                  ) : (
+                    messages.map((msg) => {
+                      const mine = msg.sender_id === meId;
+                      return (
+                        <React.Fragment key={msg.id}>
+                          {msg.id === firstUnreadId && (
+                            <div ref={unreadDividerRef} className="flex items-center gap-2 my-3">
+                              <div className="flex-1 h-px bg-rose-200" />
+                              <span className="text-[11px] font-bold uppercase tracking-wide text-rose-500">
+                                Tin nhắn chưa đọc
+                              </span>
+                              <div className="flex-1 h-px bg-rose-200" />
+                            </div>
                           )}
-                        >
-                          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                          <div
-                            className={cn(
-                              'text-[10px] mt-1 flex items-center gap-1',
-                              mine ? 'text-blue-100 justify-end' : 'text-slate-400'
-                            )}
-                          >
-                            <span>{formatTime(msg.created_at)}</span>
-                            {mine &&
-                              (msg.is_read ? (
-                                <CheckCheck className="w-3 h-3 text-blue-100" />
-                              ) : (
-                                <Check className="w-3 h-3 text-blue-100" />
-                              ))}
+                          <div className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
+                            <div
+                              className={cn(
+                                'max-w-[72%] rounded-2xl px-4 py-2.5 text-sm',
+                                mine ? 'bg-blue-600 text-white' : 'bg-white border border-slate-100 text-slate-700'
+                              )}
+                            >
+                              <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                              <div
+                                className={cn(
+                                  'text-[10px] mt-1 flex items-center gap-1',
+                                  mine ? 'text-blue-100 justify-end' : 'text-slate-400'
+                                )}
+                              >
+                                <span>{formatTime(msg.created_at)}</span>
+                                {mine &&
+                                  (msg.is_read ? (
+                                    <CheckCheck className="w-3 h-3 text-blue-100" />
+                                  ) : (
+                                    <Check className="w-3 h-3 text-blue-100" />
+                                  ))}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                        </React.Fragment>
+                      );
+                    })
+                  )}
+                  <div ref={bottomRef} />
+                </div>
+
+                {/* Chỉ báo tin chưa đọc → bấm nhảy tới tin cũ nhất chưa đọc */}
+                {firstUnreadId && unreadOnOpen > 0 && !atBottom && (
+                  <button
+                    type="button"
+                    onClick={scrollToFirstUnread}
+                    className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500 text-white text-xs font-bold shadow-lg hover:bg-rose-600 transition-colors"
+                  >
+                    <ChevronDown className="w-3.5 h-3.5 rotate-180" />
+                    {unreadOnOpen} tin chưa đọc
+                  </button>
                 )}
-                <div ref={bottomRef} />
+
+                {/* Nút mũi tên cuộn xuống tin mới nhất */}
+                {!atBottom && (
+                  <button
+                    type="button"
+                    onClick={() => scrollToBottom(true)}
+                    title="Cuộn xuống tin mới nhất"
+                    className="absolute bottom-4 right-4 z-10 w-10 h-10 rounded-full bg-white border border-slate-200 shadow-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <ChevronDown className="w-5 h-5" />
+                    {newCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                        {newCount > 9 ? '9+' : newCount}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
 
               <div className="p-4 border-t flex gap-3 shrink-0">

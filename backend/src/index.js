@@ -30,6 +30,7 @@ import {
   ensureMessagingSchema,
   getConversationParticipantUserIds,
   emitMessageNew,
+  emitMessageRead,
 } from "./services/messagingService.js";
 import { notifyNewMessageByEmail } from "./services/emailService.js";
 
@@ -1222,6 +1223,18 @@ app.patch("/conversations/:id/read", verifyToken, async (req, res) => {
         readerRole,
         messageIds: readMessageIds,
       });
+
+      // Đồng thời báo qua phòng user_<id> (UI sinh viên mới nghe ở đây) để cập
+      // nhật tick "đã đọc" realtime, không phải reload.
+      const parts = await getConversationParticipantUserIds(req.params.id);
+      if (parts) {
+        emitMessageRead(io, {
+          key: `advisor:${Number(req.params.id)}`,
+          readerId: Number(req.user.id),
+          messageIds: readMessageIds.map(Number),
+          userIds: [parts.advisorUserId, parts.studentUserId],
+        });
+      }
     }
 
     return res.json({

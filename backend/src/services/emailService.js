@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import MailComposer from 'nodemailer/lib/mail-composer/index.js';
 import dns from 'node:dns';
 import { config } from '../config.js';
 import { pool } from '../db.js';
@@ -41,12 +42,87 @@ function stripHtml(value) {
   return String(value || '').replace(/<[^>]+>/g, '').trim();
 }
 
+/**
+ * Gửi qua GMAIL API (HTTPS) bằng OAuth2 refresh token.
+ *
+ * Đây là cách DUY NHẤT còn gửi được "từ" địa chỉ @gmail.com sau khi Google chặn các dịch
+ * vụ bên thứ 3 (SMTP2GO/Brevo/SendGrid) — vì lần gửi này do CHÍNH Google thực hiện nên
+ * khớp SPF/DKIM/DMARC → vào Inbox. Dùng HTTPS:443 nên host (Render) không chặn như SMTP.
+ * Cần GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET / GMAIL_REFRESH_TOKEN của tài khoản người gửi.
+ */
+async function getGmailAccessToken() {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: config.gmailApi.clientId,
+      client_secret: config.gmailApi.clientSecret,
+      refresh_token: config.gmailApi.refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) {
+    throw new Error(`Gmail OAuth ${res.status}: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+  return data.access_token;
+}
+
+async function sendViaGmailApi({ to, subject, text, html }) {
+  const accessToken = await getGmailAccessToken();
+  // Dựng message RFC822 chuẩn (đa phần text+html, UTF-8, encode tiêu đề có dấu) rồi base64url.
+  const mail = new MailComposer({
+    from: config.smtp.from || config.smtp.user,
+    to,
+    subject,
+    text: text || stripHtml(html),
+    html,
+  });
+  const raw = (await mail.compile().build()).toString('base64url');
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ raw }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Gmail API ${res.status}: ${detail.slice(0, 300)}`);
+  }
+  return { sent: true, skipped: false };
+}
+
 // Tách "AdvisorHub <a@b.com>" -> { name, email } cho Brevo (yêu cầu sender dạng object).
 function parseSender(raw) {
   const s = String(raw || '').trim();
   const m = s.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
   if (m) return { name: m[1] || 'AdvisorHub', email: m[2].trim() };
   return { name: 'AdvisorHub', email: s };
+}
+
+/**
+ * Gửi email qua SMTP2GO HTTP API (https://api.smtp2go.com/v3/email/send) bằng HTTPS cổng 443.
+ * Dùng khi host chặn SMTP (vd Render free). Sender phải là email/domain đã verify trong SMTP2GO.
+ * LƯU Ý: SMTP2GO trả HTTP 200 ngay cả khi gửi fail → phải kiểm tra data.succeeded >= 1.
+ */
+async function sendViaSmtp2go({ to, subject, text, html }) {
+  const res = await fetch('https://api.smtp2go.com/v3/email/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({
+      api_key: config.smtp2go.apiKey,
+      sender: config.smtp.from || config.smtp.user, // chấp nhận "Tên <email>" hoặc "email"
+      to: [to],
+      subject,
+      html_body: html || undefined,
+      text_body: text || stripHtml(html),
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !(Number(data?.data?.succeeded) >= 1)) {
+    const detail = JSON.stringify(data?.data?.failures || data?.data?.error || data).slice(0, 300);
+    throw new Error(`SMTP2GO ${res.status}: ${detail}`);
+  }
+  return { sent: true, skipped: false };
 }
 
 /**
@@ -385,7 +461,14 @@ export async function sendNotificationEmail({ to, subject, text, html }) {
     return { sent: false, skipped: true, reason: 'missing_recipient' };
   }
 
-  // Ưu tiên Brevo (HTTPS 443) khi có API key — tránh việc host chặn cổng SMTP.
+  // Ưu tiên email API qua HTTPS 443 khi có cấu hình — tránh việc host chặn cổng SMTP.
+  // Gmail API đứng đầu: gửi "từ" gmail hợp lệ DMARC → vào Inbox.
+  if (config.gmailApi.clientId && config.gmailApi.clientSecret && config.gmailApi.refreshToken) {
+    return sendViaGmailApi({ to, subject, text, html });
+  }
+  if (config.smtp2go.apiKey) {
+    return sendViaSmtp2go({ to, subject, text, html });
+  }
   if (config.brevo.apiKey) {
     return sendViaBrevo({ to, subject, text, html });
   }

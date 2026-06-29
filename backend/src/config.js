@@ -30,8 +30,17 @@ export const config = {
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
   },
-  // Brevo HTTP API — dùng để gửi email qua HTTPS (cổng 443) khi host (vd Render free)
-  // chặn SMTP. Có BREVO_API_KEY thì ưu tiên Brevo; không có thì fallback SMTP ở trên.
+  // Email qua HTTP API (HTTPS cổng 443) — dùng khi host (vd Render free) chặn SMTP.
+  // Thứ tự ưu tiên trong emailService: Gmail API → SMTP2GO → Brevo → SMTP.
+  // Gmail API gửi "từ" @gmail.com hợp lệ DMARC (Google đã chặn gửi gmail qua bên thứ 3).
+  gmailApi: {
+    clientId: process.env.GMAIL_CLIENT_ID || '',
+    clientSecret: process.env.GMAIL_CLIENT_SECRET || '',
+    refreshToken: process.env.GMAIL_REFRESH_TOKEN || '',
+  },
+  smtp2go: {
+    apiKey: process.env.SMTP2GO_API_KEY || '',
+  },
   brevo: {
     apiKey: process.env.BREVO_API_KEY || '',
   },

@@ -21,10 +21,19 @@ services:
       - key: ALLOWED_ORIGINS
         sync: false           # Nhập URL Vercel của frontend
       # ----- Email (thông báo tin nhắn / lịch hẹn) -----
-      # Render gói free CHẶN cổng SMTP ra ngoài → phải gửi qua Brevo HTTP API (cổng 443).
-      # Đặt BREVO_API_KEY thì backend ưu tiên Brevo; bỏ trống thì fallback SMTP (chỉ hợp local).
+      # Render gói free CHẶN cổng SMTP ra ngoài → phải gửi qua API HTTP (cổng 443).
+      # Ưu tiên: Gmail API → SMTP2GO → Brevo → SMTP. Cấu hình nhóm nào thì dùng nhóm đó.
+      # Gmail API (KHUYẾN NGHỊ): gửi "từ" @gmail.com hợp lệ DMARC → vào Inbox.
+      - key: GMAIL_CLIENT_ID
+        sync: false           # OAuth client của Google Cloud (dạng ....apps.googleusercontent.com)
+      - key: GMAIL_CLIENT_SECRET
+        sync: false           # OAuth client secret (dạng GOCSPX-...)
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false           # Refresh token lấy từ OAuth Playground (dạng 1//...)
+      - key: SMTP2GO_API_KEY
+        sync: false           # (tùy chọn) SMTP2GO: Sending → API Keys (dạng api-...)
       - key: BREVO_API_KEY
-        sync: false           # Lấy ở Brevo: SMTP & API → API Keys (dạng xkeysib-...)
+        sync: false           # (tùy chọn) Brevo: SMTP & API → API Keys (dạng xkeysib-...)
       - key: MESSAGE_EMAIL_ENABLED
         value: "true"
       - key: MESSAGE_EMAIL_THROTTLE_MINUTES

@@ -9,6 +9,18 @@ và hỗ trợ nhà trường ra quyết định bằng các công cụ phân t�
 
 ---
 
+## 🆕 Cập nhật mới nhất
+
+- **Thời khoá biểu & Lịch thi** của sinh viên được **đồng bộ thẳng từ cổng DAA** (cùng lúc với điểm khi đăng nhập bằng cookie DAA).
+- **AI Chatbox UIT** — trợ lý hỏi đáp quy chế/đời sống UIT bằng tiếng Việt, có **RAG (vector search)** và **Google Search grounding**; mở cho **cả 3 vai trò**.
+- **AI nhận định / phân tích điểm (grade insight)** theo từng sinh viên / lớp / khoá / toàn hệ thống.
+- **Nhắn tin nâng cấp**: sinh viên ↔ sinh viên cùng lớp (có ô tìm người nhận), **cố vấn chủ động nhắn trước**, **email báo tin nhắn mới** (có tắt/mute từng người + giới hạn tần suất), **badge chưa đọc realtime** + tiêu đề tab kiểu Messenger.
+- **Email tự động cho lịch hẹn** (khi đặt mới và khi cố vấn duyệt/từ chối).
+- **Gửi email qua Gmail API** (HTTPS 443) để vẫn chạy trên host chặn cổng SMTP (Render).
+- **Tạo sinh viên test** nhanh từ MSSV (thay cho import CSV trước đây) để mở quyền đăng nhập DAA.
+
+---
+
 ## Mục lục
 
 1. [Web này là gì?](#1-web-này-là-gì)
@@ -69,6 +81,7 @@ sang *chủ động* (cảnh báo sớm, dựa trên dữ liệu).
 
 ### Dữ liệu học tập
 - **Đồng bộ bảng điểm từ cổng DAA UIT** bằng cookie phiên của sinh viên.
+- **Đồng bộ Thời khoá biểu (TKB) và Lịch thi** từ DAA (học kỳ hiện tại, lấy cùng lúc với điểm khi đăng nhập DAA).
 - Tính **GPA, tín chỉ tích lũy, số môn rớt, số môn vắng thi, xu hướng GPA theo học kỳ**.
 - Bảng điểm chi tiết theo từng môn, từng học kỳ.
 
@@ -87,10 +100,19 @@ sang *chủ động* (cảnh báo sớm, dựa trên dữ liệu).
 - **Chat-to-Data** — hỏi đáp dữ liệu học vụ bằng tiếng Việt (text-to-SQL).
 - **Pattern Mining** — khai phá mẫu/quy luật trong dữ liệu học tập.
 
+### AI dùng chung cho mọi vai trò
+- **AI nhận định / phân tích điểm (grade insight)** — sinh nhận định bằng AI theo phạm vi
+  sinh viên / lớp / khoá / toàn hệ thống; **sinh viên chỉ xem được nhận định của chính mình**.
+- **AI Chatbox UIT** — trợ lý hỏi đáp quy chế, học vụ và đời sống UIT bằng tiếng Việt,
+  dùng **RAG (vector search)** trên tài liệu nội bộ và **Google Search grounding** khi tài liệu chưa đủ.
+
 ### Tương tác & kết nối
-- **Nhắn tin realtime** giữa sinh viên và cố vấn (Socket.IO).
-- **Đặt & quản lý lịch hẹn** tư vấn.
-- **Thông báo trong ứng dụng** và **email cảnh báo tự động** (tùy chọn).
+- **Nhắn tin realtime** (Socket.IO): sinh viên ↔ cố vấn **và** sinh viên ↔ sinh viên cùng lớp,
+  có ô tìm người nhận theo MSSV/tên; **cố vấn có thể chủ động nhắn trước**.
+- **Badge tin nhắn chưa đọc realtime** + tiêu đề tab kiểu Messenger; **email báo tin nhắn mới**
+  (bật/tắt toàn cục, **mute từng người**, giới hạn tần suất chống spam).
+- **Đặt & quản lý lịch hẹn** tư vấn, kèm **email thông báo** khi đặt mới và khi cố vấn duyệt/từ chối.
+- **Thông báo trong ứng dụng** và **email cảnh báo học vụ tự động** (tùy chọn).
 - **Hồ sơ cá nhân** (avatar, ảnh bìa, tiểu sử).
 
 ### Phân tích & trực quan hóa
@@ -108,8 +130,11 @@ sang *chủ động* (cảnh báo sớm, dựa trên dữ liệu).
 | Database | PostgreSQL |
 | Realtime | Socket.IO |
 | Biểu đồ | Recharts |
-| AI | Google Gemini API (AI Brief / Chat-to-Data) + rule-based (Anomaly) |
+| AI | Google Gemini API (AI Brief / Chat-to-Data / grade insight) + RAG vector search & Google Search grounding (AI Chatbox UIT) + rule-based (Anomaly) |
+| Đồng bộ DAA | Axios + Cheerio (scrape điểm / TKB / lịch thi từ cookie phiên) |
+| Email | Gmail API (gửi qua HTTPS 443, không bị host chặn cổng SMTP) |
 | Xác thực | JWT + bcrypt |
+| Triển khai | Frontend trên Vercel · Backend trên Render · PostgreSQL cloud (Neon) |
 
 ---
 
@@ -127,14 +152,19 @@ sang *chủ động* (cảnh báo sớm, dựa trên dữ liệu).
 Mục tiêu: theo dõi kết quả học tập của bản thân và kết nối với cố vấn.
 
 1. **Đăng nhập** bằng tài khoản demo `24521001@gm.uit.edu.vn` / `password123`,
-   hoặc bằng [cookie DAA](#8-đăng-nhập-bằng-cookie-daa) để lấy điểm thật.
-2. Vào **Hồ sơ học tập** → xem GPA, tín chỉ tích lũy, tình trạng học vụ.
+   hoặc bằng [cookie DAA](#8-đăng-nhập-bằng-cookie-daa) để lấy điểm + TKB + lịch thi thật.
+2. Vào **Hồ sơ học tập** → xem GPA, tín chỉ tích lũy, tình trạng học vụ, kèm **AI nhận định** điểm của chính mình.
 3. Vào **Xem điểm** → xem bảng điểm chi tiết theo từng môn/học kỳ và biểu đồ xu hướng.
-4. Vào **Lịch hẹn** → đặt lịch gặp cố vấn.
-5. Vào **Nhắn tin** → trao đổi trực tiếp với cố vấn (realtime).
-6. Vào **Thông báo** → xem cảnh báo học vụ và các thông báo từ hệ thống.
+4. Vào **Thời khoá biểu** → xem lịch học học kỳ hiện tại (đồng bộ từ DAA).
+5. Vào **Lịch thi** → xem lịch thi giữa kỳ/cuối kỳ (đồng bộ từ DAA).
+6. Vào **Lịch hẹn** → đặt lịch gặp cố vấn.
+7. Vào **Nhắn tin** → trao đổi với cố vấn **và bạn cùng lớp** (realtime).
+8. Vào **Thông báo** → xem cảnh báo học vụ và các thông báo từ hệ thống.
+9. Vào **AI Chatbox UIT** → hỏi đáp quy chế, học vụ và đời sống UIT.
 
-> Sinh viên **không** có quyền dùng các tính năng AI (sẽ nhận lỗi 403 nếu cố gọi).
+> Sinh viên dùng được **AI Chatbox UIT** và **AI nhận định điểm của chính mình**, nhưng **không**
+> dùng được các AI quản lý dành cho ADMIN/ADVISOR (Anomaly, Brief, Chat-to-Data, Pattern Mining —
+> sẽ nhận lỗi 403 nếu cố gọi).
 
 ### 🧑‍🏫 Vai trò CỐ VẤN (ADVISOR)
 
@@ -144,9 +174,10 @@ Mục tiêu: theo dõi và hỗ trợ các lớp được phân công.
 2. Vào **Tổng quan** → xem nhanh tình hình các lớp mình phụ trách.
 3. Vào **Sinh viên** → xem danh sách sinh viên **chỉ trong lớp được phân công**, lọc sinh viên có nguy cơ.
 4. Vào **AI: Cảnh báo** → chạy/đọc phát hiện bất thường cho lớp mình.
-5. Vào **AI: Brief** → sinh báo cáo tóm tắt tình hình lớp.
-6. Vào **Lịch hẹn** → duyệt và quản lý lịch hẹn với sinh viên.
-7. Vào **Nhắn tin** → trao đổi với sinh viên.
+5. Vào **AI: Brief lớp mình** → sinh báo cáo tóm tắt tình hình lớp.
+6. Vào **Lịch hẹn** → duyệt và quản lý lịch hẹn với sinh viên (sinh viên nhận email khi được duyệt/từ chối).
+7. Vào **Nhắn tin** → trao đổi với sinh viên; cố vấn **chủ động nhắn trước** được, có thể mute từng người.
+8. Vào **AI Chatbox UIT** → hỏi đáp quy chế, học vụ và đời sống UIT.
 
 > Cố vấn **chỉ thấy dữ liệu lớp của mình**, không thấy toàn hệ thống.
 
@@ -159,11 +190,13 @@ Mục tiêu: quản lý toàn hệ thống và phân tích dữ liệu toàn tr�
 3. Vào **Sinh viên** → nhập một MSSV và chọn **Tạo sinh viên test** để mở quyền đăng nhập DAA cho sinh viên đó (thay cho cách import CSV trước đây).
 4. Vẫn ở **Sinh viên** → tìm theo MSSV, xem GPA và bảng điểm đã đồng bộ (có phân trang, tìm kiếm).
 5. Vào **Lớp học / Cố vấn / Môn học** → quản lý (thêm/sửa) và **gán cố vấn cho lớp**.
-6. Vào **AI Hub**:
+6. Vào **AI học vụ** (AI Hub):
    - **AI: Phát hiện bất thường** — quét toàn hệ thống.
    - **AI: Sinh Brief** — báo cáo tóm tắt.
    - **AI: Chat-to-Data** — hỏi đáp dữ liệu bằng tiếng Việt.
    - **AI: Pattern Mining** — khai phá mẫu/quy luật.
+   - **AI nhận định điểm** — phân tích theo sinh viên / lớp / khoá / toàn hệ thống.
+7. Vào **AI Chatbox UIT** → hỏi đáp quy chế, học vụ và đời sống UIT (RAG + Google Search).
 
 ---
 
@@ -394,41 +427,59 @@ Luồng này dành cho **sinh viên** muốn lấy bảng điểm thật từ c�
 4. Trong `Request Headers`, sao chép **toàn bộ** giá trị `Cookie`.
 5. Tại trang đăng nhập AdvisorHub, chọn **Cookie DAA**.
 6. Nhập **MSSV** và **dán cookie**.
-7. AdvisorHub xác minh phiên, lấy bảng điểm, cập nhật database và cấp JWT.
+7. AdvisorHub xác minh phiên, lấy **bảng điểm + Thời khoá biểu + Lịch thi** (học kỳ hiện tại),
+   cập nhật database và cấp JWT.
 
+> ℹ️ TKB và lịch thi chỉ đồng bộ **học kỳ hiện tại** (cổng DAA cần cookie để xem học kỳ khác,
+> mà cookie thì không được lưu lại).
+>
 > 🔒 Cookie chỉ được dùng trong request hiện tại, **không lưu database** và **không ghi log**.
 > Không gửi cookie qua chat, ảnh chụp, email hay GitHub. Nếu lộ cookie, đăng xuất DAA và đăng nhập
 > lại để hủy phiên cũ.
 
-URL bảng điểm có thể cấu hình trong `.env`:
+Các URL DAA có thể cấu hình trong `.env`:
 
 ```env
 DAA_GRADE_URL_TEMPLATE=https://daa.uit.edu.vn/print/sinhvien/kqhoctap/?sid={mssv}
+DAA_TKB_URL_TEMPLATE=https://daa.uit.edu.vn/sinhvien/tkb
+DAA_EXAM_URL_TEMPLATE=https://daa.uit.edu.vn/sinhvien/lichhoc/lichthi
 ```
 
 ---
 
 ## 9. Cấu hình tùy chọn (Gemini AI & Email)
 
-### Gemini (cho AI Brief / Chat-to-Data)
+### Gemini (cho AI Brief / Chat-to-Data / grade insight / AI Chatbox)
 
 ```env
 GEMINI_API_KEY=your_key
 ```
 
-### Gmail SMTP (cho email cảnh báo tự động)
+### Email (cảnh báo học vụ, tin nhắn mới, lịch hẹn)
+
+Hệ thống gửi email qua **Gmail API** (HTTPS 443, không bị host chặn cổng SMTP). Cần bật
+các công tắc tương ứng cho từng loại email:
 
 ```env
-ALERT_EMAIL_ENABLED=true
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your_account@gmail.com
-SMTP_PASS=your_google_app_password
+# Công tắc từng loại email
+ALERT_EMAIL_ENABLED=true            # email cảnh báo học vụ tự động
+ALERT_EMAIL_THROTTLE_HOURS=12
+MESSAGE_EMAIL_ENABLED=true          # email báo tin nhắn mới
+MESSAGE_EMAIL_THROTTLE_MINUTES=10
+
+# Gmail API
+GMAIL_CLIENT_ID=your_client_id
+GMAIL_CLIENT_SECRET=your_client_secret
+GMAIL_REFRESH_TOKEN=your_refresh_token
 SMTP_FROM=AdvisorHub <your_account@gmail.com>
 ```
 
-> Phải dùng **Google App Password**, không dùng mật khẩu Gmail chính.
+> 💡 **Vì sao dùng Gmail API?** Nhiều host miễn phí (như Render) **chặn cổng SMTP (25/465/587)**
+> nên email gửi qua SMTP sẽ timeout. Gmail API gửi qua HTTPS (443) nên luôn hoạt động và email
+> đi đúng từ địa chỉ Gmail của bạn (hợp lệ DMARC, vào Inbox).
+>
+> Lấy 3 giá trị `GMAIL_CLIENT_ID/SECRET/REFRESH_TOKEN`: Google Cloud → bật **Gmail API** →
+> tạo OAuth Client (Web), rồi dùng **OAuth Playground** lấy refresh token với scope `gmail.send`.
 
 ---
 
@@ -466,7 +517,8 @@ npm run check
 
 - Mọi API riêng tư đều dùng **JWT** và kiểm tra **role**.
 - Cố vấn bị giới hạn theo `advisor_class` (chỉ lớp của mình).
-- Sinh viên **không** được dùng API AI.
+- Sinh viên **không** được dùng các API AI quản lý (Anomaly / Brief / Chat-to-Data / Pattern Mining);
+  chỉ được dùng AI Chatbox UIT và AI nhận định điểm của chính mình.
 - Mọi query database đều dùng **tham số hóa** (chống SQL injection).
 - **Không lưu, không log** cookie DAA.
 - **Không commit** `.env` hay bất kỳ khóa bí mật nào.

@@ -23,8 +23,8 @@ async function main() {
   assert(health.status === 200 && health.data.ok, 'Health check backend thất bại.');
 
   const admin = await login('admin@uit.edu.vn', 'password123');
-  const advisor = await login('aris.thorne@uit.edu.vn', 'password123');
-  const student = await login('sv24521001@uit.edu.vn', 'password123');
+  const advisor = await login('thornea@uit.edu.vn', 'password123');
+  const student = await login('24521001@gm.uit.edu.vn', 'password123');
 
   const adminStudents = await client.get('/admin/students', {
     headers: { Authorization: `Bearer ${admin.token}` },

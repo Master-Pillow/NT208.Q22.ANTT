@@ -126,7 +126,7 @@ sang *chủ động* (cảnh báo sớm, dựa trên dữ liệu).
 
 Mục tiêu: theo dõi kết quả học tập của bản thân và kết nối với cố vấn.
 
-1. **Đăng nhập** bằng tài khoản demo `sv24521001@uit.edu.vn` / `password123`,
+1. **Đăng nhập** bằng tài khoản demo `24521001@gm.uit.edu.vn` / `password123`,
    hoặc bằng [cookie DAA](#8-đăng-nhập-bằng-cookie-daa) để lấy điểm thật.
 2. Vào **Hồ sơ học tập** → xem GPA, tín chỉ tích lũy, tình trạng học vụ.
 3. Vào **Xem điểm** → xem bảng điểm chi tiết theo từng môn/học kỳ và biểu đồ xu hướng.
@@ -140,7 +140,7 @@ Mục tiêu: theo dõi kết quả học tập của bản thân và kết nối
 
 Mục tiêu: theo dõi và hỗ trợ các lớp được phân công.
 
-1. **Đăng nhập** bằng `aris.thorne@uit.edu.vn` / `password123` (hoặc `minh.nguyen@uit.edu.vn`).
+1. **Đăng nhập** bằng `thornea@uit.edu.vn` / `password123` (hoặc `minhnv@uit.edu.vn`).
 2. Vào **Tổng quan** → xem nhanh tình hình các lớp mình phụ trách.
 3. Vào **Sinh viên** → xem danh sách sinh viên **chỉ trong lớp được phân công**, lọc sinh viên có nguy cơ.
 4. Vào **AI: Cảnh báo** → chạy/đọc phát hiện bất thường cho lớp mình.
@@ -378,9 +378,9 @@ Mật khẩu chung cho tất cả tài khoản demo: **`password123`**
 | Vai trò | Tài khoản |
 |---|---|
 | Admin | `admin@uit.edu.vn` |
-| Advisor | `aris.thorne@uit.edu.vn` |
-| Advisor | `minh.nguyen@uit.edu.vn` |
-| Student | `sv24521001@uit.edu.vn` |
+| Advisor | `thornea@uit.edu.vn` |
+| Advisor | `minhnv@uit.edu.vn` |
+| Student | `24521001@gm.uit.edu.vn` |
 
 ---
 

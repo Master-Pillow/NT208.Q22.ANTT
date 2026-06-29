@@ -6,6 +6,7 @@ import { pool } from '../db.js';
 import { getClassMetrics } from '../services/classMetricsService.js';
 import { getCohortMetrics, getSystemMetrics } from '../services/cohortSystemMetricsService.js';
 import { sendNotificationEmail } from '../services/emailService.js';
+import { studentEmail } from '../utils/uitEmail.js';
 
 const router = Router();
 
@@ -79,7 +80,7 @@ router.post('/students/quick-create', async (req, res) => {
       [
         mssv,
         `Sinh viên ${mssv}`,
-        `${mssv}@student.uit.local`,
+        studentEmail(mssv),
         mssv.length >= 2 ? `20${mssv.slice(0, 2)}` : null,
       ]
     );

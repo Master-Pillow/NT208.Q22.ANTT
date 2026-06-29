@@ -111,7 +111,7 @@ export const ClassList: React.FC<ClassListProps> = ({ onNavigate, onMessageStude
                             </div>
                             <div>
                               <p className="font-bold text-slate-900">{student.full_name}</p>
-                              <p className="text-[11px] text-slate-500">{student.mssv}@uit.edu.vn</p>
+                              <p className="text-[11px] text-slate-500">{student.mssv}@gm.uit.edu.vn</p>
                             </div>
                           </div>
                         </td>

@@ -208,7 +208,7 @@ export const CohortDetails: React.FC<{ onNavigate?: (view: string) => void }> = 
                         <div>
                           <p className="font-bold text-slate-900">{student.full_name}</p>
                           <p className="text-[11px] text-slate-500 font-semibold tracking-wide">
-                            {student.mssv}@uit.edu.vn
+                            {student.mssv}@gm.uit.edu.vn
                           </p>
                         </div>
                       </div>

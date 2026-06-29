@@ -107,26 +107,26 @@ CREATE TEMP TABLE tmp_large_advisors (
 ) ON COMMIT DROP;
 
 INSERT INTO tmp_large_advisors (advisor_no, email, full_name) VALUES
-(1,  'advisor01@uit.edu.vn', 'TS. Nguyễn Minh Quân'),
-(2,  'advisor02@uit.edu.vn', 'ThS. Trần Thu Hà'),
-(3,  'advisor03@uit.edu.vn', 'TS. Lê Quốc Bảo'),
-(4,  'advisor04@uit.edu.vn', 'ThS. Phạm Ngọc Anh'),
-(5,  'advisor05@uit.edu.vn', 'TS. Hoàng Gia Huy'),
-(6,  'advisor06@uit.edu.vn', 'ThS. Huỳnh Thanh Trúc'),
-(7,  'advisor07@uit.edu.vn', 'TS. Phan Đức Long'),
-(8,  'advisor08@uit.edu.vn', 'ThS. Vũ Thị Mai'),
-(9,  'advisor09@uit.edu.vn', 'TS. Võ Thành Nam'),
-(10, 'advisor10@uit.edu.vn', 'ThS. Đặng Kim Ngân'),
-(11, 'advisor11@uit.edu.vn', 'TS. Bùi Hải Đăng'),
-(12, 'advisor12@uit.edu.vn', 'ThS. Đỗ Minh Châu'),
-(13, 'advisor13@uit.edu.vn', 'TS. Hồ Anh Tuấn'),
-(14, 'advisor14@uit.edu.vn', 'ThS. Ngô Phương Linh'),
-(15, 'advisor15@uit.edu.vn', 'TS. Dương Khánh Toàn'),
-(16, 'advisor16@uit.edu.vn', 'ThS. Lý Hồng Nhung'),
-(17, 'advisor17@uit.edu.vn', 'TS. Đinh Quốc Việt'),
-(18, 'advisor18@uit.edu.vn', 'ThS. Lưu Bảo Ngọc'),
-(19, 'advisor19@uit.edu.vn', 'TS. Cao Tấn Phát'),
-(20, 'advisor20@uit.edu.vn', 'ThS. Tô Gia Hân');
+(1,  'quannm@uit.edu.vn',  'TS. Nguyễn Minh Quân'),
+(2,  'hatrt@uit.edu.vn',   'ThS. Trần Thu Hà'),
+(3,  'baolq@uit.edu.vn',   'TS. Lê Quốc Bảo'),
+(4,  'anhpn@uit.edu.vn',   'ThS. Phạm Ngọc Anh'),
+(5,  'huyhg@uit.edu.vn',   'TS. Hoàng Gia Huy'),
+(6,  'trucht@uit.edu.vn',  'ThS. Huỳnh Thanh Trúc'),
+(7,  'longpd@uit.edu.vn',  'TS. Phan Đức Long'),
+(8,  'maivt@uit.edu.vn',   'ThS. Vũ Thị Mai'),
+(9,  'namvt@uit.edu.vn',   'TS. Võ Thành Nam'),
+(10, 'ngandk@uit.edu.vn',  'ThS. Đặng Kim Ngân'),
+(11, 'dangbh@uit.edu.vn',  'TS. Bùi Hải Đăng'),
+(12, 'chaudm@uit.edu.vn',  'ThS. Đỗ Minh Châu'),
+(13, 'tuanha@uit.edu.vn',  'TS. Hồ Anh Tuấn'),
+(14, 'linhnp@uit.edu.vn',  'ThS. Ngô Phương Linh'),
+(15, 'toandk@uit.edu.vn',  'TS. Dương Khánh Toàn'),
+(16, 'nhunglh@uit.edu.vn', 'ThS. Lý Hồng Nhung'),
+(17, 'vietdq@uit.edu.vn',  'TS. Đinh Quốc Việt'),
+(18, 'ngoclb@uit.edu.vn',  'ThS. Lưu Bảo Ngọc'),
+(19, 'phatct@uit.edu.vn',  'TS. Cao Tấn Phát'),
+(20, 'hantg@uit.edu.vn',   'ThS. Tô Gia Hân');
 
 INSERT INTO users (email, password_hash, full_name, role)
 SELECT email, 'password123', full_name, 'ADVISOR'
@@ -310,7 +310,7 @@ named AS (
           [1 + ((student_no * 7 + class_rank) % 20)]
       END
     ) AS full_name,
-    LOWER('demo.' || 'D' || cohort || program_prefix || LPAD(student_no::text, 3, '0') || '@uit.edu.vn') AS email,
+    LOWER('D' || cohort || program_prefix || LPAD(student_no::text, 3, '0') || '@gm.uit.edu.vn') AS email,
     '09' || LPAD((70000000 + class_rank * 100 + student_no)::text, 8, '0') AS phone,
     class_code,
     cohort,
@@ -362,7 +362,7 @@ ON CONFLICT (mssv) DO NOTHING;
 
 INSERT INTO users (email, password_hash, full_name, role, student_id)
 SELECT
-  LOWER('sv' || s.mssv || '@uit.edu.vn') AS email,
+  LOWER(s.mssv || '@gm.uit.edu.vn') AS email,
   'password123' AS password_hash,
   s.full_name,
   'STUDENT' AS role,

@@ -19,7 +19,7 @@ interface LoginProps {
 
 export const Login = ({ onLogin }: LoginProps) => {
   const [loginMode, setLoginMode] = useState<'ACCOUNT' | 'DAA'>('ACCOUNT');
-  const [email, setEmail] = useState('aris.thorne@uit.edu.vn');
+  const [email, setEmail] = useState('thornea@uit.edu.vn');
   const [password, setPassword] = useState('');
   const [mssv, setMssv] = useState('');
   const [daaCookie, setDaaCookie] = useState('');
@@ -396,8 +396,8 @@ export const Login = ({ onLogin }: LoginProps) => {
 
           <div className="mt-5 text-xs text-slate-400 leading-relaxed">
             <p className="font-bold text-slate-500 mb-1">Tài khoản test:</p>
-            <p>Advisor: aris.thorne@uit.edu.vn / password123</p>
-            <p>Student: sv24521001@uit.edu.vn / password123</p>
+            <p>Advisor: thornea@uit.edu.vn / password123</p>
+            <p>Student: 24521001@gm.uit.edu.vn / password123</p>
             <p>Admin: admin@uit.edu.vn / password123</p>
           </div>
         </div>

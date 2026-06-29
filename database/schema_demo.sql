@@ -251,7 +251,7 @@ BEGIN
 
       full_name := s_last || ' ' || s_mid || ' ' || s_first;
       mssv := class_configs.prefix || lpad(student_id::text, 3, '0');
-      email := lower('student' || mssv || '@uit.edu.vn');
+      email := lower(mssv || '@gm.uit.edu.vn');
 
       INSERT INTO students (id, full_name, mssv, email, phone, class_code, cohort, status)
       VALUES (
@@ -279,16 +279,16 @@ SELECT setval('students_id_seq', (SELECT MAX(id) FROM students), true);
 
 INSERT INTO users (id, email, password_hash, full_name, role, student_id) VALUES
 (1, 'admin@uit.edu.vn',          'password123', 'Quản trị viên hệ thống', 'ADMIN', NULL),
-(2, 'aris.thorne@uit.edu.vn',    'password123', 'Dr. Aris Thorne',       'ADVISOR', NULL),
-(3, 'minh.nguyen@uit.edu.vn',    'password123', 'TS. Nguyễn Văn Minh',   'ADVISOR', NULL),
-(4, 'thu.le@uit.edu.vn',         'password123', 'ThS. Lê Thị Thu',       'ADVISOR', NULL),
-(5, 'hung.pham@uit.edu.vn',      'password123', 'TS. Phạm Quốc Hùng',    'ADVISOR', NULL),
-(6, 'lan.tran@uit.edu.vn',       'password123', 'ThS. Trần Ngọc Lan',    'ADVISOR', NULL);
+(2, 'thornea@uit.edu.vn',        'password123', 'Dr. Aris Thorne',       'ADVISOR', NULL),
+(3, 'minhnv@uit.edu.vn',         'password123', 'TS. Nguyễn Văn Minh',   'ADVISOR', NULL),
+(4, 'thult@uit.edu.vn',          'password123', 'ThS. Lê Thị Thu',       'ADVISOR', NULL),
+(5, 'hungpq@uit.edu.vn',         'password123', 'TS. Phạm Quốc Hùng',    'ADVISOR', NULL),
+(6, 'lantrn@uit.edu.vn',         'password123', 'ThS. Trần Ngọc Lan',    'ADVISOR', NULL);
 
 -- Tài khoản sinh viên test: lấy 8 sinh viên đầu tiên trong bảng students.
 INSERT INTO users (id, email, password_hash, full_name, role, student_id)
 SELECT 1000 + s.id,
-       'sv' || s.mssv || '@uit.edu.vn',
+       s.mssv || '@gm.uit.edu.vn',
        'password123',
        s.full_name,
        'STUDENT',
@@ -652,21 +652,21 @@ COMMIT;
 --   admin@uit.edu.vn / password123
 --
 -- ADVISORS:
---   aris.thorne@uit.edu.vn / password123
---   minh.nguyen@uit.edu.vn / password123
---   thu.le@uit.edu.vn / password123
---   hung.pham@uit.edu.vn / password123
---   lan.tran@uit.edu.vn / password123
+--   thornea@uit.edu.vn / password123
+--   minhnv@uit.edu.vn / password123
+--   thult@uit.edu.vn / password123
+--   hungpq@uit.edu.vn / password123
+--   lantrn@uit.edu.vn / password123
 --
 -- STUDENTS:
---   sv24521001@uit.edu.vn / password123
---   sv24521002@uit.edu.vn / password123
---   sv24521003@uit.edu.vn / password123
---   sv24521004@uit.edu.vn / password123
---   sv24521005@uit.edu.vn / password123
---   sv24521006@uit.edu.vn / password123
---   sv24521007@uit.edu.vn / password123
---   sv24521008@uit.edu.vn / password123
+--   24521001@gm.uit.edu.vn / password123
+--   24521002@gm.uit.edu.vn / password123
+--   24521003@gm.uit.edu.vn / password123
+--   24521004@gm.uit.edu.vn / password123
+--   24521005@gm.uit.edu.vn / password123
+--   24521006@gm.uit.edu.vn / password123
+--   24521007@gm.uit.edu.vn / password123
+--   24521008@gm.uit.edu.vn / password123
 --
 -- VERIFY:
 --   SELECT role, COUNT(*) FROM users GROUP BY role;

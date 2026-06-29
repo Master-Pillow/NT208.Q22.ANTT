@@ -135,15 +135,20 @@ export async function sendNewMessageEmail({ to, recipientName, senderName, previ
  * Luôn nuốt lỗi (fire-and-forget) để KHÔNG bao giờ chặn việc gửi tin nhắn.
  */
 export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserId, content }) {
-  try {
-    if (!config.messageEmail.enabled) return { sent: false, reason: 'disabled' };
-    if (!recipientUserId || !senderUserId) return { sent: false, reason: 'missing_ids' };
+  const log = (r) => {
+    console.log(
+      `[messageEmail] -> user ${recipientUserId}:`,
+      r.sent ? 'ĐÃ GỬI ✅' : `bỏ qua (${r.reason})`
+    );
+    return r;
+  };
 
-    // 1) Người nhận online? (có ít nhất 1 socket trong phòng user_<id>) → không gửi.
-    if (io) {
-      const sockets = await io.in(`user_${recipientUserId}`).fetchSockets();
-      if (sockets.length > 0) return { sent: false, reason: 'recipient_online' };
-    }
+  try {
+    if (!config.messageEmail.enabled) return log({ sent: false, reason: 'disabled (MESSAGE_EMAIL_ENABLED=false)' });
+    if (!recipientUserId || !senderUserId) return log({ sent: false, reason: 'missing_ids' });
+
+    // Luôn gửi email kể cả khi người nhận đang online (theo lựa chọn). Chống spam
+    // bằng throttle + mute ở dưới. (io giữ lại cho tương thích chữ ký hàm.)
 
     // 2) Thông tin người nhận + công tắc chung.
     const recipientRes = await pool.query(
@@ -152,8 +157,8 @@ export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserI
       [recipientUserId]
     );
     const recipient = recipientRes.rows[0];
-    if (!recipient || !recipient.email) return { sent: false, reason: 'no_email' };
-    if (!recipient.message_email_enabled) return { sent: false, reason: 'globally_muted' };
+    if (!recipient || !recipient.email) return log({ sent: false, reason: 'no_email (user chưa có email)' });
+    if (!recipient.message_email_enabled) return log({ sent: false, reason: 'globally_muted (tắt email chung)' });
 
     // 3) Mute theo người + throttle (đọc/ghi cùng bảng message_notif_prefs).
     const prefRes = await pool.query(
@@ -162,12 +167,12 @@ export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserI
       [recipientUserId, senderUserId]
     );
     const pref = prefRes.rows[0];
-    if (pref?.muted) return { sent: false, reason: 'peer_muted' };
+    if (pref?.muted) return log({ sent: false, reason: 'peer_muted (đã tắt báo người này)' });
 
     if (pref?.last_emailed_at) {
       const elapsedMs = Date.now() - new Date(pref.last_emailed_at).getTime();
       if (elapsedMs < config.messageEmail.throttleMinutes * 60 * 1000) {
-        return { sent: false, reason: 'throttled' };
+        return log({ sent: false, reason: `throttled (chờ ${config.messageEmail.throttleMinutes} phút)` });
       }
     }
 
@@ -196,9 +201,9 @@ export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserI
       );
     }
 
-    return result;
+    return log(result?.sent ? result : { sent: false, reason: result?.reason || 'smtp_not_configured (chưa điền SMTP_USER/PASS)' });
   } catch (err) {
-    console.error('[notifyNewMessageByEmail]', err.message);
+    console.error('[messageEmail] LỖI gửi email:', err.message);
     return { sent: false, reason: 'error' };
   }
 }

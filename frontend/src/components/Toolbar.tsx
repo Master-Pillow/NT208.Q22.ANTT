@@ -92,6 +92,7 @@ export const Toolbar = ({
   const searchRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const baseTitleRef = useRef<string>('');
 
   const displayName = currentUser?.full_name || currentUser?.email || 'Người dùng';
   const normalizedRole = String(currentUser?.role || '').trim().toUpperCase();
@@ -175,6 +176,16 @@ export const Toolbar = ({
       sock.off('message:read', onRead);
     };
   }, [currentUser?.id, loadMessageNotifications]);
+
+  // Hiện số tin chưa đọc lên TIÊU ĐỀ TAB kiểu "(1) Tin nhắn" như Messenger.
+  useEffect(() => {
+    if (!baseTitleRef.current) {
+      const t = document.title || 'WEBSITE COURSE2';
+      baseTitleRef.current = /^\(\d+\)/.test(t) ? 'WEBSITE COURSE2' : t;
+    }
+    document.title =
+      unreadMessageCount > 0 ? `(${unreadMessageCount}) Tin nhắn` : baseTitleRef.current;
+  }, [unreadMessageCount]);
   useEffect(() => {
     loadAppointmentRequests();
 

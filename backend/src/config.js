@@ -37,4 +37,12 @@ export const config = {
     // Không gửi quá 1 email/ sinh viên trong khoảng thời gian này (giờ) để tránh spam.
     throttleHours: Number(process.env.ALERT_EMAIL_THROTTLE_HOURS) || 12,
   },
+  messageEmail: {
+    // Gửi email cho người nhận khi có tin nhắn mới (chỉ khi họ đang offline).
+    // Đặt false để tắt toàn hệ thống.
+    enabled:
+      String(process.env.MESSAGE_EMAIL_ENABLED ?? 'true').toLowerCase() !== 'false',
+    // Không gửi quá 1 email/người-gửi trong khoảng thời gian này (phút) để tránh spam.
+    throttleMinutes: Number(process.env.MESSAGE_EMAIL_THROTTLE_MINUTES) || 10,
+  },
 };

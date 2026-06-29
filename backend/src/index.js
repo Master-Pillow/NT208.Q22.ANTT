@@ -26,9 +26,17 @@ import {
   saveStudentExams,
 } from "./services/studentScheduleImportService.js";
 
+import {
+  ensureMessagingSchema,
+  getConversationParticipantUserIds,
+  emitMessageNew,
+} from "./services/messagingService.js";
+import { notifyNewMessageByEmail } from "./services/emailService.js";
+
 import advisorRouter from "./routes/Advisorroutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
 import studentRouter from "./routes/studentRoutes.js";
+import messagingRouter from "./routes/messagingRoutes.js";
 import adminRouter from "./routes/adminRoutes.js";
 import aiAnomalyRouter from "./routes/aiAnomalyRoutes.js";
 import aiQueryRouter from "./routes/aiQueryRoutes.js";
@@ -178,6 +186,40 @@ io.on("connection", (socket) => {
       const newMessage = result.rows[0];
 
       io.to(`conv_${conversationId}`).emit("new_message", newMessage);
+
+      // Fan-out chuẩn hoá tới phòng user của 2 phía (cho UI sinh viên mới) + email.
+      try {
+        const parts = await getConversationParticipantUserIds(conversationId);
+        if (parts) {
+          const key = `advisor:${conversationId}`;
+          const normalized = {
+            id: Number(newMessage.id),
+            key,
+            sender_id: Number(newMessage.sender_id),
+            content: newMessage.content,
+            created_at: newMessage.created_at,
+            is_read: Boolean(newMessage.is_read),
+          };
+          emitMessageNew(io, {
+            key,
+            message: normalized,
+            userIds: [parts.advisorUserId, parts.studentUserId],
+          });
+
+          const recipientUserId =
+            Number(senderId) === parts.advisorUserId
+              ? parts.studentUserId
+              : parts.advisorUserId;
+          notifyNewMessageByEmail({
+            io,
+            recipientUserId,
+            senderUserId: Number(senderId),
+            content,
+          }).catch(() => {});
+        }
+      } catch (fanoutErr) {
+        console.error("[send_message fanout]", fanoutErr.message);
+      }
     } catch (err) {
       console.error("Lỗi khi lưu/gửi tin nhắn:", err.message);
     }
@@ -565,6 +607,7 @@ app.put("/auth/profile", verifyToken, upload.fields([{ name: 'avatar', maxCount:
 app.use("/advisor", verifyToken, advisorRouter);
 app.use("/appointments", verifyToken, appointmentRouter);
 app.use("/student", verifyToken, studentRouter);
+app.use("/messaging", verifyToken, messagingRouter);
 app.use("/admin", verifyToken, adminRouter);
 app.use("/ai", verifyToken, aiQueryRouter);
 app.use("/ai", verifyToken, aiAnomalyRouter);
@@ -1040,8 +1083,39 @@ app.get("/conversations/unread", verifyToken, async (req, res) => {
         [req.user.id, unreadSenderRole]
       );
 
-      const total = result.rows.reduce((sum, row) => sum + Number(row.unread_count || 0), 0);
-      return res.json({ total, items: result.rows });
+      // Gộp thêm tin chưa đọc từ các hội thoại sinh viên ↔ sinh viên (dm_threads).
+      const dmResult = await pool.query(
+        `
+        SELECT
+          'peer:' || t.id AS conversation_id,
+          COALESCE(ps.full_name, peer.full_name) AS sender_name,
+          ps.mssv AS sender_detail,
+          latest.content AS last_message,
+          latest.created_at AS last_message_at,
+          unread.unread_count::int AS unread_count
+        FROM dm_threads t
+        JOIN users peer
+          ON peer.id = CASE WHEN t.user_a_id = $1 THEN t.user_b_id ELSE t.user_a_id END
+        LEFT JOIN students ps ON ps.id = peer.student_id
+        JOIN LATERAL (
+          SELECT content, created_at FROM dm_messages
+          WHERE thread_id = t.id AND sender_id <> $1 AND read_at IS NULL
+          ORDER BY created_at DESC LIMIT 1
+        ) latest ON TRUE
+        JOIN LATERAL (
+          SELECT COUNT(*) AS unread_count FROM dm_messages
+          WHERE thread_id = t.id AND sender_id <> $1 AND read_at IS NULL
+        ) unread ON TRUE
+        WHERE (t.user_a_id = $1 OR t.user_b_id = $1)
+          AND unread.unread_count > 0
+        ORDER BY latest.created_at DESC
+        `,
+        [req.user.id]
+      );
+
+      const items = [...result.rows, ...dmResult.rows];
+      const total = items.reduce((sum, row) => sum + Number(row.unread_count || 0), 0);
+      return res.json({ total, items });
     }
 
     if (role !== "ADVISOR" && role !== "ADMIN") {
@@ -1266,6 +1340,7 @@ const startServer = async () => {
     const result = await pool.query("SELECT NOW()");
     console.log("DB connected:", result.rows[0]);
     await ensureUserProfileColumns();
+    await ensureMessagingSchema();
 
     httpServer.listen(PORT, () => {
       console.log(`Backend & Socket.io running on port ${PORT}`);

@@ -3,9 +3,9 @@ import {
   Search, Send, Paperclip, Check, CheckCheck,
   MoreVertical, Phone, Video, MessageSquare, Loader2,
 } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
 import { cn } from '../lib/utils';
 import apiClient from '../lib/api';
+import { getSocket } from '../lib/socket';
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -46,18 +46,6 @@ interface MessagesReadEvent {
   readerRole: 'ADVISOR' | 'STUDENT';
   messageIds: number[];
 }
-
-// ─────────────────────────────────────────────────────────────────
-// Socket singleton — chỉ tạo 1 lần
-// ─────────────────────────────────────────────────────────────────
-let socket: Socket | null = null;
-
-const getSocket = (): Socket => {
-  if (!socket) {
-    socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4000', { transports: ['websocket'] });
-  }
-  return socket;
-};
 
 // Helper lấy currentUser an toàn
 const getCurrentUser = () => {

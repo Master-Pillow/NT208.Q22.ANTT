@@ -50,6 +50,7 @@ CREATE TABLE users (
     bio           TEXT,
     avatar_url    TEXT,
     cover_url     TEXT,
+    message_email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -102,6 +103,36 @@ CREATE TABLE messages (
   content TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   is_read BOOLEAN DEFAULT FALSE
+);
+
+-- Hệ direct-message tổng quát user↔user (dùng cho sinh viên ↔ sinh viên cùng lớp;
+-- mở rộng được cho mọi cặp user). user_a_id < user_b_id để 1 cặp chỉ có 1 thread.
+CREATE TABLE dm_threads (
+  id BIGSERIAL PRIMARY KEY,
+  user_a_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_b_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (user_a_id < user_b_id),
+  UNIQUE (user_a_id, user_b_id)
+);
+
+CREATE TABLE dm_messages (
+  id BIGSERIAL PRIMARY KEY,
+  thread_id BIGINT NOT NULL REFERENCES dm_threads(id) ON DELETE CASCADE,
+  sender_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  read_at TIMESTAMPTZ
+);
+
+-- Tuỳ chọn email tin nhắn theo từng cặp (mute) + mốc throttle. Khoá theo cặp user
+-- nên dùng chung cho cả hệ advisor↔student lẫn dm sinh viên↔sinh viên.
+CREATE TABLE message_notif_prefs (
+  user_id      BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  peer_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  muted        BOOLEAN NOT NULL DEFAULT FALSE,
+  last_emailed_at TIMESTAMPTZ,
+  PRIMARY KEY (user_id, peer_user_id)
 );
 
 CREATE TABLE appointments (
@@ -171,6 +202,7 @@ CREATE INDEX idx_enrollments_course ON enrollments(course_id);
 CREATE INDEX idx_conversations_advisor ON conversations(advisor_id);
 CREATE INDEX idx_conversations_student ON conversations(student_id);
 CREATE INDEX idx_messages_conversation_created ON messages(conversation_id, created_at);
+CREATE INDEX idx_dm_messages_thread_created ON dm_messages(thread_id, created_at);
 CREATE INDEX idx_appointments_advisor_start ON appointments(advisor_id, start_time);
 CREATE INDEX idx_appointments_student_start ON appointments(student_id, start_time);
 CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);

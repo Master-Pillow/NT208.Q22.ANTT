@@ -30,6 +30,11 @@ export const config = {
     pass: process.env.SMTP_PASS || '',
     from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
   },
+  // Brevo HTTP API — dùng để gửi email qua HTTPS (cổng 443) khi host (vd Render free)
+  // chặn SMTP. Có BREVO_API_KEY thì ưu tiên Brevo; không có thì fallback SMTP ở trên.
+  brevo: {
+    apiKey: process.env.BREVO_API_KEY || '',
+  },
   alerts: {
     // Tự động gửi email cảnh báo học vụ tới sinh viên khi phát hiện bất thường mới.
     emailEnabled:

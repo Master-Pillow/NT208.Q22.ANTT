@@ -41,6 +41,43 @@ function stripHtml(value) {
   return String(value || '').replace(/<[^>]+>/g, '').trim();
 }
 
+// Tách "AdvisorHub <a@b.com>" -> { name, email } cho Brevo (yêu cầu sender dạng object).
+function parseSender(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1] || 'AdvisorHub', email: m[2].trim() };
+  return { name: 'AdvisorHub', email: s };
+}
+
+/**
+ * Gửi email qua Brevo HTTP API (https://api.brevo.com/v3/smtp/email) bằng HTTPS cổng 443.
+ * Dùng khi host chặn SMTP (vd Render free). Sender phải là email đã verify trong Brevo.
+ * Ném lỗi nếu Brevo trả mã != 2xx để hàm gọi log lại được nguyên nhân.
+ */
+async function sendViaBrevo({ to, subject, text, html }) {
+  const sender = parseSender(config.smtp.from || config.smtp.user);
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': config.brevo.apiKey,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      sender,
+      to: [{ email: to }],
+      subject,
+      htmlContent: html || undefined,
+      textContent: text || stripHtml(html),
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Brevo ${res.status}: ${detail.slice(0, 300)}`);
+  }
+  return { sent: true, skipped: false };
+}
+
 function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')

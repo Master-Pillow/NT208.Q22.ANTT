@@ -93,6 +93,9 @@ export const StudentMessages = () => {
   const [newCount, setNewCount] = useState(0);
   const [firstUnreadId, setFirstUnreadId] = useState<number | null>(null);
   const [unreadOnOpen, setUnreadOnOpen] = useState(0);
+  // Nút "còn N tin chưa đọc" hiển thị độc lập với vị trí cuộn: mở hội thoại là
+  // nhảy thẳng xuống tin mới nhất, vẫn còn nút để lướt lên chỗ chưa đọc.
+  const [showUnreadJump, setShowUnreadJump] = useState(false);
 
   useEffect(() => { activeKeyRef.current = activeKey; }, [activeKey]);
   useEffect(() => { threadsRef.current = threads; }, [threads]);
@@ -195,8 +198,11 @@ export const StudentMessages = () => {
         const unread = list.filter((m) => m.sender_id !== meId && !m.is_read);
         setFirstUnreadId(unread.length ? Number(unread[0].id) : null);
         setUnreadOnOpen(unread.length);
+        setShowUnreadJump(unread.length > 0);
         setNewCount(0);
-        pendingScrollRef.current = unread.length ? 'unread' : 'bottom';
+        // Luôn nhảy xuống tin mới nhất khi mở hội thoại; nút "còn N tin chưa đọc"
+        // ở trên cho phép lướt ngược lên chỗ chưa đọc.
+        pendingScrollRef.current = 'bottom';
         await markRead(activeKey!);
       } catch (err) {
         console.error('[StudentMessages/loadMessages]', err);
@@ -626,10 +632,13 @@ export const StudentMessages = () => {
                 </div>
 
                 {/* Chỉ báo tin chưa đọc → bấm nhảy tới tin cũ nhất chưa đọc */}
-                {firstUnreadId && unreadOnOpen > 0 && !atBottom && (
+                {firstUnreadId && unreadOnOpen > 0 && showUnreadJump && (
                   <button
                     type="button"
-                    onClick={scrollToFirstUnread}
+                    onClick={() => {
+                      scrollToFirstUnread();
+                      setShowUnreadJump(false);
+                    }}
                     className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500 text-white text-xs font-bold shadow-lg hover:bg-rose-600 transition-colors"
                   >
                     <ChevronDown className="w-3.5 h-3.5 rotate-180" />

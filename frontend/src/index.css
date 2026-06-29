@@ -54,6 +54,24 @@
   }
 }
 
+/* Con trỏ hình bàn tay cho mọi thứ bấm được (Tailwind v4 mặc định để mũi tên).
+   Phần tử bị disabled → con trỏ "không cho phép". */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

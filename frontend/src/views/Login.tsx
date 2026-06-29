@@ -7,6 +7,7 @@ import {
   KeyRound,
   Lock,
   Mail,
+  RefreshCw,
   ShieldCheck,
   UserRound,
   Users,
@@ -19,7 +20,7 @@ interface LoginProps {
 
 export const Login = ({ onLogin }: LoginProps) => {
   const [loginMode, setLoginMode] = useState<'ACCOUNT' | 'DAA'>('ACCOUNT');
-  const [email, setEmail] = useState('thornea@uit.edu.vn');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mssv, setMssv] = useState('');
   const [daaCookie, setDaaCookie] = useState('');
@@ -28,8 +29,34 @@ export const Login = ({ onLogin }: LoginProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Chống bot: sau 3 lần đăng nhập sai (chế độ tài khoản email/mật khẩu), bắt
+  // người dùng giải một phép tính đơn giản trước khi gửi tiếp.
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [captcha, setCaptcha] = useState(() => ({
+    a: Math.floor(Math.random() * 9) + 1,
+    b: Math.floor(Math.random() * 9) + 1,
+  }));
+  const [captchaInput, setCaptchaInput] = useState('');
+
+  const captchaRequired = loginMode === 'ACCOUNT' && failedAttempts >= 3;
+
+  const regenerateCaptcha = () => {
+    setCaptcha({
+      a: Math.floor(Math.random() * 9) + 1,
+      b: Math.floor(Math.random() * 9) + 1,
+    });
+    setCaptchaInput('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // không reload trang — chỉ báo lỗi tại chỗ để nhập lại
+
+    // Bắt buộc giải captcha trước khi gọi API (sau 3 lần sai).
+    if (captchaRequired && Number(captchaInput.trim()) !== captcha.a + captcha.b) {
+      setErrorMsg('Mã xác minh chưa đúng. Vui lòng nhập lại kết quả phép tính.');
+      regenerateCaptcha();
+      return;
+    }
 
     setIsLoading(true);
     setErrorMsg('');
@@ -59,6 +86,7 @@ export const Login = ({ onLogin }: LoginProps) => {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
 
+      setFailedAttempts(0);
       onLogin(user);
     } catch (error: any) {
       setErrorMsg(
@@ -66,6 +94,12 @@ export const Login = ({ onLogin }: LoginProps) => {
           error.message ||
           'Lỗi kết nối đến máy chủ. Vui lòng kiểm tra lại!'
       );
+      // Đếm số lần sai cho chế độ đăng nhập tài khoản; chạm mốc 3 thì hiện captcha.
+      if (loginMode === 'ACCOUNT') {
+        const next = failedAttempts + 1;
+        setFailedAttempts(next);
+        if (next >= 3) regenerateCaptcha();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -265,6 +299,41 @@ export const Login = ({ onLogin }: LoginProps) => {
                     </button>
                   </div>
                 </div>
+
+                {captchaRequired && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-sm font-bold text-slate-700 block">
+                      Xác minh bạn không phải robot
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 px-4 py-3.5 rounded-xl bg-slate-100 border border-slate-200 font-bold text-slate-700 select-none whitespace-nowrap">
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                        {captcha.a} + {captcha.b} = ?
+                      </div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={captchaInput}
+                        onChange={(e) => setCaptchaInput(e.target.value.replace(/\D/g, ''))}
+                        className="flex-1 min-w-0 bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 px-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
+                        placeholder="Nhập kết quả"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={regenerateCaptcha}
+                        title="Đổi phép tính khác"
+                        aria-label="Đổi phép tính khác"
+                        className="shrink-0 p-3 rounded-xl border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/30 transition-colors cursor-pointer"
+                      >
+                        <RefreshCw className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <p className="text-xs text-amber-600 font-medium">
+                      Bạn đã nhập sai {failedAttempts} lần. Vui lòng giải phép tính trên để tiếp tục.
+                    </p>
+                  </div>
+                )}
               </>
             ) : (
               <>

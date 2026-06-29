@@ -43,6 +43,12 @@ export const config = {
     enabled:
       String(process.env.MESSAGE_EMAIL_ENABLED ?? 'true').toLowerCase() !== 'false',
     // Không gửi quá 1 email/người-gửi trong khoảng thời gian này (phút) để tránh spam.
-    throttleMinutes: Number(process.env.MESSAGE_EMAIL_THROTTLE_MINUTES) || 10,
+    // Cho phép đặt 0 (tắt throttle, demo gửi liên tục) — không dùng `|| 10` vì 0 là falsy.
+    throttleMinutes:
+      process.env.MESSAGE_EMAIL_THROTTLE_MINUTES != null &&
+      process.env.MESSAGE_EMAIL_THROTTLE_MINUTES !== '' &&
+      Number.isFinite(Number(process.env.MESSAGE_EMAIL_THROTTLE_MINUTES))
+        ? Number(process.env.MESSAGE_EMAIL_THROTTLE_MINUTES)
+        : 10,
   },
 };

@@ -20,9 +20,36 @@ services:
         sync: false           # Nhập tay trong Render Dashboard
       - key: ALLOWED_ORIGINS
         sync: false           # Nhập URL Vercel của frontend
+      # ----- Email (thông báo tin nhắn / lịch hẹn) -----
+      # KHÔNG có các biến này thì backend trên Render sẽ bỏ qua mọi email
+      # với lý do "smtp_not_configured" (email vẫn gửi tốt khi chạy local
+      # vì local đọc backend/.env, còn .env KHÔNG được đẩy lên Render).
+      - key: MESSAGE_EMAIL_ENABLED
+        value: "true"
+      - key: MESSAGE_EMAIL_THROTTLE_MINUTES
+        value: "0"            # 0 = tắt throttle, mỗi tin nhắn gửi 1 email (cho demo)
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false           # Gmail dùng để gửi, nhập tay trong Dashboard
+      - key: SMTP_PASS
+        sync: false           # App Password 16 ký tự, KHÔNG commit
+      - key: SMTP_FROM
+        sync: false           # vd: AdvisorHub <your@gmail.com>
 
 # ============================================================
 # Hướng dẫn thêm biến môi trường:
 #   Vào Render Dashboard → Service → Environment → Add Env Var
 #   Nhập từng biến theo file backend/.env.example
+#
+#   Bắt buộc nhập tay 3 biến SMTP (vì để sync:false cho an toàn):
+#     SMTP_USER = ngquoctruong06@gmail.com
+#     SMTP_PASS = <App Password 16 ký tự của Gmail đó>
+#     SMTP_FROM = AdvisorHub <ngquoctruong06@gmail.com>
+#   Sau khi Save, Render tự deploy lại; xem log có dòng
+#     "[messageEmail] -> user 2007: ĐÃ GỬI ✅" là thành công.
 # ============================================================

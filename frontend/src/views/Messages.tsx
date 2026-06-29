@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, Send, Paperclip, Check, CheckCheck,
   MoreVertical, Phone, Video, MessageSquare, Loader2,
+  Bell, BellOff,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import apiClient from '../lib/api';
@@ -29,6 +30,8 @@ interface Chat {
   time:        string;
   unreadCount?: number;
   isUnread?: boolean;
+  student_user_id?: number;   // user id của sinh viên (để mute email)
+  muted?: boolean;            // cố vấn đã tắt email từ sinh viên này
 }
 
 interface Message {
@@ -73,8 +76,41 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
   const [inputValue,     setInputValue]     = useState('');
   const [searchQuery,    setSearchQuery]    = useState('');
   const [sending,        setSending]        = useState(false);
+  const [emailEnabled,   setEmailEnabled]   = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Công tắc email chung của tài khoản cố vấn.
+  useEffect(() => {
+    apiClient
+      .get('/messaging/settings')
+      .then(({ data }) => setEmailEnabled(Boolean(data?.message_email_enabled ?? true)))
+      .catch(() => {});
+  }, []);
+
+  const toggleEmailGlobal = async () => {
+    const next = !emailEnabled;
+    setEmailEnabled(next);
+    try {
+      await apiClient.put('/messaging/settings', { message_email_enabled: next });
+    } catch (err) {
+      console.error('[Messages] toggle email:', err);
+      setEmailEnabled(!next);
+    }
+  };
+
+  // Tắt/bật email từ một sinh viên cụ thể (mute theo người).
+  const toggleMute = async () => {
+    const chat = chats.find((c) => c.id === activeChatId);
+    if (!chat?.student_user_id) return;
+    const next = !chat.muted;
+    try {
+      await apiClient.put('/messaging/mute', { peer_user_id: chat.student_user_id, muted: next });
+      setChats((prev) => prev.map((c) => (c.id === chat.id ? { ...c, muted: next } : c)));
+    } catch (err) {
+      console.error('[Messages] toggle mute:', err);
+    }
+  };
 
   const applyReadReceipt = (event: MessagesReadEvent) => {
     setMessages(prev => prev.map(msg =>
@@ -121,6 +157,10 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     time: conversation.time ?? fallback?.time ?? '',
     unreadCount: Number(conversation.unreadCount ?? fallback?.unreadCount ?? 0),
     isUnread: Boolean(conversation.isUnread ?? fallback?.isUnread ?? false),
+    student_user_id: conversation.student_user_id != null
+      ? Number(conversation.student_user_id)
+      : fallback?.student_user_id,
+    muted: Boolean(conversation.muted ?? fallback?.muted ?? false),
   });
 
   const createConversationForStudent = async (student: Contact | Chat) => {
@@ -345,7 +385,23 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
 
         {/* Search */}
         <div className="p-4 border-b border-slate-100">
-          <h2 className="font-headline font-bold text-lg text-slate-900 mb-3">Tin nhắn</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-headline font-bold text-lg text-slate-900">Tin nhắn</h2>
+            <button
+              type="button"
+              onClick={toggleEmailGlobal}
+              title="Bật/tắt nhận email khi có tin nhắn mới"
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors',
+                emailEnabled
+                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              )}
+            >
+              {emailEnabled ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+              {emailEnabled ? 'Email' : 'Tắt'}
+            </button>
+          </div>
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -446,7 +502,22 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full transition-colors">
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  disabled={!activeChat.student_user_id}
+                  title={activeChat.muted ? 'Bật lại email từ sinh viên này' : 'Tắt email từ sinh viên này'}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                    activeChat.muted
+                      ? 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      : 'bg-primary/10 text-primary hover:bg-primary/20'
+                  )}
+                >
+                  {activeChat.muted ? <BellOff className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
+                  {activeChat.muted ? 'Đã tắt báo' : 'Đang báo'}
+                </button>
+                <button type="button" className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full transition-colors">
                   <Phone className="w-5 h-5" />
                 </button>
                 <button className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full transition-colors">

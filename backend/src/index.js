@@ -1009,9 +1009,14 @@ app.get("/conversations", verifyToken, async (req, res) => {
         TO_CHAR(latest.created_at, 'HH24:MI') AS time,
         latest.created_at AS "lastMessageAt",
         COALESCE(unread.unread_count, 0)::int AS "unreadCount",
-        (COALESCE(unread.unread_count, 0) > 0) AS "isUnread"
+        (COALESCE(unread.unread_count, 0) > 0) AS "isUnread",
+        su.id AS student_user_id,
+        COALESCE(pref.muted, FALSE) AS muted
       FROM conversations c
       JOIN students s ON s.id = c.student_id
+      LEFT JOIN users su ON su.student_id = c.student_id
+      LEFT JOIN message_notif_prefs pref
+        ON pref.user_id = c.advisor_id AND pref.peer_user_id = su.id
       LEFT JOIN LATERAL (
         SELECT content, created_at
         FROM messages
@@ -1273,9 +1278,14 @@ app.post("/conversations", verifyToken, async (req, res) => {
         TO_CHAR(latest.created_at, 'HH24:MI') AS time,
         latest.created_at AS "lastMessageAt",
         COALESCE(unread.unread_count, 0)::int AS "unreadCount",
-        (COALESCE(unread.unread_count, 0) > 0) AS "isUnread"
+        (COALESCE(unread.unread_count, 0) > 0) AS "isUnread",
+        su.id AS student_user_id,
+        COALESCE(pref.muted, FALSE) AS muted
       FROM conversations c
       JOIN students s ON s.id = c.student_id
+      LEFT JOIN users su ON su.student_id = c.student_id
+      LEFT JOIN message_notif_prefs pref
+        ON pref.user_id = c.advisor_id AND pref.peer_user_id = su.id
       LEFT JOIN LATERAL (
         SELECT content, created_at
         FROM messages

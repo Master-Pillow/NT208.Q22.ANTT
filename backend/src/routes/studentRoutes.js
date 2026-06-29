@@ -2,6 +2,10 @@ import express from 'express';
 import { pool } from '../db.js';
 import { ensureStudentGradeImportSchema } from '../services/studentGradeImportService.js';
 import { getStudentMetricsForUser } from '../services/studentMetricsService.js';
+import {
+  getStudentTimetable,
+  getStudentExams,
+} from '../services/studentScheduleImportService.js';
 
 const router = express.Router();
 
@@ -163,6 +167,48 @@ router.get('/metrics', requireStudent, async (req, res) => {
       message: 'Không thể tính xu hướng điểm học tập.',
       detail: err.message,
     });
+  }
+});
+
+async function resolveStudentId(userId) {
+  const result = await pool.query(
+    `SELECT student_id FROM users WHERE id = $1 LIMIT 1`,
+    [userId]
+  );
+  return result.rows[0]?.student_id || null;
+}
+
+// GET /student/schedule?semester=HK2-2025  (thời khoá biểu)
+router.get('/schedule', requireStudent, async (req, res) => {
+  try {
+    const studentId = await resolveStudentId(req.user.id);
+    if (!studentId) {
+      return res.status(404).json({ message: 'Không tìm thấy sinh viên' });
+    }
+    const semester = req.query.semester ? String(req.query.semester) : null;
+    const entries = await getStudentTimetable(studentId, semester);
+    const semesters = [...new Set(entries.map((e) => e.semester))];
+    res.json({ semester: semester || semesters[0] || null, semesters, entries });
+  } catch (err) {
+    console.error('[student/schedule]', err);
+    res.status(500).json({ message: 'Lỗi server', detail: err.message });
+  }
+});
+
+// GET /student/exams?semester=HK2-2025  (lịch thi)
+router.get('/exams', requireStudent, async (req, res) => {
+  try {
+    const studentId = await resolveStudentId(req.user.id);
+    if (!studentId) {
+      return res.status(404).json({ message: 'Không tìm thấy sinh viên' });
+    }
+    const semester = req.query.semester ? String(req.query.semester) : null;
+    const entries = await getStudentExams(studentId, semester);
+    const semesters = [...new Set(entries.map((e) => e.semester))];
+    res.json({ semester: semester || semesters[0] || null, semesters, entries });
+  } catch (err) {
+    console.error('[student/exams]', err);
+    res.status(500).json({ message: 'Lỗi server', detail: err.message });
   }
 });
 

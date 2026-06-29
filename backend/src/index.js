@@ -17,6 +17,14 @@ import {
   createStudentGradeImport,
   importStudentGrades,
 } from "./services/studentGradeImportService.js";
+import {
+  fetchDaaTimetablePayload,
+  fetchDaaExamPayload,
+} from "./services/daaScheduleSyncService.js";
+import {
+  saveStudentTimetable,
+  saveStudentExams,
+} from "./services/studentScheduleImportService.js";
 
 import advisorRouter from "./routes/Advisorroutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
@@ -359,6 +367,65 @@ app.post("/auth/daa-login", async (req, res) => {
       return res.status(syncResult.status).json(syncResult.body);
     }
 
+    // Đồng bộ TKB + Lịch thi bằng cùng cookie. Không chặn đăng nhập nếu lỗi
+    // (lịch là phụ; điểm mới là bắt buộc). Thu kết quả để trả về cho client.
+    //
+    // Lưu ý: trang TKB GET không tham số -> trả học kỳ hiện tại. Trang lịch thi
+    // BẮT BUỘC có lanthi/hocky/namhoc mới render bảng -> phải lấy học kỳ từ TKB
+    // trước, rồi mới fetch lịch thi (cả GK lẫn CK) theo đúng học kỳ đó.
+    const scheduleSync = { timetable: null, exams: null };
+    let currentSemester = null;
+
+    try {
+      const tkbPayload = await fetchDaaTimetablePayload({ cookie, mssv });
+      currentSemester = tkbPayload.semester;
+      const saved = await saveStudentTimetable({
+        studentId: user.student_id,
+        payload: tkbPayload,
+      });
+      scheduleSync.timetable = {
+        detected_count: tkbPayload.entries.length,
+        imported_count: saved.imported_count,
+        semester: saved.semester,
+      };
+    } catch (tkbErr) {
+      console.error("[auth/daa-login] TKB", tkbErr.message);
+    }
+
+    // "HK2-2025" -> { hocky: '2', namhoc: '2025' }
+    const semMatch = String(currentSemester || "").match(/^HK(\d)-(\d{4})$/);
+    if (semMatch) {
+      const [, hocky, namhoc] = semMatch;
+      let examImported = 0;
+      let examDetected = 0;
+      // lanthi: 1 = GK, 2 = CK
+      const examRuns = await Promise.allSettled([
+        fetchDaaExamPayload({ cookie, mssv, lanthi: 1, hocky, namhoc }),
+        fetchDaaExamPayload({ cookie, mssv, lanthi: 2, hocky, namhoc }),
+      ]);
+      for (const run of examRuns) {
+        if (run.status !== "fulfilled") {
+          console.error("[auth/daa-login] fetch exams", run.reason?.message);
+          continue;
+        }
+        examDetected += run.value.entries.length;
+        try {
+          const saved = await saveStudentExams({
+            studentId: user.student_id,
+            payload: run.value,
+          });
+          examImported += saved.imported_count;
+        } catch (saveErr) {
+          console.error("[auth/daa-login] save exams", saveErr.message);
+        }
+      }
+      scheduleSync.exams = {
+        detected_count: examDetected,
+        imported_count: examImported,
+        semester: currentSemester,
+      };
+    }
+
     const token = jwt.sign(
       {
         id: user.id,
@@ -378,6 +445,7 @@ app.post("/auth/daa-login", async (req, res) => {
         imported_count: syncResult.body.imported_count,
         skipped_count: syncResult.body.skipped_count,
       },
+      schedule_sync: scheduleSync,
       user: {
         id: user.id,
         email: user.email,

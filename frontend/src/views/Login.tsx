@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
+  Eye,
+  EyeOff,
   KeyRound,
   Lock,
   Mail,
@@ -19,8 +21,10 @@ export const Login = ({ onLogin }: LoginProps) => {
   const [loginMode, setLoginMode] = useState<'ACCOUNT' | 'DAA'>('ACCOUNT');
   const [email, setEmail] = useState('aris.thorne@uit.edu.vn');
   const [password, setPassword] = useState('');
-  const [mssv, setMssv] = useState('24521888');
+  const [mssv, setMssv] = useState('');
   const [daaCookie, setDaaCookie] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showCookie, setShowCookie] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -198,7 +202,7 @@ export const Login = ({ onLogin }: LoginProps) => {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Cookie DAA
+              Tài khoản sinh viên
             </button>
           </div>
 
@@ -240,13 +244,25 @@ export const Login = ({ onLogin }: LoginProps) => {
                   <div className="relative group">
                     <Lock className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all tracking-normal"
+                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-12 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all tracking-normal"
                       placeholder="Nhập mật khẩu..."
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
                   </div>
                 </div>
               </>
@@ -264,7 +280,7 @@ export const Login = ({ onLogin }: LoginProps) => {
                       value={mssv}
                       onChange={(event) => setMssv(event.target.value.replace(/\D/g, ''))}
                       className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
-                      placeholder="Nhập MSSV"
+                      placeholder="Nhập mã số sinh viên của bạn ở đây"
                       required
                     />
                   </div>
@@ -277,18 +293,73 @@ export const Login = ({ onLogin }: LoginProps) => {
                   <div className="relative group">
                     <KeyRound className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors" />
                     <input
-                      type="password"
+                      type={showCookie ? 'text' : 'password'}
                       value={daaCookie}
                       onChange={(event) => setDaaCookie(event.target.value)}
-                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 font-mono text-slate-900 focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
-                      placeholder="Dán Request Headers > Cookie"
+                      className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-12 font-mono text-sm text-slate-900 focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
+                      placeholder="Cookie có dạng _gid=GA1.3.1527703366.1782707143; _gat_gtag_UA_32419117_1=1; _ga_YVG75F27S1=GS2.1.s1782707143$o1$g0$t1782707143$j60$l0$h0; _ga=GA1.1.837617349.1782707143; SSESS91d146efc1199e94140be605b03688ff=w7lQbz_jeF0d9TipcB20R0ajB26OQ4MghS7hHiIo9B0"
                       autoComplete="off"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowCookie((prev) => !prev)}
+                      aria-label={showCookie ? 'Ẩn cookie' : 'Hiện cookie'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      {showCookie ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
                   </div>
-                  <p className="text-xs font-medium leading-relaxed text-slate-500">
-                    Cookie chỉ được dùng để xác minh phiên DAA và không được lưu.
-                  </p>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs leading-relaxed text-slate-500">
+                    <p className="mb-2 font-bold text-slate-700">
+                      Cách lấy Cookie từ{' '}
+                      <a
+                        href="https://daa.uit.edu.vn"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-primary hover:underline"
+                      >
+                        daa.uit.edu.vn
+                      </a>
+                    </p>
+                    <ol className="list-decimal space-y-1 pl-4 font-medium">
+                      <li>
+                        Mở{' '}
+                        <a
+                          href="https://daa.uit.edu.vn"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-bold text-primary hover:underline"
+                        >
+                          https://daa.uit.edu.vn
+                        </a>{' '}
+                        và đăng nhập bằng tài khoản sinh viên của bạn.
+                      </li>
+                      <li>
+                        Nhấn <span className="font-mono font-bold">F12</span> (hoặc chuột phải
+                        → <span className="font-semibold">Inspect</span>) để mở Developer Tools.
+                      </li>
+                      <li>
+                        Chọn tab <span className="font-semibold">Network</span>, rồi nhấn{' '}
+                        <span className="font-mono font-bold">F5</span> để tải lại trang.
+                      </li>
+                      <li>
+                        Bấm vào request đầu tiên (tên miền{' '}
+                        <span className="font-mono">daa.uit.edu.vn</span>), kéo xuống mục{' '}
+                        <span className="font-semibold">Request Headers → Cookie</span>.
+                      </li>
+                      <li>
+                        Sao chép toàn bộ giá trị Cookie và dán vào ô phía trên.
+                      </li>
+                    </ol>
+                    <p className="mt-2 text-[11px] italic text-slate-400">
+                      Cookie chỉ được dùng để xác minh phiên DAA và không được lưu.
+                    </p>
+                  </div>
                 </div>
               </>
             )}

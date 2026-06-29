@@ -34,6 +34,8 @@ const AdvisorAiBriefPage = lazy(pageImporters.advisorAiBrief);
 
 const StudentProfilePage = lazy(pageImporters.studentProfile);
 const StudentGradesPage = lazy(pageImporters.studentGrades);
+const StudentTimetablePage = lazy(pageImporters.studentTimetable);
+const StudentExamsPage = lazy(pageImporters.studentExams);
 const StudentAppointmentsPage = lazy(pageImporters.studentAppointments);
 const StudentMessagesPage = lazy(pageImporters.studentMessages);
 const StudentNotificationsPage = lazy(pageImporters.studentNotifications);
@@ -107,6 +109,8 @@ export default function App() {
                 <Route index element={<Navigate to="/student/profile" replace />} />
                 <Route path="profile" element={<StudentProfilePage />} />
                 <Route path="grades" element={<StudentGradesPage />} />
+                <Route path="timetable" element={<StudentTimetablePage />} />
+                <Route path="exams" element={<StudentExamsPage />} />
                 <Route path="appointments" element={<StudentAppointmentsPage />} />
                 <Route path="messages" element={<StudentMessagesPage />} />
                 <Route path="notifications" element={<StudentNotificationsPage />} />

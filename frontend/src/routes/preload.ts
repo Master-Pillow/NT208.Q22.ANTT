@@ -28,6 +28,8 @@ export const pageImporters = {
 
   studentProfile: () => import('../views/student/ProfilePage'),
   studentGrades: () => import('../views/student/GradesPage'),
+  studentTimetable: () => import('../views/student/TimetablePage'),
+  studentExams: () => import('../views/student/ExamsPage'),
   studentAppointments: () => import('../views/student/AppointmentsPage'),
   studentMessages: () => import('../views/student/MessagesPage'),
   studentNotifications: () => import('../views/student/NotificationsPage'),
@@ -77,6 +79,8 @@ const routePreloads: Record<string, PageImporter[]> = {
   '/student/faq': [pageImporters.uitFaq],
   '/student/profile': [pageImporters.studentProfile],
   '/student/grades': [pageImporters.studentGrades],
+  '/student/timetable': [pageImporters.studentTimetable],
+  '/student/exams': [pageImporters.studentExams],
   '/student/appointments': [pageImporters.studentAppointments],
   '/student/messages': [pageImporters.studentMessages],
   '/student/notifications': [pageImporters.studentNotifications],
@@ -100,6 +104,8 @@ const rolePreloads: Record<string, PageImporter[]> = {
   STUDENT: [
     pageImporters.studentProfile,
     pageImporters.studentGrades,
+    pageImporters.studentTimetable,
+    pageImporters.studentExams,
     pageImporters.studentAppointments,
     pageImporters.studentMessages,
     pageImporters.studentNotifications,

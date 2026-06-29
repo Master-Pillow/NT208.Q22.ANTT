@@ -5,6 +5,8 @@ import {
   Bell,
   BookOpen,
   Calendar,
+  CalendarRange,
+  ClipboardList,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -49,6 +51,8 @@ const advisorItems: NavItem[] = [
 const studentItems: NavItem[] = [
   { to: '/student/profile', label: 'Hồ sơ học tập', icon: LayoutDashboard },
   { to: '/student/grades', label: 'Xem điểm', icon: BookOpen },
+  { to: '/student/timetable', label: 'Thời khoá biểu', icon: CalendarRange },
+  { to: '/student/exams', label: 'Lịch thi', icon: ClipboardList },
   { to: '/student/appointments', label: 'Lịch hẹn', icon: Calendar },
   { to: '/student/messages', label: 'Tin nhắn', icon: MessageSquare },
   { to: '/student/notifications', label: 'Thông báo', icon: Bell },

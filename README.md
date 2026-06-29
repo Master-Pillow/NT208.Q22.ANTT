@@ -8,17 +8,6 @@ kết quả học tập, phát hiện sớm sinh viên có nguy cơ học vụ, 
 và hỗ trợ nhà trường ra quyết định bằng các công cụ phân tích dữ liệu và AI học vụ.
 
 ---
-
-## 🆕 Cập nhật mới nhất
-
-- **Thời khoá biểu & Lịch thi** của sinh viên được **đồng bộ thẳng từ cổng DAA** (cùng lúc với điểm khi đăng nhập bằng cookie DAA).
-- **AI Chatbox UIT** — trợ lý hỏi đáp quy chế/đời sống UIT bằng tiếng Việt, có **RAG (vector search)** và **Google Search grounding**; mở cho **cả 3 vai trò**.
-- **AI nhận định / phân tích điểm (grade insight)** theo từng sinh viên / lớp / khoá / toàn hệ thống.
-- **Nhắn tin nâng cấp**: sinh viên ↔ sinh viên cùng lớp (có ô tìm người nhận), **cố vấn chủ động nhắn trước**, **email báo tin nhắn mới** (có tắt/mute từng người + giới hạn tần suất), **badge chưa đọc realtime** + tiêu đề tab kiểu Messenger.
-- **Email tự động cho lịch hẹn** (khi đặt mới và khi cố vấn duyệt/từ chối).
-- **Gửi email qua Gmail API** (HTTPS 443) để vẫn chạy trên host chặn cổng SMTP (Render).
-- **Tạo sinh viên test** nhanh từ MSSV (thay cho import CSV trước đây) để mở quyền đăng nhập DAA.
-
 ---
 
 ## Mục lục

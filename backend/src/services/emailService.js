@@ -1,10 +1,40 @@
 import nodemailer from 'nodemailer';
+import dns from 'node:dns';
 import { config } from '../config.js';
 import { pool } from '../db.js';
 import { studentEmail } from '../utils/uitEmail.js';
 
 function isEmailConfigured() {
   return Boolean(config.smtp.host && config.smtp.user && config.smtp.pass && config.smtp.from);
+}
+
+/**
+ * Tạo transporter SMTP, ÉP dùng IPv4.
+ *
+ * Lý do: nodemailer phân giải hostname ra cả IPv4 lẫn IPv6 rồi chọn NGẪU NHIÊN 1 địa
+ * chỉ. Trên Render (gói free) không có định tuyến IPv6 ra ngoài → khi trúng IPv6 sẽ lỗi
+ * `connect ENETUNREACH ...:587` và email không gửi được (lúc được lúc không vì là random).
+ * Ta tự phân giải sang IPv4 và truyền thẳng IP làm host; giữ `servername` = hostname gốc
+ * để SNI + kiểm tra chứng chỉ TLS vẫn hợp lệ.
+ */
+async function createMailTransport() {
+  const base = {
+    host: config.smtp.host,
+    port: config.smtp.port,
+    secure: config.smtp.secure,
+    auth: { user: config.smtp.user, pass: config.smtp.pass },
+  };
+  try {
+    const { address } = await dns.promises.lookup(config.smtp.host, { family: 4 });
+    return nodemailer.createTransport({
+      ...base,
+      host: address,
+      servername: config.smtp.host,
+    });
+  } catch {
+    // Không phân giải được IPv4 → quay về dùng hostname như cũ.
+    return nodemailer.createTransport(base);
+  }
 }
 
 function stripHtml(value) {
@@ -322,15 +352,7 @@ export async function sendNotificationEmail({ to, subject, text, html }) {
     return { sent: false, skipped: true, reason: 'smtp_not_configured' };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: config.smtp.host,
-    port: config.smtp.port,
-    secure: config.smtp.secure,
-    auth: {
-      user: config.smtp.user,
-      pass: config.smtp.pass,
-    },
-  });
+  const transporter = await createMailTransport();
 
   await transporter.sendMail({
     from: config.smtp.from,

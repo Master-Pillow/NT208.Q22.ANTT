@@ -149,6 +149,18 @@ export function validateDaaCookie(cookie) {
 export function parseDaaGradeHtml(html, expectedMssv) {
   const $ = cheerio.load(html);
   $('script,style,noscript').remove();
+
+  // DAA's print page lays out student info in table cells. Cheerio's .text()
+  // concatenates adjacent cells with no separator, e.g. the class value cell
+  // ("ATTT2024.3") and the next label cell ("Khoa:") become "ATTT2024.3Khoa:".
+  // That corrupts the class code and breaks the name lookahead (which needs
+  // whitespace before "Ngày sinh"). Insert a space after each cell/block so the
+  // field regexes below see clean boundaries.
+  $('br').replaceWith(' ');
+  $('td, th, li, p, div, h1, h2, h3, h4, h5, h6').each((_index, element) => {
+    $(element).append(' ');
+  });
+
   const pageText = normalizeText($('body').text());
 
   if (

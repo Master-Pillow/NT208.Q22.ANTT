@@ -302,6 +302,38 @@ app.post("/auth/daa-login", async (req, res) => {
 
     const user = result.rows[0];
     const payload = await fetchDaaGradePayload({ cookie, mssv });
+
+    if (payload.student?.class_code) {
+      const cohort = mssv.length >= 2 ? `20${mssv.slice(0, 2)}` : 'Chưa cập nhật';
+      await pool.query(
+        `
+        INSERT INTO admin_classes (code, name, cohort, program)
+        VALUES ($1, $1, $2, 'Chưa cập nhật')
+        ON CONFLICT (code) DO NOTHING
+        `,
+        [payload.student.class_code, cohort]
+      );
+    }
+
+    await pool.query(
+      `
+      UPDATE students
+      SET
+        full_name = COALESCE(NULLIF($1, ''), full_name),
+        class_code = COALESCE(NULLIF($2, ''), class_code)
+      WHERE id = $3
+      `,
+      [payload.student?.full_name || '', payload.student?.class_code || '', user.student_id]
+    );
+
+    if (payload.student?.full_name) {
+      await pool.query(`UPDATE users SET full_name = $1 WHERE id = $2`, [
+        payload.student.full_name,
+        user.id,
+      ]);
+      user.full_name = payload.student.full_name;
+    }
+
     const gradeImport = await createStudentGradeImport({
       student: {
         id: user.student_id,

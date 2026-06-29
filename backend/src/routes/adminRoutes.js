@@ -1,19 +1,13 @@
 ﻿// routes/adminRoutes.js
 import { Router } from 'express';
-import multer from 'multer';
-import { importStudentAccountsForAdmin } from '../services/adminStudentImportService.js';
+import bcrypt from 'bcrypt';
+import crypto from 'node:crypto';
 import { pool } from '../db.js';
 import { getClassMetrics } from '../services/classMetricsService.js';
 import { getCohortMetrics, getSystemMetrics } from '../services/cohortSystemMetricsService.js';
 import { sendNotificationEmail } from '../services/emailService.js';
 
 const router = Router();
-const studentAccountUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 3 * 1024 * 1024,
-  },
-});
 
 // â”€â”€ Middleware: chá»‰ ADMIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const requireAdmin = (req, res, next) => {
@@ -53,6 +47,73 @@ router.get('/students', async (_req, res) => {
   } catch (err) {
     console.error('GET /admin/students ERROR:', err.message);
     return res.status(500).json({ message: 'Không thể lấy danh sách sinh viên.' });
+  }
+});
+
+// POST /admin/students/quick-create - tạo hồ sơ tối thiểu để test đăng nhập DAA
+router.post('/students/quick-create', async (req, res) => {
+  const mssv = String(req.body?.mssv || '').trim();
+  if (!/^\d{6,12}$/.test(mssv)) {
+    return res.status(400).json({ message: 'MSSV phải gồm từ 6 đến 12 chữ số.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    await client.query(
+      `
+      INSERT INTO admin_classes (code, name, cohort, program)
+      VALUES ('DAA-TEST', 'Chờ đồng bộ từ DAA', 'Chưa cập nhật', 'Chưa cập nhật')
+      ON CONFLICT (code) DO NOTHING
+      `
+    );
+
+    const studentResult = await client.query(
+      `
+      INSERT INTO students (mssv, full_name, email, class_code, cohort)
+      VALUES ($1, $2, $3, 'DAA-TEST', $4)
+      ON CONFLICT (mssv) DO UPDATE SET mssv = EXCLUDED.mssv
+      RETURNING id, mssv, full_name, email, class_code, cohort
+      `,
+      [
+        mssv,
+        `Sinh viên ${mssv}`,
+        `${mssv}@student.uit.local`,
+        mssv.length >= 2 ? `20${mssv.slice(0, 2)}` : null,
+      ]
+    );
+    const student = studentResult.rows[0];
+
+    let userResult = await client.query(
+      `SELECT id, email, full_name, role, student_id FROM users WHERE student_id = $1 LIMIT 1`,
+      [student.id]
+    );
+
+    if (userResult.rows.length === 0) {
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10);
+      userResult = await client.query(
+        `
+        INSERT INTO users (email, password_hash, full_name, role, student_id)
+        VALUES ($1, $2, $3, 'STUDENT', $4)
+        RETURNING id, email, full_name, role, student_id
+        `,
+        [student.email, passwordHash, student.full_name, student.id]
+      );
+    }
+
+    await client.query('COMMIT');
+    return res.status(201).json({
+      message: `Đã sẵn sàng MSSV ${mssv} để đăng nhập bằng cookie DAA.`,
+      student,
+      user: userResult.rows[0],
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('POST /admin/students/quick-create ERROR:', err.message);
+    return res.status(500).json({ message: 'Không thể tạo nhanh sinh viên test.' });
+  } finally {
+    client.release();
   }
 });
 
@@ -153,30 +214,6 @@ router.get('/students/:id/academic', async (req, res) => {
   } catch (err) {
     console.error('GET /admin/students/:id/academic ERROR:', err.message);
     return res.status(500).json({ message: 'Không thể lấy bảng điểm sinh viên.' });
-  }
-});
-
-// POST /admin/student-accounts/import - admin import lớp, sinh viên và tài khoản STUDENT từ CSV
-router.post('/student-accounts/import', studentAccountUpload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'Vui lòng chọn file CSV danh sách sinh viên.' });
-    }
-
-    const result = await importStudentAccountsForAdmin({
-      buffer: req.file.buffer,
-    });
-
-    return res.status(201).json({
-      message: `Đã xử lý ${result.total_rows} dòng, tạo ${result.created_count} tài khoản, cập nhật ${result.updated_count} sinh viên, bỏ qua ${result.skipped_count} dòng.`,
-      ...result,
-    });
-  } catch (err) {
-    console.error('POST /admin/student-accounts/import ERROR:', err.message);
-    return res.status(500).json({
-      message: 'Không thể import danh sách sinh viên.',
-      detail: err.message,
-    });
   }
 });
 

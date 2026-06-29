@@ -145,7 +145,7 @@ Mật khẩu chung: `password123`
 
 Luồng hiện tại dành cho sinh viên:
 
-1. Admin đã tạo hồ sơ sinh viên trong AdvisorHub.
+1. Admin vào **Sinh viên**, nhập MSSV và chọn **Tạo sinh viên test**.
 2. Sinh viên đăng nhập `https://daa.uit.edu.vn`.
 3. Mở DevTools → Network → chọn request loại `Doc`.
 4. Trong `Request Headers`, sao chép toàn bộ giá trị `Cookie`.
@@ -176,9 +176,10 @@ DAA_GRADE_URL_TEMPLATE=https://daa.uit.edu.vn/print/sinhvien/kqhoctap/?sid={mssv
 
 1. Đăng nhập `admin@uit.edu.vn`.
 2. Mở **Sinh viên**.
-3. Tìm MSSV và chọn kết quả tìm kiếm hoặc biểu tượng con mắt.
-4. Xem GPA và bảng điểm đã đồng bộ.
-5. Mở dashboard và AI học vụ.
+3. Nhập một MSSV để mở quyền đăng nhập DAA cho sinh viên test.
+4. Tìm MSSV và chọn kết quả tìm kiếm hoặc biểu tượng con mắt.
+5. Xem GPA và bảng điểm đã đồng bộ.
+6. Mở dashboard và AI học vụ.
 
 ### Advisor
 

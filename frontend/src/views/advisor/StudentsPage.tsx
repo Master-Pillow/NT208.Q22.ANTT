@@ -381,7 +381,7 @@ export default function StudentsPage() {
             <div>
               <h2 className="text-4xl font-headline font-black text-on-surface mb-2">Quản lý lớp cố vấn</h2>
               <p className="text-slate-500 font-medium">
-                Lớp được lấy từ phân công của admin. Admin import sinh viên và tài khoản, cố vấn xem danh sách và phân tích lớp.
+                Lớp được lấy từ phân công trong hệ thống. Cố vấn chỉ xem sinh viên và phân tích của lớp mình phụ trách.
               </p>
             </div>
 

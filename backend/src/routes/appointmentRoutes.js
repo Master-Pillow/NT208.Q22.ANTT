@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import { notifyAppointmentByEmail } from '../services/emailService.js';
 
 const router = Router();
 
@@ -181,7 +182,19 @@ router.post('/', requireAdvisor, async (req, res) => {
       ]
     );
 
-    res.status(201).json(result.rows[0]);
+    const appointment = result.rows[0];
+    if (student_id) {
+      pool.query('SELECT id FROM users WHERE student_id = $1 LIMIT 1', [student_id])
+        .then(({ rows }) => rows[0]?.id && notifyAppointmentByEmail({
+          recipientUserId: rows[0].id,
+          actorUserId: advisorId,
+          action: 'created',
+          appointment,
+        }))
+        .catch((err) => console.error('[appointmentEmail/create]', err.message));
+    }
+
+    res.status(201).json(appointment);
   } catch (err) {
     console.error('POST /appointments ERROR:', err.message);
     res.status(500).json({ message: err.message });
@@ -245,6 +258,12 @@ router.patch('/:id/status', requireAdvisor, async (req, res) => {
     const appointment = detailResult.rows[0] || result.rows[0];
 
     await notifyStudentAboutAdvisorDecision(appointment, status);
+    notifyAppointmentByEmail({
+      recipientUserId: appointment.student_user_id,
+      actorUserId: advisorId,
+      action: status,
+      appointment,
+    }).catch((err) => console.error('[appointmentEmail/status]', err.message));
 
     const io = req.app.get('io');
     if (io) {

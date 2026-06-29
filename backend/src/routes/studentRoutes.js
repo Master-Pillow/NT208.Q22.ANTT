@@ -1,5 +1,6 @@
 import express from 'express';
 import { pool } from '../db.js';
+import { notifyAppointmentByEmail } from '../services/emailService.js';
 import { ensureStudentGradeImportSchema } from '../services/studentGradeImportService.js';
 import { getStudentMetricsForUser } from '../services/studentMetricsService.js';
 import {
@@ -316,6 +317,13 @@ router.post('/appointments', requireStudent, async (req, res) => {
     );
 
     const appointment = insertResult.rows[0];
+
+    notifyAppointmentByEmail({
+      recipientUserId: advisor_id,
+      actorUserId: req.user.id,
+      action: 'requested',
+      appointment,
+    }).catch((err) => console.error('[appointmentEmail/request]', err.message));
 
     const notifyResult = await pool.query(
       `

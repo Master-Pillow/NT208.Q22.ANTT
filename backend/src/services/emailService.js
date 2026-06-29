@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { config } from '../config.js';
 import { pool } from '../db.js';
+import { studentEmail } from '../utils/uitEmail.js';
 
 function isEmailConfigured() {
   return Boolean(config.smtp.host && config.smtp.user && config.smtp.pass && config.smtp.from);
@@ -152,13 +153,22 @@ export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserI
 
     // 2) Thông tin người nhận + công tắc chung.
     const recipientRes = await pool.query(
-      `SELECT email, full_name, COALESCE(message_email_enabled, TRUE) AS message_email_enabled
-       FROM users WHERE id = $1 LIMIT 1`,
+      `SELECT
+         COALESCE(NULLIF(u.email, ''), NULLIF(s.email, '')) AS email,
+         u.full_name,
+         COALESCE(u.message_email_enabled, TRUE) AS message_email_enabled,
+         s.mssv
+       FROM users u
+       LEFT JOIN students s ON s.id = u.student_id
+       WHERE u.id = $1
+       LIMIT 1`,
       [recipientUserId]
     );
     const recipient = recipientRes.rows[0];
-    if (!recipient || !recipient.email) return log({ sent: false, reason: 'no_email (user chưa có email)' });
+    if (!recipient) return log({ sent: false, reason: 'user_not_found' });
     if (!recipient.message_email_enabled) return log({ sent: false, reason: 'globally_muted (tắt email chung)' });
+    const recipientEmail = recipient.mssv ? studentEmail(recipient.mssv) : recipient.email;
+    if (!recipientEmail) return log({ sent: false, reason: 'no_email (user chưa có email)' });
 
     // 3) Mute theo người + throttle (đọc/ghi cùng bảng message_notif_prefs).
     const prefRes = await pool.query(
@@ -184,7 +194,7 @@ export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserI
     const senderName = senderRes.rows[0]?.full_name || 'Một người dùng';
 
     const result = await sendNewMessageEmail({
-      to: recipient.email,
+      to: recipientEmail,
       recipientName: recipient.full_name,
       senderName,
       preview: String(content || '').slice(0, 300),
@@ -205,6 +215,101 @@ export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserI
   } catch (err) {
     console.error('[messageEmail] LỖI gửi email:', err.message);
     return { sent: false, reason: 'error' };
+  }
+}
+
+const APPOINTMENT_ACTION_LABELS = {
+  requested: 'Yêu cầu đặt lịch mới',
+  created: 'Lịch tư vấn mới',
+  confirmed: 'Lịch tư vấn đã được xác nhận',
+  cancelled: 'Lịch tư vấn đã bị từ chối hoặc hủy',
+  updated: 'Lịch tư vấn đã được cập nhật',
+};
+
+export async function sendAppointmentEmail({
+  to,
+  recipientName,
+  actorName,
+  action,
+  appointment,
+}) {
+  const label = APPOINTMENT_ACTION_LABELS[action] || APPOINTMENT_ACTION_LABELS.updated;
+  const startTime = appointment?.start_time
+    ? new Date(appointment.start_time).toLocaleString('vi-VN', {
+        timeZone: 'Asia/Ho_Chi_Minh',
+      })
+    : 'Chưa xác định';
+  const title = appointment?.title || 'Lịch tư vấn';
+  const subject = `[AdvisorHub] ${label}: ${title}`;
+
+  const html = `
+    <div style="max-width:600px;margin:0 auto;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
+      <div style="background:#1d4ed8;color:#fff;padding:18px 22px;border-radius:10px 10px 0 0">
+        <h2 style="margin:0;font-size:18px">AdvisorHub — Thông báo lịch tư vấn</h2>
+      </div>
+      <div style="border:1px solid #e2e8f0;border-top:none;padding:22px;border-radius:0 0 10px 10px">
+        <p>Chào <strong>${escapeHtml(recipientName || 'bạn')}</strong>,</p>
+        <p><strong>${escapeHtml(actorName || 'AdvisorHub')}</strong>: ${escapeHtml(label.toLowerCase())}.</p>
+        <div style="padding:14px;background:#f8fafc;border-radius:8px">
+          <div><strong>Nội dung:</strong> ${escapeHtml(title)}</div>
+          <div style="margin-top:6px"><strong>Thời gian:</strong> ${escapeHtml(startTime)}</div>
+          ${appointment?.location ? `<div style="margin-top:6px"><strong>Địa điểm:</strong> ${escapeHtml(appointment.location)}</div>` : ''}
+          ${appointment?.note ? `<div style="margin-top:6px"><strong>Ghi chú:</strong> ${escapeHtml(appointment.note)}</div>` : ''}
+        </div>
+        <p>Vui lòng đăng nhập AdvisorHub để xem chi tiết.</p>
+        <p style="font-size:12px;color:#94a3b8">Email được gửi tự động, vui lòng không trả lời.</p>
+      </div>
+    </div>`;
+
+  const text = [
+    `Chào ${recipientName || 'bạn'},`,
+    `${actorName || 'AdvisorHub'}: ${label.toLowerCase()}.`,
+    `Nội dung: ${title}`,
+    `Thời gian: ${startTime}`,
+    appointment?.location ? `Địa điểm: ${appointment.location}` : '',
+    appointment?.note ? `Ghi chú: ${appointment.note}` : '',
+    'Vui lòng đăng nhập AdvisorHub để xem chi tiết.',
+  ].filter(Boolean).join('\n');
+
+  return sendNotificationEmail({ to, subject, text, html });
+}
+
+export async function notifyAppointmentByEmail({
+  recipientUserId,
+  actorUserId,
+  action,
+  appointment,
+}) {
+  try {
+    const ids = [Number(recipientUserId), Number(actorUserId)].filter(Number.isFinite);
+    const people = await pool.query(
+      `SELECT
+         u.id,
+         u.full_name,
+         COALESCE(NULLIF(u.email, ''), NULLIF(s.email, '')) AS email,
+         s.mssv
+       FROM users u
+       LEFT JOIN students s ON s.id = u.student_id
+       WHERE u.id = ANY($1::int[])`,
+      [ids]
+    );
+    const recipient = people.rows.find((row) => Number(row.id) === Number(recipientUserId));
+    const actor = people.rows.find((row) => Number(row.id) === Number(actorUserId));
+    if (!recipient) return { sent: false, skipped: true, reason: 'recipient_not_found' };
+
+    const to = recipient.mssv ? studentEmail(recipient.mssv) : recipient.email;
+    if (!to) return { sent: false, skipped: true, reason: 'missing_recipient_email' };
+
+    return await sendAppointmentEmail({
+      to,
+      recipientName: recipient.full_name,
+      actorName: actor?.full_name,
+      action,
+      appointment,
+    });
+  } catch (err) {
+    console.error('[appointmentEmail] Lỗi gửi email:', err.message);
+    return { sent: false, skipped: true, reason: 'error' };
   }
 }
 

@@ -389,7 +389,7 @@ app.post("/auth/forgot-password", async (req, res) => {
 
     const result = await pool.query(
       `
-      SELECT u.id, u.email, u.full_name, u.is_active, s.mssv
+      SELECT u.id, u.email, u.full_name, u.role, u.is_active, s.mssv
       FROM users u
       LEFT JOIN students s ON s.id = u.student_id
       WHERE LOWER(u.email) = $1
@@ -402,6 +402,16 @@ app.post("/auth/forgot-password", async (req, res) => {
 
     // Không tồn tại / đã bị vô hiệu hoá → vẫn trả về thông điệp chung.
     if (!user || user.is_active === false) {
+      return res.json(GENERIC);
+    }
+
+    // Tài khoản sinh viên (@gm.uit.edu.vn) đăng nhập bằng phiên DAA, không có mật khẩu
+    // để đặt lại → KHÔNG gửi link. Vẫn trả thông điệp chung để không lộ thông tin.
+    const isStudentAccount =
+      normalizeRole(user.role) === "STUDENT" ||
+      Boolean(user.mssv) ||
+      String(user.email || "").toLowerCase().endsWith("@gm.uit.edu.vn");
+    if (isStudentAccount) {
       return res.json(GENERIC);
     }
 

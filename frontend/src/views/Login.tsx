@@ -119,6 +119,22 @@ export const Login = ({ onLogin }: LoginProps) => {
       return;
     }
 
+    const normalizedEmail = targetEmail.toLowerCase();
+
+    // Email sinh viên (@gm.uit.edu.vn) đăng nhập bằng phiên DAA, không có mật khẩu để đặt lại.
+    if (normalizedEmail.endsWith('@gm.uit.edu.vn')) {
+      setErrorMsg(
+        'Đây là email sinh viên nên không có mật khẩu để đặt lại. Vui lòng đăng nhập bằng tab "Tài khoản sinh viên".'
+      );
+      return;
+    }
+
+    // Chỉ email cán bộ/giảng viên UIT (đuôi @uit.edu.vn) mới được đặt lại mật khẩu.
+    if (!normalizedEmail.endsWith('@uit.edu.vn')) {
+      setErrorMsg('Vui lòng dùng email UIT (đuôi @uit.edu.vn) để đặt lại mật khẩu.');
+      return;
+    }
+
     setForgotLoading(true);
     try {
       const response = await apiClient.post('/auth/forgot-password', {

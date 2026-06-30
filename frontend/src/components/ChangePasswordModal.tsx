@@ -177,13 +177,14 @@ export const ChangePasswordModal = ({ open, onClose }: ChangePasswordModalProps)
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
-      <div
-        className="w-full max-w-md bg-white rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.18)] border border-slate-100 overflow-hidden animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh]"
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          className="w-full max-w-md bg-white rounded-3xl shadow-[0_30px_60px_rgba(0,0,0,0.18)] border border-slate-100 overflow-hidden animate-in zoom-in-95 fade-in duration-300"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <KeyRound className="w-5 h-5" />
@@ -221,7 +222,7 @@ export const ChangePasswordModal = ({ open, onClose }: ChangePasswordModalProps)
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} autoComplete="off" className="px-6 py-6 space-y-5 overflow-y-auto min-h-0">
+          <form onSubmit={handleSubmit} autoComplete="off" className="px-6 py-6 space-y-5">
             {errorMsg && (
               <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl border border-red-100 flex items-center gap-2 animate-in fade-in zoom-in-95">
                 <ShieldCheck className="w-5 h-5 shrink-0" />
@@ -337,6 +338,7 @@ export const ChangePasswordModal = ({ open, onClose }: ChangePasswordModalProps)
             </div>
           </form>
         )}
+        </div>
       </div>
     </div>
   );

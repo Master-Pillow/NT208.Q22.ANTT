@@ -28,6 +28,8 @@ export const Login = ({ onLogin }: LoginProps) => {
   const [showCookie, setShowCookie] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [noticeMsg, setNoticeMsg] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   // Chống bot: sau 3 lần đăng nhập sai (chế độ tài khoản email/mật khẩu), bắt
   // người dùng giải một phép tính đơn giản trước khi gửi tiếp.
@@ -60,6 +62,7 @@ export const Login = ({ onLogin }: LoginProps) => {
 
     setIsLoading(true);
     setErrorMsg('');
+    setNoticeMsg('');
 
     try {
       const response =
@@ -102,6 +105,36 @@ export const Login = ({ onLogin }: LoginProps) => {
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Quên mật khẩu: gửi email chứa link đặt lại tới chính địa chỉ email đã nhập ở ô trên.
+  const handleForgotPassword = async () => {
+    setErrorMsg('');
+    setNoticeMsg('');
+
+    const targetEmail = email.trim();
+    if (!targetEmail) {
+      setErrorMsg('Vui lòng nhập địa chỉ email UIT ở ô phía trên, rồi bấm "Quên mật khẩu?".');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const response = await apiClient.post('/auth/forgot-password', {
+        email: targetEmail,
+      });
+      setNoticeMsg(
+        response.data?.message ||
+          'Nếu email tồn tại, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra hộp thư.'
+      );
+    } catch (error: any) {
+      setErrorMsg(
+        error.response?.data?.message ||
+          'Không gửi được email đặt lại mật khẩu. Vui lòng thử lại sau.'
+      );
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -209,12 +242,20 @@ export const Login = ({ onLogin }: LoginProps) => {
             </div>
           )}
 
+          {noticeMsg && (
+            <div className="mb-6 p-3 bg-emerald-50 text-emerald-700 text-sm font-bold rounded-xl border border-emerald-100 flex items-start gap-2 animate-in fade-in zoom-in-95">
+              <Mail className="w-5 h-5 shrink-0 mt-0.5" />
+              {noticeMsg}
+            </div>
+          )}
+
           <div className="mb-6 grid grid-cols-2 rounded-lg bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => {
                 setLoginMode('ACCOUNT');
                 setErrorMsg('');
+                setNoticeMsg('');
               }}
               className={`min-h-10 rounded-md px-3 text-sm font-bold transition-colors ${
                 loginMode === 'ACCOUNT'
@@ -229,6 +270,7 @@ export const Login = ({ onLogin }: LoginProps) => {
               onClick={() => {
                 setLoginMode('DAA');
                 setErrorMsg('');
+                setNoticeMsg('');
               }}
               className={`min-h-10 rounded-md px-3 text-sm font-bold transition-colors ${
                 loginMode === 'DAA'
@@ -269,9 +311,11 @@ export const Login = ({ onLogin }: LoginProps) => {
 
                     <button
                       type="button"
-                      className="text-sm font-bold text-primary hover:text-primary-container transition-colors"
+                      onClick={handleForgotPassword}
+                      disabled={forgotLoading}
+                      className="text-sm font-bold text-primary hover:text-primary-container transition-colors disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      Quên mật khẩu?
+                      {forgotLoading ? 'Đang gửi...' : 'Quên mật khẩu?'}
                     </button>
                   </div>
 

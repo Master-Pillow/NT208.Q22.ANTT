@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import multer from "multer";
 
@@ -32,7 +33,11 @@ import {
   emitMessageNew,
   emitMessageRead,
 } from "./services/messagingService.js";
-import { notifyNewMessageByEmail } from "./services/emailService.js";
+import {
+  notifyNewMessageByEmail,
+  sendPasswordResetEmail,
+} from "./services/emailService.js";
+import { studentEmail } from "./utils/uitEmail.js";
 
 import advisorRouter from "./routes/Advisorroutes.js";
 import appointmentRouter from "./routes/appointmentRoutes.js";
@@ -240,6 +245,42 @@ const ensureUserProfileColumns = async () => {
   `);
 };
 
+// Bảng lưu token đặt lại mật khẩu. Chỉ lưu SHA-256 của token (không lưu token thô)
+// để nếu DB lộ vẫn không dùng lại được. Idempotent — chạy lúc khởi động.
+const ensurePasswordResetSchema = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id         BIGSERIAL PRIMARY KEY,
+      user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used_at    TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_hash
+      ON password_reset_tokens(token_hash);
+  `);
+};
+
+// URL gốc của frontend để dựng link đặt lại mật khẩu trong email.
+// Ưu tiên: APP_BASE_URL/FRONTEND_URL (env) → Origin của request (nơi người dùng đang
+// thực sự đứng) → origin production đầu tiên trong ALLOWED_ORIGINS → localhost dev.
+const getAppBaseUrl = (req) => {
+  const explicit = process.env.APP_BASE_URL || process.env.FRONTEND_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const origin = req.get("origin");
+  if (origin) return origin.replace(/\/+$/, "");
+
+  const fromAllowed = allowedOrigins.find(
+    (o) => o && o !== "*" && !/localhost|127\.0\.0\.1/.test(o)
+  );
+  if (fromAllowed) return fromAllowed.replace(/\/+$/, "");
+
+  return "http://localhost:5173";
+};
+
 // ==========================================
 // HEALTH CHECK
 // ==========================================
@@ -325,6 +366,165 @@ app.post("/auth/login", async (req, res) => {
     });
   } catch (err) {
     console.error("LOGIN ERROR:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+});
+
+// ==========================================
+// QUÊN MẬT KHẨU - gửi email chứa link đặt lại
+// ==========================================
+app.post("/auth/forgot-password", async (req, res) => {
+  // Luôn trả về thông điệp chung để KHÔNG lộ email nào có/không tồn tại (chống dò email).
+  const GENERIC = {
+    message:
+      "Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu. Vui lòng kiểm tra hộp thư.",
+  };
+
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ message: "Vui lòng nhập địa chỉ email." });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT u.id, u.email, u.full_name, u.is_active, s.mssv
+      FROM users u
+      LEFT JOIN students s ON s.id = u.student_id
+      WHERE LOWER(u.email) = $1
+      LIMIT 1
+      `,
+      [email]
+    );
+
+    const user = result.rows[0];
+
+    // Không tồn tại / đã bị vô hiệu hoá → vẫn trả về thông điệp chung.
+    if (!user || user.is_active === false) {
+      return res.json(GENERIC);
+    }
+
+    const recipientEmail = user.email || (user.mssv ? studentEmail(user.mssv) : null);
+    if (!recipientEmail) {
+      return res.json(GENERIC);
+    }
+
+    // Sinh token thô (gửi qua email) và lưu HASH của nó vào DB.
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 phút
+
+    // Vô hiệu hoá các token cũ chưa dùng của user này, rồi tạo token mới.
+    await pool.query(
+      `UPDATE password_reset_tokens SET used_at = NOW()
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [user.id]
+    );
+    await pool.query(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+       VALUES ($1, $2, $3)`,
+      [user.id, tokenHash, expiresAt]
+    );
+
+    const resetUrl = `${getAppBaseUrl(req)}/reset-password?token=${rawToken}`;
+
+    // Gửi email không đồng bộ — không để lỗi SMTP làm chậm/lộ thông tin phản hồi.
+    sendPasswordResetEmail({
+      to: recipientEmail,
+      recipientName: user.full_name,
+      resetUrl,
+      expiresMinutes: 30,
+    })
+      .then((r) =>
+        console.log(
+          `[forgot-password] -> ${recipientEmail}:`,
+          r?.sent ? "ĐÃ GỬI ✅" : `bỏ qua (${r?.reason || "unknown"})`
+        )
+      )
+      .catch((err) =>
+        console.error("[forgot-password] LỖI gửi email:", err.message)
+      );
+
+    return res.json(GENERIC);
+  } catch (err) {
+    console.error("FORGOT PASSWORD ERROR:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+});
+
+// Kiểm tra nhanh token còn hợp lệ không — để trang /reset-password báo sớm cho người dùng.
+app.get("/auth/reset-password/validate", async (req, res) => {
+  try {
+    const token = String(req.query?.token || "").trim();
+    if (!token) return res.status(400).json({ valid: false });
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const result = await pool.query(
+      `SELECT expires_at, used_at FROM password_reset_tokens
+       WHERE token_hash = $1 LIMIT 1`,
+      [tokenHash]
+    );
+    const row = result.rows[0];
+    const valid = Boolean(
+      row && !row.used_at && new Date(row.expires_at).getTime() >= Date.now()
+    );
+    return res.json({ valid });
+  } catch (err) {
+    console.error("VALIDATE RESET TOKEN ERROR:", err);
+    return res.status(500).json({ valid: false });
+  }
+});
+
+// Đặt lại mật khẩu bằng token. Token chỉ dùng được một lần và phải còn hạn.
+app.post("/auth/reset-password", async (req, res) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+    const password = String(req.body?.password || "");
+
+    if (!token) {
+      return res.status(400).json({ message: "Thiếu mã đặt lại mật khẩu." });
+    }
+    if (password.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const result = await pool.query(
+      `SELECT id, user_id, expires_at, used_at FROM password_reset_tokens
+       WHERE token_hash = $1 LIMIT 1`,
+      [tokenHash]
+    );
+    const row = result.rows[0];
+
+    if (
+      !row ||
+      row.used_at ||
+      new Date(row.expires_at).getTime() < Date.now()
+    ) {
+      return res.status(400).json({
+        message: "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [
+      passwordHash,
+      row.user_id,
+    ]);
+    await pool.query(
+      `UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1`,
+      [row.id]
+    );
+
+    return res.json({
+      message: "Đặt lại mật khẩu thành công. Bạn có thể đăng nhập bằng mật khẩu mới.",
+    });
+  } catch (err) {
+    console.error("RESET PASSWORD ERROR:", err);
     return res.status(500).json({ message: "Lỗi server" });
   }
 });
@@ -1364,6 +1564,7 @@ const startServer = async () => {
     console.log("DB connected:", result.rows[0]);
     await ensureUserProfileColumns();
     await ensureMessagingSchema();
+    await ensurePasswordResetSchema();
 
     httpServer.listen(PORT, () => {
       console.log(`Backend & Socket.io running on port ${PORT}`);

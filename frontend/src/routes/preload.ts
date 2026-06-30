@@ -5,6 +5,7 @@ type PageImporter = () => Promise<PageModule>;
 
 export const pageImporters = {
   login: () => import('../views/LoginPage'),
+  resetPassword: () => import('../views/ResetPasswordPage'),
   accountProfile: () => import('../views/shared/AccountProfilePage'),
   uitFaq: () => import('../views/shared/UITFaqPage'),
 

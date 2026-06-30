@@ -11,6 +11,7 @@ import { pageImporters } from './routes/preload';
 import AdminAiHubPage from './views/admin/AiHubPage';
 
 const LoginPage = lazy(pageImporters.login);
+const ResetPasswordPage = lazy(pageImporters.resetPassword);
 const UITFaqPage = lazy(pageImporters.uitFaq);
 const AccountProfilePage = lazy(pageImporters.accountProfile);
 
@@ -71,6 +72,7 @@ export default function App() {
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/unauthorized" element={<Unauthorized />} />
               <Route path="/" element={<HomeRedirect />} />
 

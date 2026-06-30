@@ -361,6 +361,47 @@ export async function notifyNewMessageByEmail({ io, recipientUserId, senderUserI
   }
 }
 
+/**
+ * Email đặt lại mật khẩu: chứa link có token (hết hạn sau N phút) dẫn tới trang
+ * /reset-password của frontend. Template tiếng Việt, tái dùng sendNotificationEmail.
+ */
+export async function sendPasswordResetEmail({ to, recipientName, resetUrl, expiresMinutes = 30 }) {
+  const safeName = escapeHtml(recipientName || 'bạn');
+  const safeUrl = escapeHtml(resetUrl);
+  const subject = '🔐 AdvisorHub — Đặt lại mật khẩu';
+
+  const html = `
+  <div style="max-width:600px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; color:#0f172a;">
+    <div style="background:#1d4ed8; color:#ffffff; padding:18px 22px; border-radius:10px 10px 0 0;">
+      <h2 style="margin:0; font-size:18px;">🎓 AdvisorHub — Đặt lại mật khẩu</h2>
+    </div>
+    <div style="border:1px solid #e2e8f0; border-top:none; padding:22px; border-radius:0 0 10px 10px;">
+      <p style="margin-top:0;">Chào <strong>${safeName}</strong>,</p>
+      <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản AdvisorHub của bạn. Nhấn nút bên dưới để tạo mật khẩu mới:</p>
+      <p style="text-align:center; margin:28px 0;">
+        <a href="${safeUrl}" style="display:inline-block; background:#1d4ed8; color:#ffffff; text-decoration:none; font-weight:600; padding:12px 28px; border-radius:10px;">Đặt lại mật khẩu</a>
+      </p>
+      <p style="color:#64748b; font-size:13px;">Hoặc sao chép liên kết sau vào trình duyệt:<br>
+        <span style="word-break:break-all; color:#1d4ed8;">${safeUrl}</span>
+      </p>
+      <p style="color:#64748b; font-size:13px;">Liên kết sẽ hết hạn sau <strong>${expiresMinutes} phút</strong> và chỉ dùng được một lần.</p>
+      <p style="font-size:12px; color:#94a3b8; margin-top:20px;">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này — mật khẩu của bạn vẫn an toàn. Email được gửi tự động, vui lòng không trả lời.</p>
+    </div>
+  </div>`;
+
+  const text = [
+    `Chào ${recipientName || 'bạn'},`,
+    'Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản AdvisorHub của bạn.',
+    'Mở liên kết sau để tạo mật khẩu mới:',
+    resetUrl,
+    '',
+    `Liên kết sẽ hết hạn sau ${expiresMinutes} phút và chỉ dùng được một lần.`,
+    'Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.',
+  ].join('\n');
+
+  return sendNotificationEmail({ to, subject, text, html });
+}
+
 const APPOINTMENT_ACTION_LABELS = {
   requested: 'Yêu cầu đặt lịch mới',
   created: 'Lịch tư vấn mới',

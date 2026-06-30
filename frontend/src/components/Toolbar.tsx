@@ -91,6 +91,7 @@ export const Toolbar = ({
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [notificationError, setNotificationError] = useState('');
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -108,10 +109,32 @@ export const Toolbar = ({
         ? 'Quản trị viên'
         : 'Cố vấn học vụ';
 
-  const avatarSeed = encodeURIComponent(currentUser?.email || displayName);
+  // Ảnh đại diện: ưu tiên ảnh đã upload (đường dẫn tương đối → ghép API base).
+  // Nếu thiếu hoặc tải lỗi (file bị xoá trên server ephemeral, mạng chập chờn...)
+  // thì rơi về avatar chữ cái dựng tại chỗ — KHÔNG gọi mạng nên không bao giờ mất ảnh.
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+  const avatarSrc = currentUser?.avatar_url
+    ? (/^https?:\/\//i.test(currentUser.avatar_url)
+        ? currentUser.avatar_url
+        : `${apiBase}${currentUser.avatar_url}`)
+    : '';
+  const avatarInitials =
+    (displayName || 'U')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(-2)
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase() || 'U';
   const appointmentPendingCount = appointmentRequests.length;
   const unreadMessageCount = messageNotifications.reduce((sum, item) => sum + Number(item.unread_count || 0), 0);
   const pendingCount = appointmentPendingCount + unreadMessageCount;
+
+  // Reset trạng thái lỗi khi đổi ảnh (vd: vừa cập nhật avatar) để thử tải lại.
+  useEffect(() => {
+    setAvatarError(false);
+  }, [avatarSrc]);
 
   const loadAppointmentRequests = useCallback(async () => {
     if (!isAdvisor) {
@@ -566,12 +589,24 @@ export const Toolbar = ({
             </p>
           </div>
 
-          <img
-            src={currentUser?.avatar_url ? `${import.meta.env.VITE_API_URL || 'http://localhost:4000'}${currentUser.avatar_url}` : `https://api.dicebear.com/7.x/initials/svg?seed=${avatarSeed}`}
-            alt={displayName}
-            onClick={() => setShowSettings(!showSettings)}
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-primary-fixed shrink-0 cursor-pointer"
-          />
+          {avatarSrc && !avatarError ? (
+            <img
+              src={avatarSrc}
+              alt={displayName}
+              onClick={() => setShowSettings(!showSettings)}
+              onError={() => setAvatarError(true)}
+              className="w-10 h-10 rounded-full object-cover ring-2 ring-primary-fixed shrink-0 cursor-pointer"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSettings(!showSettings)}
+              aria-label={displayName}
+              className="w-10 h-10 rounded-full ring-2 ring-primary-fixed shrink-0 cursor-pointer bg-primary text-white flex items-center justify-center text-sm font-bold select-none"
+            >
+              {avatarInitials}
+            </button>
+          )}
 
           <button
             onClick={() => setShowSettings(!showSettings)}

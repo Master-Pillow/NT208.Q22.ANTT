@@ -137,16 +137,20 @@ const __dirname = path.dirname(__filename);
 // Serve static uploads
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../uploads/"));
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + "-" + file.originalname);
+// Lưu ảnh avatar/cover TRỰC TIẾP TRONG DB (cột TEXT, dạng data URL base64) thay vì
+// ghi ra ổ đĩa: máy chủ free (Render...) có filesystem ephemeral nên file upload sẽ
+// bị xoá sau mỗi lần redeploy → ảnh "biến mất". Dùng memoryStorage để lấy buffer rồi
+// chuyển sang base64. Client đã nén ảnh nhỏ trước khi gửi nên dung lượng DB hợp lý;
+// limit 4MB chỉ là chốt chặn an toàn.
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: { fileSize: 4 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\//i.test(file.mimetype)) cb(null, true);
+    else cb(new Error("Chỉ chấp nhận tệp ảnh."));
   },
 });
-const upload = multer({ storage: storage });
 
 // ==========================================
 // SOCKET.IO
@@ -805,18 +809,34 @@ app.post("/auth/daa-login", async (req, res) => {
 // ==========================================
 // UPDATE PROFILE
 // ==========================================
-app.put("/auth/profile", verifyToken, upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'cover', maxCount: 1 }]), async (req, res) => {
+// Bọc multer để lỗi upload (quá lớn / sai định dạng) trả JSON gọn thay vì HTML 500.
+const profileUpload = upload.fields([{ name: 'avatar', maxCount: 1 }, { name: 'cover', maxCount: 1 }]);
+const handleProfileUpload = (req, res, next) => {
+  profileUpload(req, res, (err) => {
+    if (err) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? 'Ảnh quá lớn (tối đa 4MB).'
+        : (err.message || 'Tải ảnh thất bại.');
+      return res.status(400).json({ message });
+    }
+    next();
+  });
+};
+
+app.put("/auth/profile", verifyToken, handleProfileUpload, async (req, res) => {
   try {
     const { bio } = req.body;
     let avatarUrl = undefined;
     let coverUrl = undefined;
 
+    // Lưu thẳng ảnh vào DB dưới dạng data URL base64 (bền vững qua mỗi lần deploy).
+    const toDataUrl = (file) => `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
     if (req.files) {
       if (req.files.avatar && req.files.avatar[0]) {
-        avatarUrl = "/uploads/" + req.files.avatar[0].filename;
+        avatarUrl = toDataUrl(req.files.avatar[0]);
       }
       if (req.files.cover && req.files.cover[0]) {
-        coverUrl = "/uploads/" + req.files.cover[0].filename;
+        coverUrl = toDataUrl(req.files.cover[0]);
       }
     }
 

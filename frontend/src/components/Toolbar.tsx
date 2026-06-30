@@ -114,7 +114,7 @@ export const Toolbar = ({
   // thì rơi về avatar chữ cái dựng tại chỗ — KHÔNG gọi mạng nên không bao giờ mất ảnh.
   const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000';
   const avatarSrc = currentUser?.avatar_url
-    ? (/^https?:\/\//i.test(currentUser.avatar_url)
+    ? (/^(https?:|data:|blob:)/i.test(currentUser.avatar_url)
         ? currentUser.avatar_url
         : `${apiBase}${currentUser.avatar_url}`)
     : '';

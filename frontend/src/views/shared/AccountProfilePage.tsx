@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Mail, Shield, User, Fingerprint, Camera, Edit2, Save, X, CalendarDays, CheckCircle2, BadgeInfo } from 'lucide-react';
 import { PageLayout } from '../../components/layout/PageLayout';
 import { useAuth } from '../../auth/AuthContext';
@@ -12,6 +12,45 @@ const roleLabel: Record<string, string> = {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
+// Ảnh được lưu trong DB dưới dạng data URL; ảnh xem trước là blob URL; ảnh cũ có thể
+// là đường dẫn tương đối "/uploads/...". Chỉ ghép API base cho đường dẫn tương đối.
+const resolveMedia = (url?: string | null) => {
+  if (!url) return '';
+  return /^(https?:|data:|blob:)/i.test(url) ? url : `${API_BASE_URL}${url}`;
+};
+
+// Nén ảnh phía client (thu nhỏ + JPEG) để data URL lưu trong DB/localStorage gọn nhẹ.
+const compressImage = (file: File, maxDim: number, quality = 0.85): Promise<Blob> =>
+  new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (Math.max(width, height) > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Không tạo được canvas.'));
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('Nén ảnh thất bại.'))),
+        'image/jpeg',
+        quality
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Không đọc được ảnh.'));
+    };
+    img.src = objectUrl;
+  });
+
 export default function AccountProfilePage() {
   const { currentUser, login } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -20,21 +59,36 @@ export default function AccountProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [bio, setBio] = useState(currentUser?.bio || '');
   
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarFile, setAvatarFile] = useState<Blob | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  
-  const [coverFile, setCoverFile] = useState<File | null>(null);
+
+  const [coverFile, setCoverFile] = useState<Blob | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  
+
   const [isSaving, setIsSaving] = useState(false);
+
+  // Ảnh đã lưu nhưng tải lỗi (file cũ trên server ephemeral đã mất...) → quay về mặc định.
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  const [coverBroken, setCoverBroken] = useState(false);
 
   // Default to active for current user profile
   const isActive = true;
 
   const role = String(currentUser?.role || '').toUpperCase();
   const displayName = currentUser?.full_name || currentUser?.email || 'Người dùng';
-  const avatarUrl = currentUser?.avatar_url ? `${API_BASE_URL}${currentUser.avatar_url}` : null;
-  const coverUrl = currentUser?.cover_url ? `${API_BASE_URL}${currentUser.cover_url}` : null;
+  const avatarUrl = resolveMedia(currentUser?.avatar_url);
+  const coverUrl = resolveMedia(currentUser?.cover_url);
+
+  // Chữ cái mặc định cho avatar, vd "anh trường" → "AT".
+  const avatarInitials =
+    displayName
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(-2)
+      .map((word) => word[0])
+      .join('')
+      .toUpperCase() || 'U';
 
   const handleAvatarClick = () => {
     if (isEditing && fileInputRef.current) {
@@ -48,17 +102,30 @@ export default function AccountProfilePage() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const previewUrl = URL.createObjectURL(file);
-      if (type === 'avatar') {
-        setAvatarFile(file);
-        setAvatarPreview(previewUrl);
-      } else {
-        setCoverFile(file);
-        setCoverPreview(previewUrl);
-      }
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // cho phép chọn lại cùng một tệp
+    if (!file) return;
+
+    // Nén nhỏ trước khi gửi; nếu nén lỗi thì dùng tệp gốc.
+    let blob: Blob = file;
+    try {
+      blob = await compressImage(file, type === 'avatar' ? 512 : 1280, 0.85);
+    } catch (err) {
+      console.error('[Profile] Nén ảnh thất bại, dùng ảnh gốc:', err);
+    }
+    const previewUrl = URL.createObjectURL(blob);
+
+    if (type === 'avatar') {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      setAvatarFile(blob);
+      setAvatarPreview(previewUrl);
+      setAvatarBroken(false);
+    } else {
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+      setCoverFile(blob);
+      setCoverPreview(previewUrl);
+      setCoverBroken(false);
     }
   };
 
@@ -68,10 +135,10 @@ export default function AccountProfilePage() {
       const formData = new FormData();
       formData.append('bio', bio);
       if (avatarFile) {
-        formData.append('avatar', avatarFile);
+        formData.append('avatar', avatarFile, 'avatar.jpg');
       }
       if (coverFile) {
-        formData.append('cover', coverFile);
+        formData.append('cover', coverFile, 'cover.jpg');
       }
 
       const res = await apiClient.put('/auth/profile', formData, {
@@ -110,6 +177,10 @@ export default function AccountProfilePage() {
   const displayAvatar = avatarPreview || avatarUrl;
   const displayCover = coverPreview || coverUrl;
 
+  // Khi đổi nguồn ảnh (vd vừa lưu ảnh mới) thì cho phép thử tải lại.
+  useEffect(() => { setAvatarBroken(false); }, [displayAvatar]);
+  useEffect(() => { setCoverBroken(false); }, [displayCover]);
+
   return (
     <PageLayout title="Hồ sơ tài khoản" breadcrumb={[roleLabel[role] || 'USER', 'Hồ sơ']}>
       <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
@@ -139,10 +210,23 @@ export default function AccountProfilePage() {
             className={`h-64 w-full bg-gradient-to-br from-blue-700 via-sky-500 to-cyan-400 bg-[length:200%_200%] animate-gradient-x relative ${isEditing ? 'cursor-pointer group/cover' : ''}`}
             onClick={handleCoverClick}
           >
-            {displayCover && (
-              <img src={displayCover} alt="Cover" className="w-full h-full object-cover" />
+            {displayCover && !coverBroken ? (
+              <>
+                <img
+                  src={displayCover}
+                  alt="Cover"
+                  onError={() => setCoverBroken(true)}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]"></div>
+              </>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-white/80 text-6xl font-black tracking-[0.3em] select-none drop-shadow-lg">
+                  CV
+                </span>
+              </div>
             )}
-            <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]"></div>
 
             {isEditing && (
               <div className="absolute inset-0 bg-slate-900/50 flex flex-col items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-all duration-300 backdrop-blur-sm">
@@ -167,10 +251,15 @@ export default function AccountProfilePage() {
               className={`relative w-36 h-36 shrink-0 rounded-full border-[6px] border-white shadow-2xl flex items-center justify-center text-5xl font-black bg-gradient-to-br from-blue-700 to-sky-500 text-white overflow-hidden -mt-16 mb-4 ${isEditing ? 'cursor-pointer group/avatar' : ''}`}
               onClick={handleAvatarClick}
             >
-              {displayAvatar ? (
-                <img src={displayAvatar} alt="Avatar" className={`w-full h-full object-cover transition-transform duration-500 ${isEditing ? 'group-hover/avatar:scale-110' : ''}`} />
+              {displayAvatar && !avatarBroken ? (
+                <img
+                  src={displayAvatar}
+                  alt="Avatar"
+                  onError={() => setAvatarBroken(true)}
+                  className={`w-full h-full object-cover transition-transform duration-500 ${isEditing ? 'group-hover/avatar:scale-110' : ''}`}
+                />
               ) : (
-                displayName.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()
+                avatarInitials
               )}
 
               {isEditing && (

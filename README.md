@@ -157,7 +157,7 @@ Mục tiêu: theo dõi kết quả học tập của bản thân và kết nối
 
 Mục tiêu: theo dõi và hỗ trợ các lớp được phân công.
 
-1. **Đăng nhập** bằng `thornea@uit.edu.vn` / `password123` (hoặc `minhnv@uit.edu.vn`).
+1. **Đăng nhập** bằng `aris.thorne@uit.edu.vn` / `password123` (hoặc `minhnv@uit.edu.vn`).
 2. Vào **Tổng quan** → xem nhanh tình hình các lớp mình phụ trách.
 3. Vào **Sinh viên** → xem danh sách sinh viên **chỉ trong lớp được phân công**, lọc sinh viên có nguy cơ.
 4. Vào **AI: Cảnh báo** → chạy/đọc phát hiện bất thường cho lớp mình.

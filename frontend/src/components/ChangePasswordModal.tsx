@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CheckCircle2,
   Eye,
@@ -176,7 +177,7 @@ export const ChangePasswordModal = ({ open, onClose }: ChangePasswordModalProps)
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[70] flex justify-end bg-slate-900/40 backdrop-blur-sm animate-in fade-in"
       onClick={handleClose}
@@ -346,6 +347,7 @@ export const ChangePasswordModal = ({ open, onClose }: ChangePasswordModalProps)
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

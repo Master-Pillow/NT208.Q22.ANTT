@@ -540,6 +540,66 @@ app.post("/auth/reset-password", async (req, res) => {
 });
 
 // ==========================================
+// ĐỔI MẬT KHẨU (đang đăng nhập) - cần mật khẩu cũ
+// ==========================================
+app.post("/auth/change-password", verifyToken, async (req, res) => {
+  try {
+    const oldPassword = String(req.body?.oldPassword || "");
+    const newPassword = String(req.body?.newPassword || "");
+
+    if (!oldPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Vui lòng nhập đầy đủ mật khẩu cũ và mật khẩu mới." });
+    }
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự." });
+    }
+    if (oldPassword === newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu mới phải khác mật khẩu cũ." });
+    }
+
+    const result = await pool.query(
+      `SELECT id, password_hash FROM users WHERE id = $1 LIMIT 1`,
+      [req.user.id]
+    );
+    const user = result.rows[0];
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản." });
+    }
+
+    // Xác minh mật khẩu cũ — hỗ trợ cả bcrypt lẫn plaintext giống /auth/login.
+    let isValid = false;
+    if (
+      typeof user.password_hash === "string" &&
+      user.password_hash.startsWith("$2")
+    ) {
+      isValid = await bcrypt.compare(oldPassword, user.password_hash);
+    } else {
+      isValid = oldPassword === user.password_hash;
+    }
+    if (!isValid) {
+      return res.status(400).json({ message: "Mật khẩu cũ không đúng." });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [
+      newHash,
+      user.id,
+    ]);
+
+    return res.json({ message: "Đổi mật khẩu thành công." });
+  } catch (err) {
+    console.error("CHANGE PASSWORD ERROR:", err);
+    return res.status(500).json({ message: "Lỗi server" });
+  }
+});
+
+// ==========================================
 // LOGIN WITH A STUDENT DAA SESSION
 // ==========================================
 app.post("/auth/daa-login", async (req, res) => {

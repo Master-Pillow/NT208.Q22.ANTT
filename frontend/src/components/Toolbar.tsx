@@ -14,10 +14,12 @@ import {
   Users,
   AlertCircle,
   MessageSquare,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import apiClient from '../lib/api';
 import { getSocket } from '../lib/socket';
+import { ChangePasswordModal } from './ChangePasswordModal';
 
 interface SearchItem {
   id: number | null;
@@ -79,6 +81,7 @@ export const Toolbar = ({
 }: ToolbarProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -591,7 +594,19 @@ export const Toolbar = ({
                   Xem hồ sơ
                 </button>
 
-                
+                {isAdvisor && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowChangePassword(true);
+                      setShowSettings(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-primary rounded-2xl transition-colors cursor-pointer"
+                  >
+                    <KeyRound className="w-4 h-4 ml-1" />
+                    Đổi mật khẩu
+                  </button>
+                )}
               </div>
 
               <div className="p-2 border-t border-slate-100 bg-slate-50/50">
@@ -607,6 +622,11 @@ export const Toolbar = ({
           )}
         </div>
       </div>
+
+      <ChangePasswordModal
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </header>
   );
 };

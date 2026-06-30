@@ -71,7 +71,7 @@ const PasswordField = ({
           onChange={(e) => onChange(e.target.value)}
           readOnly={locked}
           onFocus={() => manualOnly && setLocked(false)}
-          className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-12 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
+          className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3 pl-12 pr-12 text-slate-900 font-medium focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
           placeholder={placeholder}
           required
           autoComplete={autoComplete}
@@ -225,112 +225,116 @@ export const ChangePasswordModal = ({ open, onClose }: ChangePasswordModalProps)
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} autoComplete="off" className="px-6 py-6 space-y-5 flex-1 min-h-0 overflow-y-auto">
-            {errorMsg && (
-              <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl border border-red-100 flex items-center gap-2 animate-in fade-in zoom-in-95">
-                <ShieldCheck className="w-5 h-5 shrink-0" />
-                {errorMsg}
-              </div>
-            )}
-
-            <PasswordField
-              label="Mật khẩu cũ"
-              value={oldPassword}
-              onChange={setOldPassword}
-              show={showOld}
-              onToggle={() => setShowOld((prev) => !prev)}
-              placeholder="Tự nhập mật khẩu hiện tại"
-              icon={<Lock className="w-5 h-5" />}
-              autoComplete="off"
-              name="current-password-manual"
-              manualOnly
-            />
-
-            <PasswordField
-              label="Mật khẩu mới"
-              value={newPassword}
-              onChange={setNewPassword}
-              show={showNew}
-              onToggle={() => setShowNew((prev) => !prev)}
-              placeholder="Ít nhất 6 ký tự"
-              icon={<KeyRound className="w-5 h-5" />}
-              autoComplete="new-password"
-            />
-
-            <PasswordField
-              label="Nhập lại mật khẩu mới"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              show={showConfirm}
-              onToggle={() => setShowConfirm((prev) => !prev)}
-              placeholder="Nhập lại mật khẩu mới"
-              icon={<KeyRound className="w-5 h-5" />}
-              autoComplete="new-password"
-            />
-
-            {/* Mã xác nhận (captcha) chống bot/đổi mật khẩu tự động */}
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 block">Mã xác nhận</label>
-              <div className="flex items-center gap-3">
-                <div
-                  className="select-none flex-1 h-12 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-100 via-white to-slate-100 flex items-center justify-center gap-1.5 overflow-hidden relative"
-                  aria-label={`Mã captcha: ${captcha.split('').join(' ')}`}
-                >
-                  {captcha.split('').map((ch, i) => (
-                    <span
-                      key={i}
-                      className="text-xl font-black text-slate-700"
-                      style={{
-                        fontFamily: 'monospace',
-                        transform: `rotate(${(i % 2 === 0 ? 1 : -1) * (5 + i * 2)}deg) translateY(${i % 2 === 0 ? -1 : 2}px)`,
-                      }}
-                    >
-                      {ch}
-                    </span>
-                  ))}
-                  <span className="absolute left-3 right-3 top-1/2 h-px bg-slate-400/50 -rotate-2" />
+          <form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col flex-1 min-h-0">
+            {/* Vùng cuộn: chỉ các ô nhập cuộn nếu màn hình thấp; tiêu đề & nút luôn cố định */}
+            <div className="px-6 py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
+              {errorMsg && (
+                <div className="p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl border border-red-100 flex items-center gap-2 animate-in fade-in zoom-in-95">
+                  <ShieldCheck className="w-5 h-5 shrink-0" />
+                  {errorMsg}
                 </div>
-                <button
-                  type="button"
-                  onClick={refreshCaptcha}
-                  aria-label="Tạo mã mới"
-                  title="Tạo mã mới"
-                  className="shrink-0 w-12 h-12 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="relative group">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
-                  <ShieldCheck className="w-5 h-5" />
-                </span>
-                <input
-                  type="text"
-                  value={captchaInput}
-                  onChange={(e) => setCaptchaInput(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3.5 pl-12 pr-4 text-slate-900 font-medium tracking-widest uppercase focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
-                  placeholder="Nhập mã phía trên"
-                  required
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                />
+              )}
+
+              <PasswordField
+                label="Mật khẩu cũ"
+                value={oldPassword}
+                onChange={setOldPassword}
+                show={showOld}
+                onToggle={() => setShowOld((prev) => !prev)}
+                placeholder="Tự nhập mật khẩu hiện tại"
+                icon={<Lock className="w-5 h-5" />}
+                autoComplete="off"
+                name="current-password-manual"
+                manualOnly
+              />
+
+              <PasswordField
+                label="Mật khẩu mới"
+                value={newPassword}
+                onChange={setNewPassword}
+                show={showNew}
+                onToggle={() => setShowNew((prev) => !prev)}
+                placeholder="Ít nhất 6 ký tự"
+                icon={<KeyRound className="w-5 h-5" />}
+                autoComplete="new-password"
+              />
+
+              <PasswordField
+                label="Nhập lại mật khẩu mới"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                show={showConfirm}
+                onToggle={() => setShowConfirm((prev) => !prev)}
+                placeholder="Nhập lại mật khẩu mới"
+                icon={<KeyRound className="w-5 h-5" />}
+                autoComplete="new-password"
+              />
+
+              {/* Mã xác nhận (captcha) chống bot/đổi mật khẩu tự động */}
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700 block">Mã xác nhận</label>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="select-none flex-1 h-11 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-100 via-white to-slate-100 flex items-center justify-center gap-1.5 overflow-hidden relative"
+                    aria-label={`Mã captcha: ${captcha.split('').join(' ')}`}
+                  >
+                    {captcha.split('').map((ch, i) => (
+                      <span
+                        key={i}
+                        className="text-xl font-black text-slate-700"
+                        style={{
+                          fontFamily: 'monospace',
+                          transform: `rotate(${(i % 2 === 0 ? 1 : -1) * (5 + i * 2)}deg) translateY(${i % 2 === 0 ? -1 : 2}px)`,
+                        }}
+                      >
+                        {ch}
+                      </span>
+                    ))}
+                    <span className="absolute left-3 right-3 top-1/2 h-px bg-slate-400/50 -rotate-2" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={refreshCaptcha}
+                    aria-label="Tạo mã mới"
+                    title="Tạo mã mới"
+                    className="shrink-0 w-11 h-11 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 hover:text-primary flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="relative group">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">
+                    <ShieldCheck className="w-5 h-5" />
+                  </span>
+                  <input
+                    type="text"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 outline-none rounded-xl py-3 pl-12 pr-4 text-slate-900 font-medium tracking-widest uppercase focus:bg-white focus:border-primary/30 focus:ring-4 focus:ring-primary/10 transition-all"
+                    placeholder="Nhập mã phía trên"
+                    required
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex gap-3 pt-1">
+            {/* Chân cố định: nút luôn nhìn thấy, không bị tràn ra ngoài màn hình */}
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 shrink-0 bg-white">
               <button
                 type="button"
                 onClick={handleClose}
                 disabled={isLoading}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl py-3.5 font-bold text-base transition-all active:scale-[0.98] cursor-pointer disabled:opacity-60"
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl py-3 font-bold text-base transition-all active:scale-[0.98] cursor-pointer disabled:opacity-60"
               >
                 Hủy
               </button>
               <button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-primary hover:bg-primary/90 text-white rounded-2xl py-3.5 font-bold text-base transition-all active:scale-[0.98] shadow-lg shadow-primary/20 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                className="flex-1 bg-primary hover:bg-primary/90 text-white rounded-2xl py-3 font-bold text-base transition-all active:scale-[0.98] shadow-lg shadow-primary/20 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
               >
                 {isLoading ? (
                   <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

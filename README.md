@@ -43,8 +43,8 @@ AdvisorHub giải quyết vấn đề đó bằng cách đưa tất cả lên m�
 
 Nói ngắn gọn: **AdvisorHub là “trung tâm điều khiển học vụ” cho cả nhà trường, cố vấn và sinh viên.**
 
-Link web đã deploy: https://nt-208-q22-antt-ta9e.vercel.app/
-link video demo: https://drive.google.com/file/d/1SqT_0wJzQ4EfhsfcUyacsKYu1f2lChk_/view?usp=sharing
+- Link web đã deploy: https://nt-208-q22-antt-ta9e.vercel.app/
+- Link video demo: https://drive.google.com/file/d/1SqT_0wJzQ4EfhsfcUyacsKYu1f2lChk_/view?usp=sharing
 ---
 
 ## 2. Web này giúp ích gì cho mọi người?

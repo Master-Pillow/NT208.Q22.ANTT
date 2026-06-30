@@ -462,13 +462,6 @@ export const Login = ({ onLogin }: LoginProps) => {
               </p>
             </div>
           </div>
-
-          <div className="mt-5 text-xs text-slate-400 leading-relaxed">
-            <p className="font-bold text-slate-500 mb-1">Tài khoản test:</p>
-            <p>Advisor: thornea@uit.edu.vn / password123</p>
-            <p>Student: 24521001@gm.uit.edu.vn / password123</p>
-            <p>Admin: admin@uit.edu.vn / password123</p>
-          </div>
         </div>
       </div>
     </div>

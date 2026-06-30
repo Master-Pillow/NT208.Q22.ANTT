@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
-  Search, Send, Paperclip, Check, CheckCheck,
-  MoreVertical, Phone, Video, MessageSquare, Loader2,
+  Search, Send, Check, CheckCheck,
+  MoreVertical, MessageSquare, Loader2,
   Bell, BellOff, ChevronDown,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -26,6 +26,7 @@ interface Chat {
   student_id:  number;
   name:        string;
   idNumber:    string;   // mssv
+  classCode:   string;   // lớp sinh hoạt
   lastMessage: string;
   time:        string;
   unreadCount?: number;
@@ -181,6 +182,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     student_id: Number(conversation.student_id ?? fallback?.student_id),
     name: conversation.name ?? fallback?.name ?? 'Sinh viên',
     idNumber: conversation.idNumber ?? conversation.mssv ?? fallback?.idNumber ?? '',
+    classCode: conversation.classCode ?? conversation.class_code ?? fallback?.classCode ?? '',
     lastMessage: conversation.lastMessage ?? fallback?.lastMessage ?? '',
     time: conversation.time ?? fallback?.time ?? '',
     unreadCount: Number(conversation.unreadCount ?? fallback?.unreadCount ?? 0),
@@ -198,6 +200,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
       student_id: studentId,
       name: student.name,
       idNumber: 'mssv' in student ? student.mssv : student.idNumber,
+      classCode: 'classCode' in student ? student.classCode : '',
       lastMessage: 'Cuộc trò chuyện mới',
     });
 
@@ -245,6 +248,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
             student_id: Number(student.id),
             name: student.full_name || 'Sinh viên',
             idNumber: student.mssv || '',
+            classCode: student.class_code || '',
             lastMessage: 'Chưa có hội thoại',
             time: '',
             unreadCount: 0,
@@ -454,6 +458,28 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
     }
   };
 
+  // Khoá theo ngày (yyyy-mm-dd) để biết khi nào sang ngày mới → chèn mốc ngày.
+  const dayKey = (isoStr: string) => {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    return Number.isNaN(d.getTime()) ? '' : `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+
+  // Nhãn ngày kiểu Messenger: Hôm nay / Hôm qua / "Thứ Bảy, 28/06/2026".
+  const formatDayLabel = (isoStr: string) => {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (Number.isNaN(d.getTime())) return '';
+    const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diffDays = Math.round((startOfDay(new Date()) - startOfDay(d)) / 86400000);
+    if (diffDays === 0) return 'Hôm nay';
+    if (diffDays === 1) return 'Hôm qua';
+    const weekdays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${weekdays[d.getDay()]}, ${dd}/${mm}/${d.getFullYear()}`;
+  };
+
   // ─────────────────────────────────────────────────────────────
   // Render
   // ─────────────────────────────────────────────────────────────
@@ -576,7 +602,7 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
                   <h3 className="font-bold text-slate-900">{activeChat.name}</h3>
                   <p className="text-xs text-slate-500 flex items-center gap-1.5">
                     <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">
-                      {activeChat.idNumber}
+                      {[activeChat.idNumber, activeChat.classCode].filter(Boolean).join(' - ')}
                     </span>
                   </p>
                 </div>
@@ -596,12 +622,6 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
                 >
                   {activeChat.muted ? <BellOff className="w-3.5 h-3.5" /> : <Bell className="w-3.5 h-3.5" />}
                   {activeChat.muted ? 'Đã tắt báo' : 'Đang báo'}
-                </button>
-                <button type="button" className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full transition-colors">
-                  <Phone className="w-5 h-5" />
-                </button>
-                <button className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full transition-colors">
-                  <Video className="w-5 h-5" />
                 </button>
                 <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
                   <MoreVertical className="w-5 h-5" />
@@ -628,16 +648,19 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
                   </div>
                 ) : (
                   <>
-                    <div className="text-center">
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
-                        Hôm nay
-                      </span>
-                    </div>
-
-                    {messages.map(msg => {
+                    {messages.map((msg, idx) => {
                       const isMe = msg.sender_role === 'ADVISOR';
+                      const prev = messages[idx - 1];
+                      const showDayDivider = !prev || dayKey(prev.created_at) !== dayKey(msg.created_at);
                       return (
                         <React.Fragment key={msg.id}>
+                          {showDayDivider && (
+                            <div className="text-center my-3">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
+                                {formatDayLabel(msg.created_at)}
+                              </span>
+                            </div>
+                          )}
                           {String(msg.id) === firstUnreadId && (
                             <div ref={unreadDividerRef} className="flex items-center gap-2 my-3">
                               <div className="flex-1 h-px bg-rose-200" />
@@ -713,9 +736,6 @@ export const Messages: React.FC<MessagesProps> = ({ initialContact }) => {
             {/* Input */}
             <div className="p-4 border-t border-slate-100 bg-white shrink-0">
               <div className="flex items-end gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-2 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/30 transition-all shadow-sm">
-                <button className="p-2 text-slate-400 hover:text-primary transition-colors shrink-0">
-                  <Paperclip className="w-5 h-5" />
-                </button>
                 <textarea
                   placeholder="Nhập tin nhắn... (Enter để gửi)"
                   value={inputValue}
